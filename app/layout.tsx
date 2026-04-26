@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "بطولة كأس مطروح",
-  description: "تطبيق بطولة كرة القدم",
+  title: "بطولة كأس مطروح ٢٠٢٦",
+  description: "نتائج المباريات - جدول الترتيب - الهدافين - الكروت",
+  keywords: ["كأس مطروح", "بطولة مطروح", "نتائج مباريات", "ترتيب", "هدافين"],
   manifest: "/manifest.json",
-  themeColor: "#020617",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "كأس مطروح",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -27,20 +28,17 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
-        {/* PWA */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="theme-color" content="#facc15" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="كأس مطروح" />
+        
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#020617" />
-
-        {/* Icons */}
         <link rel="apple-touch-icon" href="/icon-192.png" />
-
-        {/* Splash Screen */}
-        <link rel="apple-touch-startup-image" href="/splash.png" />
+        <link rel="icon" href="/icon-192.png" />
       </head>
-
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-white`}
-      >
+      <body className="bg-[#0a1428] text-white antialiased">
         {children}
       </body>
     </html>
