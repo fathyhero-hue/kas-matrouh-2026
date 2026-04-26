@@ -1,4 +1,4 @@
-// sw.js
+// public/sw.js
 const CACHE_NAME = 'matrouh-cup-v1';
 
 self.addEventListener('install', (event) => {
@@ -8,7 +8,8 @@ self.addEventListener('install', (event) => {
         '/',
         '/manifest.json',
         '/icon-192.png',
-        '/icon-512.png'
+        '/icon-512.png',
+        '/logo.png'
       ]);
     })
   );
