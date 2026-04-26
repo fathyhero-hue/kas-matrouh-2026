@@ -27,6 +27,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl">
+<link rel="manifest" href="/manifest.json" />
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <meta name="theme-color" content="#facc15" />
