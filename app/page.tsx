@@ -103,7 +103,7 @@ export default function Page() {
         const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
         const supported = await isSupported();
         if (!supported) {
-          alert("متصفحك الحالي لا يدعم الإشعارات.");
+          alert("متصفحك الحالي لا يدعم الإشعارات الذكية.");
           return;
         }
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -113,10 +113,13 @@ export default function Page() {
         if (token) {
           await setDoc(doc(db, "subscribers", token), { token, dateAdded: new Date().toISOString() });
           setIsSubscribed(true);
-          alert("✅ تم تفعيل الإشعارات بنجاح!");
+          alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك أخبار البطولة لحظة بلحظة.");
         }
+      } else {
+        alert("❌ تم رفض صلاحية الإشعارات.");
       }
     } catch (error: any) {
+      console.error("خطأ في تفعيل الإشعارات:", error);
       alert("حدث خطأ: " + (error.message || "تأكد من الاتصال بالإنترنت."));
     }
   };
@@ -137,6 +140,7 @@ export default function Page() {
       const key = `${e.player}__${normalizeTeamName(e.team)}`; 
       if (!map.has(key)) map.set(key, { player: e.player, team: e.team, goals: 0, imageUrl: e.imageUrl || "" }); 
       map.get(key)!.goals += Number(e.goals) || 1; 
+      if (e.imageUrl && !map.get(key)!.imageUrl) map.get(key)!.imageUrl = e.imageUrl;
     });
     return Array.from(map.values()).sort((a, b) => b.goals - a.goals);
   }, [goalEvents]);
@@ -144,30 +148,47 @@ export default function Page() {
   const statsData = useMemo(() => {
     const totalMatches = finishedMatches.length;
     let totalGoals = 0;
-    finishedMatches.forEach(m => totalGoals += (m.homeGoals + m.awayGoals));
+    let draws00 = 0;
+    let drawsPositive = 0;
+
+    finishedMatches.forEach(m => {
+      totalGoals += (m.homeGoals + m.awayGoals);
+      if (m.homeGoals === m.awayGoals) {
+        if (m.homeGoals === 0) draws00++;
+        else drawsPositive++;
+      }
+    });
+
     const totalYellow = cardEvents.reduce((acc, curr) => acc + (Number(curr.yellow) || 0), 0);
     const totalRed = cardEvents.reduce((acc, curr) => acc + (Number(curr.red) || 0), 0);
+
     const sortedByAttack = [...standings].sort((a, b) => b.gf - a.gf);
     const sortedByDef = [...standings].sort((a, b) => a.ga - b.ga);
+
     return {
-      totalMatches, totalGoals, totalYellow, totalRed,
-      bestAttack: sortedByAttack[0], worstAttack: sortedByAttack[sortedByAttack.length - 1],
-      bestDefense: sortedByDef[0], worstDefense: sortedByDef[sortedByDef.length - 1],
-      topScorer: scorers[0], goalsPerMatch: totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0"
+      totalMatches,
+      totalGoals,
+      draws00,
+      drawsPositive,
+      totalYellow,
+      totalRed,
+      bestAttack: sortedByAttack[0],
+      worstAttack: sortedByAttack[sortedByAttack.length - 1],
+      bestDefense: sortedByDef[0],
+      worstDefense: sortedByDef[sortedByDef.length - 1],
+      topScorer: scorers[0],
+      goalsPerMatch: totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0",
+      draws00Percent: totalMatches > 0 ? Math.round((draws00 / totalMatches) * 100) : 0,
+      drawsPosPercent: totalMatches > 0 ? Math.round((drawsPositive / totalMatches) * 100) : 0,
+      yellowPerMatch: totalMatches > 0 ? (totalYellow / totalMatches).toFixed(2) : "0",
+      redPerMatch: totalMatches > 0 ? (totalRed / totalMatches).toFixed(2) : "0"
     };
   }, [finishedMatches, standings, cardEvents, scorers]);
 
   const cardsList = useMemo(() => {
     const map = new Map<string, any>();
-    cardEvents.forEach(e => { 
-        const key = `${e.player}__${normalizeTeamName(e.team)}`; 
-        if (!map.has(key)) map.set(key, { player: e.player, team: e.team, yellow: 0, red: 0 }); 
-        const item = map.get(key)!; item.yellow += Number(e.yellow) || 0; item.red += Number(e.red) || 0; 
-    });
-    return Array.from(map.values()).map(row => ({ 
-        ...row, 
-        status: row.red > 0 ? "طرد" : row.yellow >= 3 ? "إيقاف" : "متاح" 
-    })).sort((a, b) => b.red - a.red || b.yellow - a.yellow);
+    cardEvents.forEach(e => { const key = `${e.player}__${normalizeTeamName(e.team)}`; if (!map.has(key)) map.set(key, { player: e.player, team: e.team, yellow: 0, red: 0 }); const item = map.get(key)!; item.yellow += Number(e.yellow) || 0; item.red += Number(e.red) || 0; });
+    return Array.from(map.values()).map(row => ({ ...row, status: row.red > 0 ? "طرد" : row.yellow >= 3 ? "إيقاف" : "متاح" })).sort((a, b) => b.red - a.red || b.yellow - a.yellow);
   }, [cardEvents]);
 
   if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /></div>;
@@ -176,17 +197,58 @@ export default function Page() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white relative pb-20">
       <div className="mx-auto max-w-7xl p-3 sm:p-4 md:p-6 lg:p-8">
 
-        <div className="mb-6 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
+        {/* 1. شريط الأخبار (آخر تحديث) */}
+        <div className="mb-4 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
           <span className="shrink-0 rounded-2xl bg-yellow-400 px-5 py-2 text-sm font-black text-black">آخر تحديث</span>
           <div className="flex-1 overflow-hidden"><div className="animate-marquee whitespace-nowrap text-lg font-bold text-yellow-300">{tickerText}</div></div>
         </div>
 
+        {/* 2. شريط الرعاة (تم تصغيره ونقله هنا وبألوان طبيعية) */}
+        <div className="mb-6 bg-[#13213a] py-3 rounded-2xl border border-yellow-400/20 overflow-hidden relative shadow-sm">
+          <div className="flex animate-marquee whitespace-nowrap items-center gap-10">
+            {[1, 2, 3, 4].map((i) => (
+              <React.Fragment key={i}>
+                <span className="text-yellow-400/60 font-bold tracking-widest text-[10px] px-2 border-l border-white/10 uppercase">شركاء النجاح</span>
+                {[
+                  { name: "الفهد للديكور", src: "/alfahd.png" },
+                  { name: "مكتب احمد عبدالعاطي المحامي", src: "/abdelaty.png" },
+                  { name: "دثار للزي العربي", src: "/dithar.png" },
+                  { name: "معصرة الزيتون فرجينيا", src: "/virginia.png" },
+                  { name: "دبي للزي العربي", src: "/dubai.png" },
+                  { name: "معرض الأمانة للديكور", src: "/alamana.png" },
+                  { name: "تراث البادية للزي العربي", src: "/torath.png" },
+                  { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" },
+                  { name: "مياة حياة", src: "/hayah.png" },
+                  { name: "القدس للأثاث الراقي", src: "/alquds.png" },
+                  { name: "أيس كريم الملكة", src: "/almaleka.png" },
+                  { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
+                  { name: "M MART", src: "/mmart.png" },
+                  { name: "هيرو سبورت للملابس الرياضية", src: "/hero-sport.png" },
+                  { name: "الفتح للفراشة الحديثة", src: "/alfath.png" },
+{ name: "عادل العميري للديكور", src: "/alomairy.png" }
+                ].map((sponsor, idx) => (
+                  <img 
+                    key={idx}
+                    src={sponsor.src} 
+                    alt={sponsor.name} 
+                    title={sponsor.name}
+                    className="h-10 w-24 object-contain drop-shadow-sm" 
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                ))}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* 3. هيدر البطولة */}
         <div className="mb-8 sm:mb-10 rounded-3xl border border-yellow-400/40 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-6 sm:p-8 shadow-2xl text-center">
           <div className="flex justify-center mb-6"><img src="/logo.png" alt="شعار البطولة" className="h-28 sm:h-36 w-auto drop-shadow-2xl" /></div>
           <h1 className="text-4xl sm:text-6xl font-black text-yellow-300 tracking-tight">بطولة كأس مطروح</h1>
           <p className="mt-3 text-2xl sm:text-3xl text-cyan-300">النسخة الثالثة ٢٠٢٦</p>
         </div>
 
+        {/* التبويبات */}
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8">
           {[
             { key: "live", label: "مباشر", icon: "🔴" }, 
@@ -199,74 +261,230 @@ export default function Page() {
             { key: "cards", label: "الكروت", icon: "🟨" },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex-1 sm:flex-none px-5 py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all border border-yellow-400/30 ${activeTab === tab.key ? "bg-yellow-400 text-black shadow-lg scale-105" : "bg-[#1e2a4a] text-white hover:bg-[#25345a] hover:text-yellow-300"}`}>
-              <span className={`text-lg`}>{tab.icon}</span> <span>{tab.label}</span>
+              <span className={`text-lg ${tab.key === "live" && activeTab === "live" ? "animate-pulse" : ""}`}>{tab.icon}</span> <span>{tab.label}</span>
             </button>
           ))}
         </div>
 
+        {/* محتوى الإحصائيات بالكامل */}
         {activeTab === "stats" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
-                { label: "الأهداف", val: statsData.totalGoals, icon: "⚽", color: "text-yellow-400", sub: `${statsData.goalsPerMatch} / مباراة` },
-                { label: "المباريات", val: statsData.totalMatches, icon: "🏟️", color: "text-cyan-400", sub: "إجمالي اللعب" },
-                { label: "إنذار أصفر", val: statsData.totalYellow, icon: "🟨", color: "text-yellow-500", sub: "إجمالي الكروت" },
-                { label: "حالة طرد", val: statsData.totalRed, icon: "🟥", color: "text-red-500", sub: "إجمالي الطرد" },
+                { label: "الأهداف المسجلة", val: statsData.totalGoals, icon: "⚽", color: "text-yellow-400", sub: `${statsData.goalsPerMatch} هدف / مباراة` },
+                { label: "مباريات ملعوبة", val: statsData.totalMatches, icon: "🏟️", color: "text-cyan-400", sub: "إجمالي المباريات" },
+                { label: "تعادل سلبي", val: statsData.draws00, icon: "🤝", color: "text-gray-400", sub: `بنسبة ${statsData.draws00Percent}%` },
+                { label: "تعادل إيجابي", val: statsData.drawsPositive, icon: "🔥", color: "text-emerald-400", sub: `بنسبة ${statsData.drawsPosPercent}%` },
+                { label: "إنذار أصفر", val: statsData.totalYellow, icon: "🟨", color: "text-yellow-500", sub: `${statsData.yellowPerMatch} إنذار / مباراة` },
+                { label: "حالة طرد", val: statsData.totalRed, icon: "🟥", color: "text-red-500", sub: `${statsData.redPerMatch} طرد / مباراة` },
               ].map((s, i) => (
-                <Card key={i} className="bg-[#13213a] border-white/5 text-center p-4">
-                  <div className={`text-4xl font-black ${s.color}`}>{s.val}</div>
-                  <div className="text-xs text-gray-400 font-bold mt-2">{s.label}</div>
-                  <Badge className="mt-2 bg-black/40 text-gray-300">{s.sub}</Badge>
+                <Card key={i} className="bg-[#13213a] border-white/5 text-center p-4 relative overflow-hidden group">
+                  <div className="absolute inset-x-0 bottom-0 h-1 bg-white/5 group-hover:bg-yellow-400/50 transition-all"></div>
+                  <div className="text-2xl mb-2 opacity-80">{s.icon}</div>
+                  <div className={`text-4xl font-black ${s.color} drop-shadow-md`}>{s.val}</div>
+                  <div className="text-xs text-gray-400 font-bold mt-2 uppercase">{s.label}</div>
+                  <Badge className="mt-2 bg-black/40 text-gray-300 border-none font-bold text-[10px]">{s.sub}</Badge>
                 </Card>
               ))}
             </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
+                  <Target className="mx-auto mb-4 text-emerald-400 h-10 w-10" />
+                  <h4 className="text-gray-400 text-sm font-bold mb-2">أقوى هجوم</h4>
+                  <div className="text-xl font-black text-white">{statsData.bestAttack?.team || "—"}</div>
+                  <Badge className="mt-2 bg-emerald-500/10 text-emerald-400 border-none">{statsData.bestAttack?.gf || 0} هدف</Badge>
+               </Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
+                  <Zap className="mx-auto mb-4 text-rose-400 h-10 w-10" />
+                  <h4 className="text-gray-400 text-sm font-bold mb-2">أضعف هجوم</h4>
+                  <div className="text-xl font-black text-white">{statsData.worstAttack?.team || "—"}</div>
+                  <Badge className="mt-2 bg-rose-500/10 text-rose-400 border-none">{statsData.worstAttack?.gf || 0} هدف</Badge>
+               </Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
+                  <Shield className="mx-auto mb-4 text-cyan-400 h-10 w-10" />
+                  <h4 className="text-gray-400 text-sm font-bold mb-2">أقوى دفاع</h4>
+                  <div className="text-xl font-black text-white">{statsData.bestDefense?.team || "—"}</div>
+                  <Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">استقبل {statsData.bestDefense?.ga || 0}</Badge>
+               </Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
+                  <ShieldAlert className="mx-auto mb-4 text-amber-500 h-10 w-10" />
+                  <h4 className="text-gray-400 text-sm font-bold mb-2">أضعف دفاع</h4>
+                  <div className="text-xl font-black text-white">{statsData.worstDefense?.team || "—"}</div>
+                  <Badge className="mt-2 bg-amber-500/10 text-amber-500 border-none">استقبل {statsData.worstDefense?.ga || 0}</Badge>
+               </Card>
+            </div>
+
+            <Card className="bg-gradient-to-r from-[#1e2a4a] to-[#13213a] border-2 border-yellow-400/50 p-6 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(250,204,21,0.15)] relative overflow-hidden">
+               <div className="absolute left-0 top-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-3xl"></div>
+               <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                  <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-right">
+                    <div className="relative">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-2xl blur opacity-60 animate-pulse"></div>
+                      <div className="relative h-28 w-28 md:h-36 md:w-36 bg-[#0a1428] rounded-2xl flex items-center justify-center text-6xl shadow-2xl overflow-hidden border-2 border-yellow-400 shrink-0">
+                        {statsData.topScorer?.imageUrl ? (
+                          <img src={statsData.topScorer.imageUrl} alt={statsData.topScorer.player} className="h-full w-full object-cover" />
+                        ) : (
+                          <span>👑</span>
+                        )}
+                      </div>
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-4 py-1 rounded-full shadow-lg border-2 border-[#1e2a4a]">الـهـداف</div>
+                    </div>
+                    <div className="flex flex-col justify-center mt-4 md:mt-0">
+                      <h3 className="text-yellow-400 font-black text-sm uppercase tracking-widest mb-2 flex items-center justify-center md:justify-start gap-2"><Trophy className="h-5 w-5" /> هداف البطولة</h3>
+                      <div className="text-4xl md:text-6xl font-black bg-gradient-to-r from-white via-yellow-100 to-yellow-500 bg-clip-text text-transparent drop-shadow-sm pb-1">{statsData.topScorer?.player || "في الانتظار..."}</div>
+                      <div className="text-cyan-300 font-bold mt-2 text-xl bg-[#0a1428]/50 inline-block px-4 py-1 rounded-lg border border-cyan-500/20">{statsData.topScorer?.team || "—"}</div>
+                    </div>
+                  </div>
+                  <div className="text-center md:text-right bg-[#0a1428] px-10 py-6 rounded-3xl border border-yellow-400/20 shadow-inner">
+                    <div className="text-6xl md:text-7xl font-black text-yellow-400 drop-shadow-lg">{statsData.topScorer?.goals || 0}</div>
+                    <div className="text-sm text-gray-400 font-bold uppercase mt-2 tracking-widest">أهداف مسجلة</div>
+                  </div>
+               </div>
+            </Card>
           </div>
         )}
 
+        {/* محتوى مباشر بالكامل */}
         {activeTab === "live" && (
-          <Card className="rounded-3xl border-2 border-red-500 bg-[#13213a] p-6">
-            <h2 className="text-center text-red-500 font-black text-2xl mb-6">🔴 المباريات الجارية الآن</h2>
-            {liveMatches.length > 0 ? liveMatches.map(m => (
-              <div key={m.id} className="bg-[#1e2a4a] p-8 rounded-3xl mb-4 border border-white/10 text-center">
-                <div className="text-sm bg-red-600 px-4 py-1 inline-block rounded-full mb-4 animate-pulse">الدقيقة {m.liveMinute}' - {m.status}</div>
-                <div className="flex justify-between items-center gap-4">
-                  <div className="text-2xl font-bold flex-1">{m.home}</div>
-                  <div className="text-6xl font-black text-yellow-400">{m.homeGoals} : {m.awayGoals}</div>
-                  <div className="text-2xl font-bold flex-1">{m.away}</div>
-                </div>
+          <Card className="rounded-3xl border-2 border-red-500/50 bg-[#13213a] shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+            <CardHeader className="text-center border-b border-white/5">
+              <div className="flex justify-center items-center gap-2 mb-2">
+                <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>
+                <span className="text-red-500 font-black tracking-widest uppercase">Live Now</span>
               </div>
-            )) : <p className="text-center text-gray-500 py-10 text-xl font-bold">لا توجد مباريات جارية حالياً</p>}
+              <CardTitle className="text-3xl font-black text-white">المباريات الجارية</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 grid gap-6">
+              {liveMatches.length > 0 ? liveMatches.map(match => (
+                <div key={match.id} className="relative rounded-3xl bg-gradient-to-r from-[#1e2a4a] to-[#25345a] border border-white/10 p-8 overflow-hidden">
+                  <div className="absolute top-0 inset-x-0 bg-red-600 text-white text-center py-1 text-sm font-bold shadow-md flex justify-center items-center gap-2">
+                     <span className={match.status !== "انتهت" && match.status !== "استراحة" ? "animate-pulse" : ""}>
+                        {match.status || "جارية الآن"} 
+                        {match.status !== "استراحة" && match.status !== "انتهت" && match.status !== "ضربات جزاء" && ` - الدقيقة ${match.liveMinute || 0}'`}
+                     </span>
+                  </div>
+                  <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex-1 text-center md:text-right">
+                      <div className="flex items-center justify-center md:justify-end gap-2 mb-2">
+                         <div className="text-2xl font-bold text-white">{match.home}</div>
+                         {match.redCardsHome > 0 && Array.from({length: match.redCardsHome}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6 bg-[#0a1428]/50 px-8 py-4 rounded-3xl border border-white/5 shadow-inner">
+                      <span className="text-6xl font-black text-white drop-shadow-lg">{match.homeGoals}</span>
+                      <span className="text-3xl text-yellow-400 font-black">:</span>
+                      <span className="text-6xl font-black text-white drop-shadow-lg">{match.awayGoals}</span>
+                    </div>
+                    <div className="flex-1 text-center md:text-left">
+                      <div className="flex items-center justify-center md:justify-start gap-2 mb-2 flex-row-reverse md:flex-row">
+                         {match.redCardsAway > 0 && Array.from({length: match.redCardsAway}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}
+                         <div className="text-2xl font-bold text-white">{match.away}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {(match.status === "ضربات جزاء" || (match.penaltiesHome && match.penaltiesHome.length > 0)) && (
+                     <div className="mt-8 border-t border-white/10 pt-6">
+                        <div className="text-center text-sm text-yellow-400 font-bold mb-3 uppercase tracking-widest">نتيجة ركلات الترجيح</div>
+                        <div className="flex justify-center items-center gap-6">
+                           <div className="flex gap-1.5 flex-row-reverse">
+                             {(match.penaltiesHome || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : p === 'missed' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-gray-600'}`}></div>)}
+                           </div>
+                           <div className="text-2xl font-black text-white bg-black/40 px-4 py-1 rounded-xl">
+                              ({(match.penaltiesHome || []).filter((p:string) => p === 'scored').length}) <span className="text-gray-500 mx-2">-</span> ({(match.penaltiesAway || []).filter((p:string) => p === 'scored').length})
+                           </div>
+                           <div className="flex gap-1.5">
+                             {(match.penaltiesAway || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : p === 'missed' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-gray-600'}`}></div>)}
+                           </div>
+                        </div>
+                     </div>
+                  )}
+                </div>
+              )) : (
+                <div className="py-20 text-center">
+                  <Calendar className="h-16 w-16 text-gray-600 mx-auto mb-4 opacity-20" />
+                  <p className="text-xl text-gray-500">لا توجد مباريات جارية في الوقت الحالي</p>
+                </div>
+              )}
+            </CardContent>
           </Card>
         )}
 
+        {/* محتوى الترتيب بالكامل */}
         {activeTab === "standings" && (
-          <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] overflow-hidden">
-            <ScrollArea className="h-[600px]">
-              <table className="w-full text-right">
-                <thead className="bg-[#13213a] sticky top-0 border-b border-yellow-400/30">
-                  <tr>{STANDINGS_HEADERS.map(h => <th key={h} className="p-4 text-cyan-300 text-sm">{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {standings.map(row => (
-                    <tr key={row.team} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="p-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td>
-                      <td className="p-4 font-bold">{row.team}</td>
-                      <td className="p-4">{row.played}</td>
-                      <td className="p-4 text-yellow-400 font-bold">{row.wins}</td>
-                      <td className="p-4">{row.draws}</td>
-                      <td className="p-4">{row.losses}</td>
-                      <td className="p-4 text-emerald-400">{row.gf}</td>
-                      <td className="p-4 text-rose-400">{row.ga}</td>
-                      <td className="p-4 text-cyan-400">{row.gd}</td>
-                      <td className="p-4 font-black text-xl text-yellow-300">{row.points}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollArea>
+          <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
+            <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[calc(100vh-320px)]">
+                <table className="w-full text-white text-right">
+                  <thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30">
+                    <tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm">{h}</th>))}</tr>
+                  </thead>
+                  <tbody>
+                    {standings.map(row => (
+                      <tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td>
+                        <td className="px-4 py-4 font-bold text-white">{row.team}</td>
+                        <td className="px-4 py-4 text-center">{row.played}</td>
+                        <td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td>
+                        <td className="px-4 py-4 text-center">{row.draws}</td>
+                        <td className="px-4 py-4 text-center">{row.losses}</td>
+                        <td className="px-4 py-4 text-center text-emerald-400">{row.gf}</td>
+                        <td className="px-4 py-4 text-center text-rose-400">{row.ga}</td>
+                        <td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td>
+                        <td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollArea>
+            </CardContent>
           </Card>
         )}
 
+        {/* محتوى النتائج بالكامل */}
+        {activeTab === "all" && (
+           <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader className="flex flex-col sm:flex-row justify-between gap-4"><CardTitle className="text-yellow-300">النتائج السابقة</CardTitle><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث عن فريق..." className="max-w-sm bg-[#1e2a4a] border-yellow-400 text-white" /></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2">{finishedMatches.filter(m => !search || m.home.includes(search) || m.away.includes(search)).map(match => (<Card key={match.id} className="bg-[#1e2a4a] border-yellow-400/30"><CardContent className="p-6"><div className="flex justify-between text-cyan-300 mb-4 text-sm"><span>الجولة {match.round}</span><span>{match.date}</span></div><div className="grid grid-cols-3 items-center text-center"><div className="font-bold text-white text-lg">{match.home}</div><div className="text-3xl font-black text-yellow-400">{match.homeGoals} - {match.awayGoals}</div><div className="font-bold text-white text-lg">{match.away}</div></div></CardContent></Card>))}</CardContent></Card>
+        )}
+
+        {/* محتوى اليوم بالكامل */}
+        {activeTab === "today" && (
+           <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader className="text-center border-b border-yellow-400/30"><Badge className="bg-yellow-400 text-black text-lg px-6 py-2.5">اليوم • {todayStr}</Badge><CardTitle className="text-3xl sm:text-4xl font-black text-yellow-300 mt-4">مباريات اليوم القادمة</CardTitle></CardHeader><CardContent className="p-6 grid gap-6">{todayMatches.length > 0 ? todayMatches.map(match => (<div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-6 hover:border-yellow-400 transition-all"><div className="text-center mb-6"><div className="text-cyan-300">{match.dayName} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-5 w-5" /><span className="text-2xl font-bold">{formatTime12(match.time)}</span></div></div><div className="flex items-center justify-center gap-6 text-2xl font-bold"><div className="flex-1">{match.home}</div><div className="text-yellow-400 font-black">VS</div><div className="flex-1">{match.away}</div></div></div>)) : <p className="text-center py-10 text-cyan-300 font-bold">لا توجد مباريات قادمة اليوم</p>}</CardContent></Card>
+        )}
+
+        {/* محتوى غداً بالكامل */}
+        {activeTab === "tomorrow" && (
+           <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Calendar className="h-8 w-8" /> مباريات غداً • {tomorrowStr}</CardTitle></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{tomorrowMatches.map(match => (<div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-6 text-center hover:border-yellow-400 transition-all"><div className="text-cyan-300 mb-4">{formatTime12(match.time)}</div><div className="font-bold text-2xl text-white mb-4">{match.home}</div><div className="text-5xl font-black text-yellow-400 mb-4">VS</div><div className="font-bold text-2xl text-white">{match.away}</div></div>))}</CardContent></Card>
+        )}
+
+        {/* محتوى الهدافين بالكامل */}
+        {activeTab === "scorers" && (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {scorers.map((player, i) => (
+              <Card key={i} className={`bg-[#1e2a4a] border-yellow-400/30 rounded-3xl relative overflow-hidden ${i === 0 ? "border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.2)] scale-[1.02] transform transition-transform" : ""}`}>
+                {i === 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-black text-[10px] font-black px-3 py-1 rounded-bl-lg z-10">المركز الأول 👑</div>}
+                <CardContent className="p-6 flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    {player.imageUrl ? (
+                      <div className="relative">
+                         <img src={player.imageUrl} className={`rounded-full object-cover border-2 shadow-md ${i === 0 ? 'border-yellow-400 h-16 w-16' : 'border-white/20 h-12 w-12'}`} />
+                      </div>
+                    ) : (
+                      <div className={`rounded-full bg-[#0a1428] flex items-center justify-center text-2xl ${i === 0 ? 'h-16 w-16 border-2 border-yellow-400' : 'h-12 w-12'}`}>👤</div>
+                    )}
+                    <div>
+                      <h3 className={`font-bold text-white ${i === 0 ? 'text-2xl text-yellow-300' : 'text-xl'}`}>{player.player}</h3>
+                      <p className="text-cyan-300">{player.team}</p>
+                    </div>
+                  </div>
+                  <Badge className={`text-black text-3xl px-6 py-3 font-black ${i === 0 ? 'bg-gradient-to-r from-yellow-300 to-yellow-500 scale-110' : 'bg-yellow-400'}`}>{player.goals}</Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* محتوى الكروت بالكامل */}
         {activeTab === "cards" && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {cardsList.filter(c => c.yellow > 0 || c.red > 0).map((item, i) => (
@@ -291,50 +509,15 @@ export default function Page() {
           </div>
         )}
 
-        {/* أضف باقي التبويبات هنا بنفس النمط (today, tomorrow, all, scorers) */}
-        
-      </div>
-
-      {/* شريط الرعاة والشركاء المعتمدين الـ 15 */}
-      <div className="bg-[#0a1428] py-8 mt-12 border-y border-yellow-400/20 overflow-hidden relative shadow-[0_0_30px_rgba(250,204,21,0.05)]">
-        <div className="flex animate-marquee whitespace-nowrap items-center gap-12">
-          {[1, 2, 3].map((i) => (
-            <React.Fragment key={i}>
-              <span className="text-yellow-400/50 font-bold tracking-widest text-[12px] px-4 border-l border-white/10 uppercase">شركاء النجاح</span>
-              {[
-                { name: "الفهد للديكور", src: "/alfahd.png" },
-                { name: "مكتب احمد عبدالعاطي المحامي", src: "/abdelaty.png" },
-                { name: "دثار للزي العربي", src: "/dithar.png" },
-                { name: "معصرة الزيتون فرجينيا", src: "/virginia.png" },
-                { name: "دبي للزي العربي", src: "/dubai.png" },
-                { name: "معرض الأمانة للديكور", src: "/alamana.png" },
-                { name: "تراث البادية للزي العربي", src: "/torath.png" },
-                { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" },
-                { name: "مياة حياة", src: "/hayah.png" },
-                { name: "القدس للأثاث الراقي", src: "/alquds.png" },
-                { name: "أيس كريم الملكة", src: "/almaleka.png" },
-                { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
-                { name: "M MART", src: "/mmart.png" },
-                { name: "هيرو سبورت للملابس الرياضية", src: "/hero-sport.png" },
-                { name: "الفتح للفراشة الحديثة", src: "/alfath.png" }
-              ].map((sponsor, idx) => (
-                <img 
-                  key={idx}
-                  src={sponsor.src} 
-                  alt={sponsor.name} 
-                  title={sponsor.name}
-                  className="h-16 w-32 object-contain filter grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer" 
-                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                />
-              ))}
-            </React.Fragment>
-          ))}
-        </div>
       </div>
 
       {!isSubscribed && (
-        <button onClick={handleSubscribe} className="fixed bottom-6 right-6 z-50 bg-yellow-400 text-black px-5 py-3 rounded-full font-black shadow-lg hover:scale-105 transition-transform flex items-center gap-2 border-2 border-black animate-bounce">
-          <BellRing className="h-6 w-6" /> <span className="hidden sm:inline">تفعيل الإشعارات</span>
+        <button 
+          onClick={handleSubscribe} 
+          className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 bg-yellow-400 text-black px-5 py-3 rounded-full font-black shadow-[0_0_20px_rgba(250,204,21,0.4)] flex items-center gap-3 hover:scale-105 transition-transform animate-bounce border-2 border-black"
+        >
+          <BellRing className="h-6 w-6" />
+          <span className="hidden sm:inline text-sm">تفعيل الإشعارات</span>
         </button>
       )}
     </div>
