@@ -12,6 +12,10 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
+// 🎯 فلتر ذكي لتنظيف أسماء الفرق من الشدة والأخطاء الإملائية
+const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
+const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
+
 type AdminMatch = {
   id: string;
   teamA: string;
@@ -49,17 +53,17 @@ export default function AdminPage() {
   const [goalSearchTerm, setGoalSearchTerm] = useState("");
   const [cardSearchTerm, setCardSearchTerm] = useState("");
 
-  const sortedTeams = useMemo(() => [...TEAM_NAMES].sort((a, b) => a.localeCompare(b, "ar")), []);
+  const sortedTeams = useMemo(() => [...CLEANED_TEAM_NAMES].sort((a, b) => a.localeCompare(b, "ar")), []);
 
   const [matchForm, setMatchForm] = useState({
-    teamA: TEAM_NAMES[0], teamB: TEAM_NAMES[1], homeGoals: 0, awayGoals: 0,
+    teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0,
     round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30",
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  const [goalForm, setGoalForm] = useState({ player: "", team: TEAM_NAMES[0], goalsCount: 1, imageUrl: "" });
+  const [goalForm, setGoalForm] = useState({ player: "", team: CLEANED_TEAM_NAMES[0], goalsCount: 1, imageUrl: "" });
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
-  const [cardForm, setCardForm] = useState({ player: "", team: TEAM_NAMES[0], type: "yellow" as "yellow" | "red" });
+  const [cardForm, setCardForm] = useState({ player: "", team: CLEANED_TEAM_NAMES[0], type: "yellow" as "yellow" | "red" });
 
   const now = new Date();
   const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
@@ -69,9 +73,33 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAuth) return;
-    const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminMatch))));
-    const unsubGoals = onSnapshot(collection(db, "goals"), (snap) => setGoals(snap.docs.map(d => ({ id: d.id, ...d.data() } as GoalEvent))));
-    const unsubCards = onSnapshot(collection(db, "cards"), (snap) => setCardEvents(snap.docs.map(d => ({ id: d.id, ...d.data() } as CardEvent))));
+    
+    const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => {
+      setMatches(snap.docs.map(d => {
+        const data = d.data();
+        return { 
+          id: d.id, 
+          ...data, 
+          teamA: cleanTeamString(data.teamA), 
+          teamB: cleanTeamString(data.teamB) 
+        } as AdminMatch;
+      }));
+    });
+    
+    const unsubGoals = onSnapshot(collection(db, "goals"), (snap) => {
+      setGoals(snap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, ...data, team: cleanTeamString(data.team) } as GoalEvent;
+      }));
+    });
+    
+    const unsubCards = onSnapshot(collection(db, "cards"), (snap) => {
+      setCardEvents(snap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, ...data, team: cleanTeamString(data.team) } as CardEvent;
+      }));
+    });
+    
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
 
     const timerInterval = setInterval(() => {
@@ -93,7 +121,7 @@ export default function AdminPage() {
     const data = { ...matchForm, dayName, isLive: false };
     if (editingId) { await updateDoc(doc(db, "matches", editingId), data); setEditingId(null); alert("✅ تم تعديل المباراة بنجاح");} 
     else { await addDoc(collection(db, "matches"), data); alert("✅ تم إضافة المباراة بنجاح");}
-    setMatchForm({ teamA: TEAM_NAMES[0], teamB: TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30" });
+    setMatchForm({ teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30" });
   };
 
   const startEdit = (match: AdminMatch) => {
@@ -123,7 +151,6 @@ export default function AdminPage() {
     });
   };
 
-  // 🎯 إدارة الأهداف الذكية (نظام تراكمي)
   const addOrUpdateGoal = async () => {
     if (!goalForm.player.trim()) return alert("اكتب اسم اللاعب");
     
@@ -133,39 +160,31 @@ export default function AdminPage() {
     const imageToAdd = goalForm.imageUrl.trim();
 
     if (editingGoalId) { 
-      // حالة تعديل سجل موجود بالفعل
       const data = { player: playerNameTrimmed, team: teamSelected, goals: goalsToAdd, imageUrl: imageToAdd };
       await updateDoc(doc(db, "goals", editingGoalId), data); 
       setEditingGoalId(null); 
       alert("✅ تم تعديل الهدف بنجاح");
     } 
     else { 
-      // البحث عن اللاعب في نفس الفريق
       const existingPlayer = goals.find(g => 
         g.player.trim().toLowerCase() === playerNameTrimmed.toLowerCase() && 
         g.team === teamSelected
       );
 
       if (existingPlayer) {
-        // اللاعب موجود: إضافة الأهداف الجديدة للرصيد القديم
         const newTotalGoals = (Number(existingPlayer.goals) || 0) + goalsToAdd;
         const updateData: any = { goals: newTotalGoals };
-        
-        // تحديث الصورة إذا تم إدخال رابط جديد
         if (imageToAdd) updateData.imageUrl = imageToAdd;
 
         await updateDoc(doc(db, "goals", existingPlayer.id), updateData);
         alert(`✅ تم التحديث تراكمياً.. رصيد اللاعب أصبح (${newTotalGoals}) أهداف`);
       } else {
-        // اللاعب غير موجود: تسجيل كلاعب جديد
         const data = { player: playerNameTrimmed, team: teamSelected, goals: goalsToAdd, imageUrl: imageToAdd };
         await addDoc(collection(db, "goals"), data); 
         alert("✅ تم إضافة اللاعب والهدف بنجاح");
       }
     }
-    
-    // تفريغ الحقول بعد الإضافة
-    setGoalForm({ player: "", team: TEAM_NAMES[0], goalsCount: 1, imageUrl: "" });
+    setGoalForm({ player: "", team: CLEANED_TEAM_NAMES[0], goalsCount: 1, imageUrl: "" });
   };
   
   const startEditGoal = (goal: GoalEvent) => { 
@@ -175,7 +194,6 @@ export default function AdminPage() {
   
   const deleteGoal = async (id: string) => confirm("حذف هذا الهدف؟") && await deleteDoc(doc(db, "goals", id));
 
-  // إدارة الكروت
   const addCard = async () => {
     if (!cardForm.player.trim()) return alert("اكتب اسم اللاعب");
     await addDoc(collection(db, "cards"), { player: cardForm.player.trim(), team: cardForm.team, yellow: cardForm.type === "yellow" ? 1 : 0, red: cardForm.type === "red" ? 1 : 0 });
@@ -295,7 +313,6 @@ export default function AdminPage() {
           <TabsContent value="today"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300">مباريات اليوم (بدون نتيجة)</CardTitle></CardHeader><CardContent className="space-y-3">{matches.filter(m => m.date === todayStr && !m.isLive && m.homeGoals === 0 && m.awayGoals === 0).map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center border-l-4 border-yellow-400 gap-4"><div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div><div className="flex gap-2"><Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, status: "الشوط الأول", liveMinute: 1 }); setActiveTab("live"); }} className="bg-red-600 text-white hover:bg-red-700"><Play className="ml-1 h-4 w-4" /> ابدأ البث</Button><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive">حذف</Button></div></div>))}</CardContent></Card></TabsContent>
           <TabsContent value="tomorrow"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300">مباريات غداً</CardTitle></CardHeader><CardContent className="space-y-3">{matches.filter(m => m.date === tomorrowStr && !m.isLive).map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 border-l-4 border-sky-400"><div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive">حذف</Button></div></div>))}</CardContent></Card></TabsContent>
 
-          {/* تبويب الأهداف مع حقل الصورة الجديد */}
           <TabsContent value="goals">
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader><CardTitle className="text-yellow-300">إدارة الأهداف</CardTitle><Input placeholder="ابحث عن لاعب أو فريق..." value={goalSearchTerm} onChange={(e) => setGoalSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader>

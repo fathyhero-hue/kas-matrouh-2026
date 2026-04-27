@@ -19,10 +19,14 @@ function formatTime12(time24: string): string {
 
 const STANDINGS_HEADERS = ["#", "الفريق", "لعب", "ف", "ت", "خ", "له", "عليه", "فارق", "نقاط"];
 
+// 🎯 الفلتر الذكي للرئيسية أيضاً
+const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
+const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
+
 type StandingRow = { team: string; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; points: number; rank: number; };
 
 function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
-function getOriginalTeamName(norm: string): string { return TEAM_NAMES.find(t => normalizeTeamName(t) === norm) || norm; }
+function getOriginalTeamName(norm: string): string { return CLEANED_TEAM_NAMES.find(t => normalizeTeamName(t) === norm) || norm; }
 
 function buildStandings(matchRows: any[], allTeams: string[]) {
   const table = new Map<string, StandingRow>();
@@ -42,7 +46,13 @@ function zoneColor(rank: number) { return rank <= 8 ? "bg-emerald-500 text-white
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 
 export default function Page() {
-  const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES);
+  const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map(m => ({
+    ...m,
+    home: cleanTeamString(m.home || m.teamA),
+    away: cleanTeamString(m.away || m.teamB),
+    teamA: cleanTeamString(m.teamA || m.home),
+    teamB: cleanTeamString(m.teamB || m.away)
+  })));
   const [goalEvents, setGoalEvents] = useState<any[]>([]);
   const [cardEvents, setCardEvents] = useState<any[]>([]);
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
@@ -52,19 +62,26 @@ export default function Page() {
 
   useEffect(() => {
     const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => {
-      setMatches(snap.docs.map((doc) => ({
-        id: doc.id, home: doc.data().teamA || doc.data().home || "", away: doc.data().teamB || doc.data().away || "",
-        homeGoals: Number(doc.data().homeGoals) || 0, awayGoals: Number(doc.data().awayGoals) || 0,
-        round: doc.data().round || 1, date: doc.data().date || "", time: doc.data().time || "15:30", dayName: doc.data().dayName || "",
-        status: doc.data().status || "", liveMinute: doc.data().liveMinute || 0, isLive: doc.data().isLive || false,
-        redCardsHome: doc.data().redCardsHome || 0, redCardsAway: doc.data().redCardsAway || 0,
-        penaltiesHome: doc.data().penaltiesHome || [], penaltiesAway: doc.data().penaltiesAway || []
-      })));
+      setMatches(snap.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          id: doc.id, 
+          home: cleanTeamString(d.teamA || d.home), 
+          away: cleanTeamString(d.teamB || d.away),
+          teamA: cleanTeamString(d.teamA || d.home), 
+          teamB: cleanTeamString(d.teamB || d.away),
+          homeGoals: Number(d.homeGoals) || 0, awayGoals: Number(d.awayGoals) || 0,
+          round: d.round || 1, date: d.date || "", time: d.time || "15:30", dayName: d.dayName || "",
+          status: d.status || "", liveMinute: d.liveMinute || 0, isLive: d.isLive || false,
+          redCardsHome: d.redCardsHome || 0, redCardsAway: d.redCardsAway || 0,
+          penaltiesHome: d.penaltiesHome || [], penaltiesAway: d.penaltiesAway || []
+        };
+      }));
       setLoading(false);
     }, () => setLoading(false));
 
-    const unsubGoals = onSnapshot(collection(db, "goals"), (snap) => setGoalEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubCards = onSnapshot(collection(db, "cards"), (snap) => setCardEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubGoals = onSnapshot(collection(db, "goals"), (snap) => setGoalEvents(snap.docs.map(d => ({ id: d.id, ...d.data(), team: cleanTeamString(d.data().team) }))));
+    const unsubCards = onSnapshot(collection(db, "cards"), (snap) => setCardEvents(snap.docs.map(d => ({ id: d.id, ...d.data(), team: cleanTeamString(d.data().team) }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text?.trim() || "مطروح الرياضية..."));
 
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubTicker(); };
@@ -78,7 +95,7 @@ export default function Page() {
   const tomorrowMatches = sortMatches(matches.filter(m => m.date === tomorrowStr && Number(m.homeGoals) === 0 && Number(m.awayGoals) === 0));
   const finishedMatches = sortMatches(matches.filter(m => !m.isLive && (m.status === "انتهت" || (m.date !== todayStr && m.date !== tomorrowStr))));
 
-  const standings = useMemo(() => buildStandings(finishedMatches, TEAM_NAMES), [finishedMatches]);
+  const standings = useMemo(() => buildStandings(finishedMatches, CLEANED_TEAM_NAMES), [finishedMatches]);
   
   const scorers = useMemo(() => {
     const map = new Map<string, any>();
@@ -143,20 +160,17 @@ export default function Page() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white">
       <div className="mx-auto max-w-7xl p-3 sm:p-4 md:p-6 lg:p-8">
 
-        {/* شريط الأخبار */}
         <div className="mb-6 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
           <span className="shrink-0 rounded-2xl bg-yellow-400 px-5 py-2 text-sm font-black text-black">آخر تحديث</span>
           <div className="flex-1 overflow-hidden"><div className="animate-marquee whitespace-nowrap text-lg font-bold text-yellow-300">{tickerText}</div></div>
         </div>
 
-        {/* الهيدر */}
         <div className="mb-8 sm:mb-10 rounded-3xl border border-yellow-400/40 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-6 sm:p-8 shadow-2xl text-center">
           <div className="flex justify-center mb-6"><img src="/logo.png" alt="شعار البطولة" className="h-28 sm:h-36 w-auto drop-shadow-2xl" /></div>
           <h1 className="text-4xl sm:text-6xl font-black text-yellow-300 tracking-tight">بطولة كأس مطروح</h1>
           <p className="mt-3 text-2xl sm:text-3xl text-cyan-300">النسخة الثالثة ٢٠٢٦</p>
         </div>
 
-        {/* التبويبات */}
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8">
           {[
             { key: "live", label: "مباشر", icon: "🔴" }, 
@@ -174,7 +188,6 @@ export default function Page() {
           ))}
         </div>
 
-        {/* 📈 الإحصائيات 📈 */}
         {activeTab === "stats" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -223,13 +236,10 @@ export default function Page() {
                </Card>
             </div>
 
-            {/* الهداف V.I.P */}
             <Card className="bg-gradient-to-r from-[#1e2a4a] to-[#13213a] border-2 border-yellow-400/50 p-6 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(250,204,21,0.15)] relative overflow-hidden">
                <div className="absolute left-0 top-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-3xl"></div>
                <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
                   <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-right">
-                    
-                    {/* الصورة الفخمة للهداف */}
                     <div className="relative">
                       <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-2xl blur opacity-60 animate-pulse"></div>
                       <div className="relative h-28 w-28 md:h-36 md:w-36 bg-[#0a1428] rounded-2xl flex items-center justify-center text-6xl shadow-2xl overflow-hidden border-2 border-yellow-400 shrink-0">
@@ -239,25 +249,14 @@ export default function Page() {
                           <span>👑</span>
                         )}
                       </div>
-                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-4 py-1 rounded-full shadow-lg border-2 border-[#1e2a4a]">
-                        الـهـداف
-                      </div>
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-4 py-1 rounded-full shadow-lg border-2 border-[#1e2a4a]">الـهـداف</div>
                     </div>
-
-                    {/* الاسم مميز بالذهبي */}
                     <div className="flex flex-col justify-center mt-4 md:mt-0">
-                      <h3 className="text-yellow-400 font-black text-sm uppercase tracking-widest mb-2 flex items-center justify-center md:justify-start gap-2">
-                        <Trophy className="h-5 w-5" /> هداف البطولة
-                      </h3>
-                      <div className="text-4xl md:text-6xl font-black bg-gradient-to-r from-white via-yellow-100 to-yellow-500 bg-clip-text text-transparent drop-shadow-sm pb-1">
-                        {statsData.topScorer?.player || "في الانتظار..."}
-                      </div>
-                      <div className="text-cyan-300 font-bold mt-2 text-xl bg-[#0a1428]/50 inline-block px-4 py-1 rounded-lg border border-cyan-500/20">
-                        {statsData.topScorer?.team || "—"}
-                      </div>
+                      <h3 className="text-yellow-400 font-black text-sm uppercase tracking-widest mb-2 flex items-center justify-center md:justify-start gap-2"><Trophy className="h-5 w-5" /> هداف البطولة</h3>
+                      <div className="text-4xl md:text-6xl font-black bg-gradient-to-r from-white via-yellow-100 to-yellow-500 bg-clip-text text-transparent drop-shadow-sm pb-1">{statsData.topScorer?.player || "في الانتظار..."}</div>
+                      <div className="text-cyan-300 font-bold mt-2 text-xl bg-[#0a1428]/50 inline-block px-4 py-1 rounded-lg border border-cyan-500/20">{statsData.topScorer?.team || "—"}</div>
                     </div>
                   </div>
-
                   <div className="text-center md:text-right bg-[#0a1428] px-10 py-6 rounded-3xl border border-yellow-400/20 shadow-inner">
                     <div className="text-6xl md:text-7xl font-black text-yellow-400 drop-shadow-lg">{statsData.topScorer?.goals || 0}</div>
                     <div className="text-sm text-gray-400 font-bold uppercase mt-2 tracking-widest">أهداف مسجلة</div>
@@ -267,7 +266,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 قسم المباشر 🔴 */}
         {activeTab === "live" && (
           <Card className="rounded-3xl border-2 border-red-500/50 bg-[#13213a] shadow-[0_0_20px_rgba(239,68,68,0.2)]">
             <CardHeader className="text-center border-b border-white/5">
@@ -332,7 +330,6 @@ export default function Page() {
           </Card>
         )}
 
-        {/* 📊 الترتيب 📊 */}
         {activeTab === "standings" && (
           <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
             <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب</CardTitle></CardHeader>
@@ -364,7 +361,6 @@ export default function Page() {
           </Card>
         )}
 
-        {/* النتائج واليوم وغداً */}
         {activeTab === "all" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader className="flex flex-col sm:flex-row justify-between gap-4"><CardTitle className="text-yellow-300">النتائج السابقة</CardTitle><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث عن فريق..." className="max-w-sm bg-[#1e2a4a] border-yellow-400 text-white" /></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2">{finishedMatches.filter(m => !search || m.home.includes(search) || m.away.includes(search)).map(match => (<Card key={match.id} className="bg-[#1e2a4a] border-yellow-400/30"><CardContent className="p-6"><div className="flex justify-between text-cyan-300 mb-4 text-sm"><span>الجولة {match.round}</span><span>{match.date}</span></div><div className="grid grid-cols-3 items-center text-center"><div className="font-bold text-white text-lg">{match.home}</div><div className="text-3xl font-black text-yellow-400">{match.homeGoals} - {match.awayGoals}</div><div className="font-bold text-white text-lg">{match.away}</div></div></CardContent></Card>))}</CardContent></Card>
         )}
@@ -375,7 +371,6 @@ export default function Page() {
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Calendar className="h-8 w-8" /> مباريات غداً • {tomorrowStr}</CardTitle></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{tomorrowMatches.map(match => (<div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-6 text-center hover:border-yellow-400 transition-all"><div className="text-cyan-300 mb-4">{formatTime12(match.time)}</div><div className="font-bold text-2xl text-white mb-4">{match.home}</div><div className="text-5xl font-black text-yellow-400 mb-4">VS</div><div className="font-bold text-2xl text-white">{match.away}</div></div>))}</CardContent></Card>
         )}
 
-        {/* 🥇 الهدافين (تعديل كارت الأول) 🥇 */}
         {activeTab === "scorers" && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {scorers.map((player, i) => (
@@ -402,7 +397,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* الكروت والموقوفين */}
         {activeTab === "cards" && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{cardsList.filter(c => c.status !== "متاح").map((item, i) => (<Card key={i} className="bg-[#1e2a4a] border-yellow-400/30 rounded-3xl"><CardContent className="p-6"><div className="flex justify-between items-start"><div><h3 className="font-bold text-xl text-white">{item.player}</h3><p className="text-cyan-300">{item.team}</p></div><Badge className="bg-rose-500 text-white font-bold">{item.status}</Badge></div><div className="mt-4 flex gap-4"><Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold">🟨 {item.yellow}</Badge><Badge className="bg-red-500/20 text-red-300 px-4 py-2 font-bold">🟥 {item.red}</Badge></div></CardContent></Card>))}</div>
         )}
