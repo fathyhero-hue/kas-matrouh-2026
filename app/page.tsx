@@ -45,25 +45,24 @@ function zoneColor(rank: number) { return rank <= 8 ? "bg-emerald-500 text-white
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 
 export default function Page() {
-  const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map(m => ({
+  // 🎯 هنا تم إضافة (m: any) لحل مشكلة Type error
+  const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map((m: any) => ({
     ...m,
     home: cleanTeamString(m.home || m.teamA),
     away: cleanTeamString(m.away || m.teamB),
     teamA: cleanTeamString(m.teamA || m.home),
     teamB: cleanTeamString(m.teamB || m.away)
   })));
+  
   const [goalEvents, setGoalEvents] = useState<any[]>([]);
   const [cardEvents, setCardEvents] = useState<any[]>([]);
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "today" | "tomorrow" | "all" | "standings" | "scorers" | "stats" | "cards" | "suspended">("standings");
-  
-  // حالة لمعرفة هل المستخدم اشترك في الإشعارات ولا لأ
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
-    // التحقق المبدئي إذا كان المستخدم مفعل الإشعارات
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "granted") setIsSubscribed(true);
     }
@@ -94,7 +93,6 @@ export default function Page() {
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubTicker(); };
   }, []);
 
-  // 🔔 دالة تفعيل وحفظ الإشعارات باستخدام VAPID
   const handleSubscribe = async () => {
     try {
       const permission = await Notification.requestPermission();
@@ -107,12 +105,10 @@ export default function Page() {
         }
 
         const messaging = getMessaging(db.app);
-        // مفتاح VAPID الخاص بك
         const vapidKey = "BIaf6ABhsIzwUuJmFudhT6rMpY0LjumPTlYoGxEbmAW9HfkQXvWJSrbeW0zu6OIgVSG_ggxcj5lN5xngnZ36Eso";
         
         const token = await getToken(messaging, { vapidKey });
         if (token) {
-          // حفظ كود المستخدم في قاعدة البيانات عشان نقدر نبعتله بعدين
           await setDoc(doc(db, "subscribers", token), {
             token: token,
             dateAdded: new Date().toISOString()
@@ -445,7 +441,6 @@ export default function Page() {
 
       </div>
 
-      {/* زرار تفعيل الإشعارات العائم (بيختفي لو المستخدم اشترك) */}
       {!isSubscribed && (
         <button 
           onClick={handleSubscribe} 
