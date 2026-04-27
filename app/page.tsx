@@ -45,7 +45,6 @@ function zoneColor(rank: number) { return rank <= 8 ? "bg-emerald-500 text-white
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 
 export default function Page() {
-  // 🎯 هنا تم إضافة (m: any) لحل مشكلة Type error
   const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map((m: any) => ({
     ...m,
     home: cleanTeamString(m.home || m.teamA),
@@ -53,13 +52,13 @@ export default function Page() {
     teamA: cleanTeamString(m.teamA || m.home),
     teamB: cleanTeamString(m.teamB || m.away)
   })));
-  
   const [goalEvents, setGoalEvents] = useState<any[]>([]);
   const [cardEvents, setCardEvents] = useState<any[]>([]);
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "today" | "tomorrow" | "all" | "standings" | "scorers" | "stats" | "cards" | "suspended">("standings");
+  
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
@@ -93,35 +92,52 @@ export default function Page() {
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubTicker(); };
   }, []);
 
+  // 🔔 دالة تفعيل وحفظ الإشعارات (معدلة للتسجيل الإجباري واكتشاف الأخطاء)
   const handleSubscribe = async () => {
+    if (!("Notification" in window)) {
+      alert("متصفحك لا يدعم الإشعارات.");
+      return;
+    }
+
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
         const supported = await isSupported();
         if (!supported) {
-          alert("متصفحك الحالي لا يدعم الإشعارات.");
+          alert("متصفحك الحالي لا يدعم الإشعارات الذكية.");
           return;
         }
+
+        // إجبار المتصفح على تسجيل ملف البواب أولاً
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
         const messaging = getMessaging(db.app);
         const vapidKey = "BIaf6ABhsIzwUuJmFudhT6rMpY0LjumPTlYoGxEbmAW9HfkQXvWJSrbeW0zu6OIgVSG_ggxcj5lN5xngnZ36Eso";
         
-        const token = await getToken(messaging, { vapidKey });
+        // تمرير الملف لدالة توليد الكود
+        const token = await getToken(messaging, { 
+          vapidKey,
+          serviceWorkerRegistration: registration 
+        });
+
         if (token) {
           await setDoc(doc(db, "subscribers", token), {
             token: token,
             dateAdded: new Date().toISOString()
           });
           setIsSubscribed(true);
-          alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك كل أخبار البطولة لحظة بلحظة.");
+          alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك أخبار البطولة لحظة بلحظة.");
+        } else {
+          alert("لم يتم توليد كود الإشعار، حاول مرة أخرى.");
         }
       } else {
         alert("❌ تم رفض صلاحية الإشعارات.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("خطأ في تفعيل الإشعارات:", error);
-      alert("حدث خطأ أثناء تفعيل الإشعارات، تأكد من الاتصال بالإنترنت.");
+      // هنا هيظهرلك سبب الخطأ الحقيقي اللي جوجل بتبعته بدل الرسالة العادية
+      alert("حدث خطأ: " + (error.message || "تأكد من الاتصال بالإنترنت."));
     }
   };
 
