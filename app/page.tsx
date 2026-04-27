@@ -45,6 +45,7 @@ function zoneColor(rank: number) { return rank <= 8 ? "bg-emerald-500 text-white
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 
 export default function Page() {
+  // تم حل مشكلة any هنا
   const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map((m: any) => ({
     ...m,
     home: cleanTeamString(m.home || m.teamA),
@@ -92,7 +93,7 @@ export default function Page() {
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubTicker(); };
   }, []);
 
-  // 🔔 دالة تفعيل وحفظ الإشعارات (معدلة للتسجيل الإجباري واكتشاف الأخطاء)
+  // 🔔 دالة تفعيل وحفظ الإشعارات (النهائية)
   const handleSubscribe = async () => {
     if (!("Notification" in window)) {
       alert("متصفحك لا يدعم الإشعارات.");
@@ -109,13 +110,10 @@ export default function Page() {
           return;
         }
 
-        // إجبار المتصفح على تسجيل ملف البواب أولاً
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-
         const messaging = getMessaging(db.app);
         const vapidKey = "BIaf6ABhsIzwUuJmFudhT6rMpY0LjumPTlYoGxEbmAW9HfkQXvWJSrbeW0zu6OIgVSG_ggxcj5lN5xngnZ36Eso";
         
-        // تمرير الملف لدالة توليد الكود
         const token = await getToken(messaging, { 
           vapidKey,
           serviceWorkerRegistration: registration 
@@ -136,7 +134,6 @@ export default function Page() {
       }
     } catch (error: any) {
       console.error("خطأ في تفعيل الإشعارات:", error);
-      // هنا هيظهرلك سبب الخطأ الحقيقي اللي جوجل بتبعته بدل الرسالة العادية
       alert("حدث خطأ: " + (error.message || "تأكد من الاتصال بالإنترنت."));
     }
   };
@@ -451,8 +448,29 @@ export default function Page() {
           </div>
         )}
 
+        {/* تعديل الكروت النهائي */}
         {activeTab === "cards" && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{cardsList.filter(c => c.status !== "متاح").map((item, i) => (<Card key={i} className="bg-[#1e2a4a] border-yellow-400/30 rounded-3xl"><CardContent className="p-6"><div className="flex justify-between items-start"><div><h3 className="font-bold text-xl text-white">{item.player}</h3><p className="text-cyan-300">{item.team}</p></div><Badge className="bg-rose-500 text-white font-bold">{item.status}</Badge></div><div className="mt-4 flex gap-4"><Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold">🟨 {item.yellow}</Badge><Badge className="bg-red-500/20 text-red-300 px-4 py-2 font-bold">🟥 {item.red}</Badge></div></CardContent></Card>))}</div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {cardsList.filter(c => c.yellow > 0 || c.red > 0).map((item, i) => (
+              <Card key={i} className="bg-[#1e2a4a] border-yellow-400/30 rounded-3xl hover:border-yellow-400 transition-all">
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-xl text-white">{item.player}</h3>
+                      <p className="text-cyan-300">{item.team}</p>
+                    </div>
+                    <Badge className={`${item.status === 'متاح' ? 'bg-emerald-500' : item.status === 'إيقاف' ? 'bg-amber-500' : 'bg-rose-500'} text-white font-bold text-sm px-3`}>
+                      {item.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 flex gap-4">
+                    <Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold text-lg">🟨 {item.yellow}</Badge>
+                    <Badge className="bg-red-500/20 text-red-300 px-4 py-2 font-bold text-lg">🟥 {item.red}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
 
       </div>
