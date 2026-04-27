@@ -1,6 +1,7 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
+// وضع البيانات مباشرة لحل مشكلة Vercel Environment Variables
 const firebaseConfig = {
   apiKey: "AIzaSyCuHBBvyD6q6E0i6MUIqhZ4DDsCkyaRoz4",
   authDomain: "matrouh-cup.firebaseapp.com",
@@ -11,6 +12,8 @@ const firebaseConfig = {
   measurementId: "G-9HBQWREVXK"
 };
 
-const app = initializeApp(firebaseConfig);
+// تهيئة التطبيق
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
 
-export const db = getFirestore(app);
+export { app, db };
