@@ -46,11 +46,8 @@ function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !
 
 export default function Page() {
   const [matches, setMatches] = useState<any[]>(INITIAL_MATCHES.map((m: any) => ({
-    ...m,
-    home: cleanTeamString(m.home || m.teamA),
-    away: cleanTeamString(m.away || m.teamB),
-    teamA: cleanTeamString(m.teamA || m.home),
-    teamB: cleanTeamString(m.teamB || m.away)
+    ...m, home: cleanTeamString(m.home || m.teamA), away: cleanTeamString(m.away || m.teamB),
+    teamA: cleanTeamString(m.teamA || m.home), teamB: cleanTeamString(m.teamB || m.away)
   })));
   const [goalEvents, setGoalEvents] = useState<any[]>([]);
   const [cardEvents, setCardEvents] = useState<any[]>([]);
@@ -58,23 +55,16 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "today" | "tomorrow" | "all" | "standings" | "scorers" | "stats" | "cards">("standings");
-  
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      if (Notification.permission === "granted") setIsSubscribed(true);
-    }
-
+    if (typeof window !== "undefined" && "Notification" in window) { if (Notification.permission === "granted") setIsSubscribed(true); }
     const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => {
       setMatches(snap.docs.map((doc) => {
         const d = doc.data();
         return {
-          id: doc.id, 
-          home: cleanTeamString(d.teamA || d.home), 
-          away: cleanTeamString(d.teamB || d.away),
-          teamA: cleanTeamString(d.teamA || d.home), 
-          teamB: cleanTeamString(d.teamB || d.away),
+          id: doc.id, home: cleanTeamString(d.teamA || d.home), away: cleanTeamString(d.teamB || d.away),
+          teamA: cleanTeamString(d.teamA || d.home), teamB: cleanTeamString(d.teamB || d.away),
           homeGoals: Number(d.homeGoals) || 0, awayGoals: Number(d.awayGoals) || 0,
           round: d.round || 1, date: d.date || "", time: d.time || "15:30", dayName: d.dayName || "",
           status: d.status || "", liveMinute: d.liveMinute || 0, isLive: d.isLive || false,
@@ -93,44 +83,38 @@ export default function Page() {
   }, []);
 
   const handleSubscribe = async () => {
-    if (!("Notification" in window)) {
-      alert("متصفحك لا يدعم الإشعارات.");
-      return;
-    }
+    if (!("Notification" in window)) { alert("متصفحك لا يدعم الإشعارات."); return; }
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
         const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
         const supported = await isSupported();
-        if (!supported) {
-          alert("متصفحك الحالي لا يدعم الإشعارات الذكية.");
-          return;
-        }
+        if (!supported) { alert("متصفحك الحالي لا يدعم الإشعارات."); return; }
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
         const messaging = getMessaging(db.app);
         const vapidKey = "BIaf6ABhsIzwUuJmFudhT6rMpY0LjumPTlYoGxEbmAW9HfkQXvWJSrbeW0zu6OIgVSG_ggxcj5lN5xngnZ36Eso";
         const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
         if (token) {
           await setDoc(doc(db, "subscribers", token), { token, dateAdded: new Date().toISOString() });
-          setIsSubscribed(true);
-          alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك أخبار البطولة لحظة بلحظة.");
+          setIsSubscribed(true); alert("✅ تم تفعيل الإشعارات بنجاح!");
         }
-      } else {
-        alert("❌ تم رفض صلاحية الإشعارات.");
       }
-    } catch (error: any) {
-      console.error("خطأ في تفعيل الإشعارات:", error);
-      alert("حدث خطأ: " + (error.message || "تأكد من الاتصال بالإنترنت."));
-    }
+    } catch (error: any) { alert("حدث خطأ: " + (error.message || "تأكد من الاتصال بالإنترنت.")); }
   };
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
+  // 🔴 الحل الجذري لتصنيف المباريات
   const liveMatches = sortMatches(matches.filter(m => m.isLive === true));
-  const todayMatches = sortMatches(matches.filter(m => m.date === todayStr && !m.isLive && Number(m.homeGoals) === 0 && Number(m.awayGoals) === 0));
-  const tomorrowMatches = sortMatches(matches.filter(m => m.date === tomorrowStr && Number(m.homeGoals) === 0 && Number(m.awayGoals) === 0));
-  const finishedMatches = sortMatches(matches.filter(m => !m.isLive && (m.status === "انتهت" || (m.date !== todayStr && m.date !== tomorrowStr))));
+  
+  // نعتبر المباراة انتهت لو حالتها "انتهت" أو لو تاريخها أقدم من النهاردة
+  const finishedMatches = sortMatches(matches.filter(m => !m.isLive && (m.status === "انتهت" || m.date < todayStr)));
+  
+  // مباريات اليوم هي اللي تاريخها النهاردة وحالتها لسه مش "انتهت"
+  const todayMatches = sortMatches(matches.filter(m => !m.isLive && m.date === todayStr && m.status !== "انتهت"));
+  
+  const tomorrowMatches = sortMatches(matches.filter(m => !m.isLive && m.date === tomorrowStr && m.status !== "انتهت"));
 
   const standings = useMemo(() => buildStandings(finishedMatches, CLEANED_TEAM_NAMES), [finishedMatches]);
   
@@ -147,37 +131,20 @@ export default function Page() {
 
   const statsData = useMemo(() => {
     const totalMatches = finishedMatches.length;
-    let totalGoals = 0;
-    let draws00 = 0;
-    let drawsPositive = 0;
-
+    let totalGoals = 0, draws00 = 0, drawsPositive = 0;
     finishedMatches.forEach(m => {
       totalGoals += (m.homeGoals + m.awayGoals);
-      if (m.homeGoals === m.awayGoals) {
-        if (m.homeGoals === 0) draws00++;
-        else drawsPositive++;
-      }
+      if (m.homeGoals === m.awayGoals) { if (m.homeGoals === 0) draws00++; else drawsPositive++; }
     });
-
     const totalYellow = cardEvents.reduce((acc, curr) => acc + (Number(curr.yellow) || 0), 0);
     const totalRed = cardEvents.reduce((acc, curr) => acc + (Number(curr.red) || 0), 0);
-
     const sortedByAttack = [...standings].sort((a, b) => b.gf - a.gf);
     const sortedByDef = [...standings].sort((a, b) => a.ga - b.ga);
-
     return {
-      totalMatches,
-      totalGoals,
-      draws00,
-      drawsPositive,
-      totalYellow,
-      totalRed,
-      bestAttack: sortedByAttack[0],
-      worstAttack: sortedByAttack[sortedByAttack.length - 1],
-      bestDefense: sortedByDef[0],
-      worstDefense: sortedByDef[sortedByDef.length - 1],
-      topScorer: scorers[0],
-      goalsPerMatch: totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0",
+      totalMatches, totalGoals, draws00, drawsPositive, totalYellow, totalRed,
+      bestAttack: sortedByAttack[0], worstAttack: sortedByAttack[sortedByAttack.length - 1],
+      bestDefense: sortedByDef[0], worstDefense: sortedByDef[sortedByDef.length - 1],
+      topScorer: scorers[0], goalsPerMatch: totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : "0",
       draws00Percent: totalMatches > 0 ? Math.round((draws00 / totalMatches) * 100) : 0,
       drawsPosPercent: totalMatches > 0 ? Math.round((drawsPositive / totalMatches) * 100) : 0,
       yellowPerMatch: totalMatches > 0 ? (totalYellow / totalMatches).toFixed(2) : "0",
@@ -197,76 +164,54 @@ export default function Page() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white relative pb-20">
       <div className="mx-auto max-w-7xl p-3 sm:p-4 md:p-6 lg:p-8">
 
-        {/* 1. شريط الأخبار (آخر تحديث) */}
+        {/* 1. شريط الأخبار */}
         <div className="mb-4 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
           <span className="shrink-0 rounded-2xl bg-yellow-400 px-5 py-2 text-sm font-black text-black">آخر تحديث</span>
           <div className="flex-1 overflow-hidden"><div className="animate-marquee whitespace-nowrap text-lg font-bold text-yellow-300">{tickerText}</div></div>
         </div>
 
-        {/* 2. شريط الرعاة (تم تصغيره ونقله هنا وبألوان طبيعية) */}
-        <div className="mb-6 bg-[#13213a] py-3 rounded-2xl border border-yellow-400/20 overflow-hidden relative shadow-sm">
-          <div className="flex animate-marquee whitespace-nowrap items-center gap-10">
-            {[1, 2, 3, 4].map((i) => (
-              <React.Fragment key={i}>
+        {/* 2. شريط الرعاة بحركة لا نهائية للموبايل */}
+        <style dangerouslySetInnerHTML={{__html: `@keyframes infinite-scroll-rtl { 0% { transform: translateX(0); } 100% { transform: translateX(50%); } } .sponsor-track { display: flex; width: max-content; animation: infinite-scroll-rtl 40s linear infinite; } .sponsor-track:hover { animation-play-state: paused; }`}} />
+        <div className="mb-6 bg-[#13213a] py-3 rounded-2xl border border-yellow-400/20 overflow-hidden relative shadow-sm" dir="rtl">
+          <div className="sponsor-track items-center gap-10">
+            {[1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-10">
                 <span className="text-yellow-400/60 font-bold tracking-widest text-[10px] px-2 border-l border-white/10 uppercase">شركاء النجاح</span>
                 {[
-                  { name: "الفهد للديكور", src: "/alfahd.png" },
-                  { name: "مكتب احمد عبدالعاطي المحامي", src: "/abdelaty.png" },
-                  { name: "دثار للزي العربي", src: "/dithar.png" },
-                  { name: "معصرة الزيتون فرجينيا", src: "/virginia.png" },
-                  { name: "دبي للزي العربي", src: "/dubai.png" },
-                  { name: "معرض الأمانة للديكور", src: "/alamana.png" },
-                  { name: "تراث البادية للزي العربي", src: "/torath.png" },
-                  { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" },
-                  { name: "مياة حياة", src: "/hayah.png" },
-                  { name: "القدس للأثاث الراقي", src: "/alquds.png" },
-                  { name: "أيس كريم الملكة", src: "/almaleka.png" },
-                  { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
-                  { name: "M MART", src: "/mmart.png" },
-                  { name: "هيرو سبورت للملابس الرياضية", src: "/hero-sport.png" },
-                  { name: "الفتح للفراشة الحديثة", src: "/alfath.png" },
-{ name: "عادل العميري للديكور", src: "/alomairy.png" }
+                  { name: "الفهد للديكور", src: "/alfahd.png" }, { name: "أحمد عبدالعاطي المحامي", src: "/abdelaty.png" }, { name: "دثار للزي العربي", src: "/dithar.png" },
+                  { name: "معصرة فرجينيا", src: "/virginia.png" }, { name: "دبي للزي العربي", src: "/dubai.png" }, { name: "معرض الأمانة", src: "/alamana.png" },
+                  { name: "تراث البادية", src: "/torath.png" }, { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" }, { name: "مياة حياة", src: "/hayah.png" },
+                  { name: "القدس للأثاث", src: "/alquds.png" }, { name: "أيس كريم الملكة", src: "/almaleka.png" }, { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
+                  { name: "M MART", src: "/mmart.png" }, { name: "هيرو سبورت", src: "/hero-sport.png" }, { name: "الفتح للفراشة", src: "/alfath.png" }, { name: "عادل العميري للديكور", src: "/alomairy.png" }
                 ].map((sponsor, idx) => (
-                  <img 
-                    key={idx}
-                    src={sponsor.src} 
-                    alt={sponsor.name} 
-                    title={sponsor.name}
-                    className="h-10 w-24 object-contain drop-shadow-sm" 
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
+                  <img key={idx} src={sponsor.src} alt={sponsor.name} title={sponsor.name} className="h-10 w-24 object-contain drop-shadow-sm transition-transform hover:scale-110 cursor-pointer" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ))}
-              </React.Fragment>
+              </div>
             ))}
           </div>
         </div>
 
         {/* 3. هيدر البطولة */}
-        <div className="mb-8 sm:mb-10 rounded-3xl border border-yellow-400/40 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-6 sm:p-8 shadow-2xl text-center">
-          <div className="flex justify-center mb-6"><img src="/logo.png" alt="شعار البطولة" className="h-28 sm:h-36 w-auto drop-shadow-2xl" /></div>
+        <div className="mb-8 rounded-3xl border border-yellow-400/40 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-6 text-center shadow-2xl">
+          <div className="flex justify-center mb-6"><img src="/logo.png" alt="شعار البطولة" className="h-28 sm:h-36 w-auto" /></div>
           <h1 className="text-4xl sm:text-6xl font-black text-yellow-300 tracking-tight">بطولة كأس مطروح</h1>
-          <p className="mt-3 text-2xl sm:text-3xl text-cyan-300">النسخة الثالثة ٢٠٢٦</p>
+          <p className="mt-3 text-2xl text-cyan-300">النسخة الثالثة ٢٠٢٦</p>
         </div>
 
-        {/* التبويبات */}
-        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8">
+        {/* 4. أزرار التبويبات */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
-            { key: "live", label: "مباشر", icon: "🔴" }, 
-            { key: "stats", label: "إحصائيات", icon: "📊" },
-            { key: "today", label: "اليوم", icon: "📅" }, 
-            { key: "tomorrow", label: "غداً", icon: "📆" },
-            { key: "all", label: "النتائج", icon: "⚽" }, 
-            { key: "standings", label: "الترتيب", icon: "📊" }, 
-            { key: "scorers", label: "الهدافين", icon: "🥇" },
-            { key: "cards", label: "الكروت", icon: "🟨" },
+            { key: "live", label: "مباشر", icon: "🔴" }, { key: "stats", label: "إحصائيات", icon: "📊" }, { key: "today", label: "اليوم", icon: "📅" }, 
+            { key: "tomorrow", label: "غداً", icon: "📆" }, { key: "all", label: "النتائج", icon: "⚽" }, { key: "standings", label: "الترتيب", icon: "📊" }, 
+            { key: "scorers", label: "الهدافين", icon: "🥇" }, { key: "cards", label: "الكروت", icon: "🟨" },
           ].map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex-1 sm:flex-none px-5 py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all border border-yellow-400/30 ${activeTab === tab.key ? "bg-yellow-400 text-black shadow-lg scale-105" : "bg-[#1e2a4a] text-white hover:bg-[#25345a] hover:text-yellow-300"}`}>
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex-1 sm:flex-none px-5 py-3.5 rounded-2xl font-bold text-sm transition-all border border-yellow-400/30 ${activeTab === tab.key ? "bg-yellow-400 text-black shadow-lg scale-105" : "bg-[#1e2a4a] text-white hover:bg-[#25345a]"}`}>
               <span className={`text-lg ${tab.key === "live" && activeTab === "live" ? "animate-pulse" : ""}`}>{tab.icon}</span> <span>{tab.label}</span>
             </button>
           ))}
         </div>
 
-        {/* محتوى الإحصائيات بالكامل */}
+        {/* 5. المحتوى المتغير */}
         {activeTab === "stats" && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -289,30 +234,10 @@ export default function Page() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
-                  <Target className="mx-auto mb-4 text-emerald-400 h-10 w-10" />
-                  <h4 className="text-gray-400 text-sm font-bold mb-2">أقوى هجوم</h4>
-                  <div className="text-xl font-black text-white">{statsData.bestAttack?.team || "—"}</div>
-                  <Badge className="mt-2 bg-emerald-500/10 text-emerald-400 border-none">{statsData.bestAttack?.gf || 0} هدف</Badge>
-               </Card>
-               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
-                  <Zap className="mx-auto mb-4 text-rose-400 h-10 w-10" />
-                  <h4 className="text-gray-400 text-sm font-bold mb-2">أضعف هجوم</h4>
-                  <div className="text-xl font-black text-white">{statsData.worstAttack?.team || "—"}</div>
-                  <Badge className="mt-2 bg-rose-500/10 text-rose-400 border-none">{statsData.worstAttack?.gf || 0} هدف</Badge>
-               </Card>
-               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
-                  <Shield className="mx-auto mb-4 text-cyan-400 h-10 w-10" />
-                  <h4 className="text-gray-400 text-sm font-bold mb-2">أقوى دفاع</h4>
-                  <div className="text-xl font-black text-white">{statsData.bestDefense?.team || "—"}</div>
-                  <Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">استقبل {statsData.bestDefense?.ga || 0}</Badge>
-               </Card>
-               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg">
-                  <ShieldAlert className="mx-auto mb-4 text-amber-500 h-10 w-10" />
-                  <h4 className="text-gray-400 text-sm font-bold mb-2">أضعف دفاع</h4>
-                  <div className="text-xl font-black text-white">{statsData.worstDefense?.team || "—"}</div>
-                  <Badge className="mt-2 bg-amber-500/10 text-amber-500 border-none">استقبل {statsData.worstDefense?.ga || 0}</Badge>
-               </Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Target className="mx-auto mb-4 text-emerald-400 h-10 w-10" /><h4 className="text-gray-400 text-sm font-bold mb-2">أقوى هجوم</h4><div className="text-xl font-black text-white">{statsData.bestAttack?.team || "—"}</div><Badge className="mt-2 bg-emerald-500/10 text-emerald-400 border-none">{statsData.bestAttack?.gf || 0} هدف</Badge></Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Zap className="mx-auto mb-4 text-rose-400 h-10 w-10" /><h4 className="text-gray-400 text-sm font-bold mb-2">أضعف هجوم</h4><div className="text-xl font-black text-white">{statsData.worstAttack?.team || "—"}</div><Badge className="mt-2 bg-rose-500/10 text-rose-400 border-none">{statsData.worstAttack?.gf || 0} هدف</Badge></Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Shield className="mx-auto mb-4 text-cyan-400 h-10 w-10" /><h4 className="text-gray-400 text-sm font-bold mb-2">أقوى دفاع</h4><div className="text-xl font-black text-white">{statsData.bestDefense?.team || "—"}</div><Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">استقبل {statsData.bestDefense?.ga || 0}</Badge></Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><ShieldAlert className="mx-auto mb-4 text-amber-500 h-10 w-10" /><h4 className="text-gray-400 text-sm font-bold mb-2">أضعف دفاع</h4><div className="text-xl font-black text-white">{statsData.worstDefense?.team || "—"}</div><Badge className="mt-2 bg-amber-500/10 text-amber-500 border-none">استقبل {statsData.worstDefense?.ga || 0}</Badge></Card>
             </div>
 
             <Card className="bg-gradient-to-r from-[#1e2a4a] to-[#13213a] border-2 border-yellow-400/50 p-6 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(250,204,21,0.15)] relative overflow-hidden">
@@ -322,11 +247,7 @@ export default function Page() {
                     <div className="relative">
                       <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-2xl blur opacity-60 animate-pulse"></div>
                       <div className="relative h-28 w-28 md:h-36 md:w-36 bg-[#0a1428] rounded-2xl flex items-center justify-center text-6xl shadow-2xl overflow-hidden border-2 border-yellow-400 shrink-0">
-                        {statsData.topScorer?.imageUrl ? (
-                          <img src={statsData.topScorer.imageUrl} alt={statsData.topScorer.player} className="h-full w-full object-cover" />
-                        ) : (
-                          <span>👑</span>
-                        )}
+                        {statsData.topScorer?.imageUrl ? <img src={statsData.topScorer.imageUrl} alt={statsData.topScorer.player} className="h-full w-full object-cover" /> : <span>👑</span>}
                       </div>
                       <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black text-xs font-black px-4 py-1 rounded-full shadow-lg border-2 border-[#1e2a4a]">الـهـداف</div>
                     </div>
@@ -345,138 +266,71 @@ export default function Page() {
           </div>
         )}
 
-        {/* محتوى مباشر بالكامل */}
         {activeTab === "live" && (
           <Card className="rounded-3xl border-2 border-red-500/50 bg-[#13213a] shadow-[0_0_20px_rgba(239,68,68,0.2)]">
             <CardHeader className="text-center border-b border-white/5">
-              <div className="flex justify-center items-center gap-2 mb-2">
-                <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>
-                <span className="text-red-500 font-black tracking-widest uppercase">Live Now</span>
-              </div>
+              <div className="flex justify-center items-center gap-2 mb-2"><span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span><span className="text-red-500 font-black tracking-widest uppercase">Live Now</span></div>
               <CardTitle className="text-3xl font-black text-white">المباريات الجارية</CardTitle>
             </CardHeader>
             <CardContent className="p-6 grid gap-6">
               {liveMatches.length > 0 ? liveMatches.map(match => (
                 <div key={match.id} className="relative rounded-3xl bg-gradient-to-r from-[#1e2a4a] to-[#25345a] border border-white/10 p-8 overflow-hidden">
                   <div className="absolute top-0 inset-x-0 bg-red-600 text-white text-center py-1 text-sm font-bold shadow-md flex justify-center items-center gap-2">
-                     <span className={match.status !== "انتهت" && match.status !== "استراحة" ? "animate-pulse" : ""}>
-                        {match.status || "جارية الآن"} 
-                        {match.status !== "استراحة" && match.status !== "انتهت" && match.status !== "ضربات جزاء" && ` - الدقيقة ${match.liveMinute || 0}'`}
-                     </span>
+                     <span className={match.status !== "انتهت" && match.status !== "استراحة" ? "animate-pulse" : ""}>{match.status || "جارية الآن"} {match.status !== "استراحة" && match.status !== "انتهت" && match.status !== "ضربات جزاء" && ` - الدقيقة ${match.liveMinute || 0}'`}</span>
                   </div>
                   <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex-1 text-center md:text-right">
-                      <div className="flex items-center justify-center md:justify-end gap-2 mb-2">
-                         <div className="text-2xl font-bold text-white">{match.home}</div>
-                         {match.redCardsHome > 0 && Array.from({length: match.redCardsHome}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}
-                      </div>
+                      <div className="flex items-center justify-center md:justify-end gap-2 mb-2"><div className="text-2xl font-bold text-white">{match.home}</div>{match.redCardsHome > 0 && Array.from({length: match.redCardsHome}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}</div>
                     </div>
-                    <div className="flex items-center gap-6 bg-[#0a1428]/50 px-8 py-4 rounded-3xl border border-white/5 shadow-inner">
-                      <span className="text-6xl font-black text-white drop-shadow-lg">{match.homeGoals}</span>
-                      <span className="text-3xl text-yellow-400 font-black">:</span>
-                      <span className="text-6xl font-black text-white drop-shadow-lg">{match.awayGoals}</span>
-                    </div>
+                    <div className="flex items-center gap-6 bg-[#0a1428]/50 px-8 py-4 rounded-3xl border border-white/5 shadow-inner"><span className="text-6xl font-black text-white drop-shadow-lg">{match.homeGoals}</span><span className="text-3xl text-yellow-400 font-black">:</span><span className="text-6xl font-black text-white drop-shadow-lg">{match.awayGoals}</span></div>
                     <div className="flex-1 text-center md:text-left">
-                      <div className="flex items-center justify-center md:justify-start gap-2 mb-2 flex-row-reverse md:flex-row">
-                         {match.redCardsAway > 0 && Array.from({length: match.redCardsAway}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}
-                         <div className="text-2xl font-bold text-white">{match.away}</div>
-                      </div>
+                      <div className="flex items-center justify-center md:justify-start gap-2 mb-2 flex-row-reverse md:flex-row">{match.redCardsAway > 0 && Array.from({length: match.redCardsAway}).map((_, i) => <div key={i} className="w-4 h-5 bg-red-600 rounded-sm border border-white/50 shadow-sm" title="طرد"></div>)}<div className="text-2xl font-bold text-white">{match.away}</div></div>
                     </div>
                   </div>
                   {(match.status === "ضربات جزاء" || (match.penaltiesHome && match.penaltiesHome.length > 0)) && (
                      <div className="mt-8 border-t border-white/10 pt-6">
                         <div className="text-center text-sm text-yellow-400 font-bold mb-3 uppercase tracking-widest">نتيجة ركلات الترجيح</div>
                         <div className="flex justify-center items-center gap-6">
-                           <div className="flex gap-1.5 flex-row-reverse">
-                             {(match.penaltiesHome || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : p === 'missed' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-gray-600'}`}></div>)}
-                           </div>
-                           <div className="text-2xl font-black text-white bg-black/40 px-4 py-1 rounded-xl">
-                              ({(match.penaltiesHome || []).filter((p:string) => p === 'scored').length}) <span className="text-gray-500 mx-2">-</span> ({(match.penaltiesAway || []).filter((p:string) => p === 'scored').length})
-                           </div>
-                           <div className="flex gap-1.5">
-                             {(match.penaltiesAway || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : p === 'missed' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : 'bg-gray-600'}`}></div>)}
-                           </div>
+                           <div className="flex gap-1.5 flex-row-reverse">{(match.penaltiesHome || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500' : p === 'missed' ? 'bg-red-500' : 'bg-gray-600'}`}></div>)}</div>
+                           <div className="text-2xl font-black text-white bg-black/40 px-4 py-1 rounded-xl">({(match.penaltiesHome || []).filter((p:string) => p === 'scored').length}) <span className="text-gray-500 mx-2">-</span> ({(match.penaltiesAway || []).filter((p:string) => p === 'scored').length})</div>
+                           <div className="flex gap-1.5">{(match.penaltiesAway || []).map((p: string, i: number) => <div key={i} className={`w-3 h-3 rounded-full ${p === 'scored' ? 'bg-emerald-500' : p === 'missed' ? 'bg-red-500' : 'bg-gray-600'}`}></div>)}</div>
                         </div>
                      </div>
                   )}
                 </div>
-              )) : (
-                <div className="py-20 text-center">
-                  <Calendar className="h-16 w-16 text-gray-600 mx-auto mb-4 opacity-20" />
-                  <p className="text-xl text-gray-500">لا توجد مباريات جارية في الوقت الحالي</p>
-                </div>
-              )}
+              )) : <div className="py-20 text-center"><Calendar className="h-16 w-16 text-gray-600 mx-auto mb-4 opacity-20" /><p className="text-xl text-gray-500">لا توجد مباريات جارية في الوقت الحالي</p></div>}
             </CardContent>
           </Card>
         )}
 
-        {/* محتوى الترتيب بالكامل */}
         {activeTab === "standings" && (
           <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
             <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب</CardTitle></CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-320px)]">
-                <table className="w-full text-white text-right">
-                  <thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30">
-                    <tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm">{h}</th>))}</tr>
-                  </thead>
-                  <tbody>
-                    {standings.map(row => (
-                      <tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td>
-                        <td className="px-4 py-4 font-bold text-white">{row.team}</td>
-                        <td className="px-4 py-4 text-center">{row.played}</td>
-                        <td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td>
-                        <td className="px-4 py-4 text-center">{row.draws}</td>
-                        <td className="px-4 py-4 text-center">{row.losses}</td>
-                        <td className="px-4 py-4 text-center text-emerald-400">{row.gf}</td>
-                        <td className="px-4 py-4 text-center text-rose-400">{row.ga}</td>
-                        <td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td>
-                        <td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollArea>
+              <ScrollArea className="h-[calc(100vh-320px)]"><table className="w-full text-white text-right"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm">{h}</th>))}</tr></thead><tbody>{standings.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-emerald-400">{row.gf}</td><td className="px-4 py-4 text-center text-rose-400">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></ScrollArea>
             </CardContent>
           </Card>
         )}
 
-        {/* محتوى النتائج بالكامل */}
         {activeTab === "all" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader className="flex flex-col sm:flex-row justify-between gap-4"><CardTitle className="text-yellow-300">النتائج السابقة</CardTitle><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث عن فريق..." className="max-w-sm bg-[#1e2a4a] border-yellow-400 text-white" /></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2">{finishedMatches.filter(m => !search || m.home.includes(search) || m.away.includes(search)).map(match => (<Card key={match.id} className="bg-[#1e2a4a] border-yellow-400/30"><CardContent className="p-6"><div className="flex justify-between text-cyan-300 mb-4 text-sm"><span>الجولة {match.round}</span><span>{match.date}</span></div><div className="grid grid-cols-3 items-center text-center"><div className="font-bold text-white text-lg">{match.home}</div><div className="text-3xl font-black text-yellow-400">{match.homeGoals} - {match.awayGoals}</div><div className="font-bold text-white text-lg">{match.away}</div></div></CardContent></Card>))}</CardContent></Card>
         )}
 
-        {/* محتوى اليوم بالكامل */}
         {activeTab === "today" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader className="text-center border-b border-yellow-400/30"><Badge className="bg-yellow-400 text-black text-lg px-6 py-2.5">اليوم • {todayStr}</Badge><CardTitle className="text-3xl sm:text-4xl font-black text-yellow-300 mt-4">مباريات اليوم القادمة</CardTitle></CardHeader><CardContent className="p-6 grid gap-6">{todayMatches.length > 0 ? todayMatches.map(match => (<div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-6 hover:border-yellow-400 transition-all"><div className="text-center mb-6"><div className="text-cyan-300">{match.dayName} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-5 w-5" /><span className="text-2xl font-bold">{formatTime12(match.time)}</span></div></div><div className="flex items-center justify-center gap-6 text-2xl font-bold"><div className="flex-1">{match.home}</div><div className="text-yellow-400 font-black">VS</div><div className="flex-1">{match.away}</div></div></div>)) : <p className="text-center py-10 text-cyan-300 font-bold">لا توجد مباريات قادمة اليوم</p>}</CardContent></Card>
         )}
 
-        {/* محتوى غداً بالكامل */}
         {activeTab === "tomorrow" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Calendar className="h-8 w-8" /> مباريات غداً • {tomorrowStr}</CardTitle></CardHeader><CardContent className="p-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">{tomorrowMatches.map(match => (<div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-6 text-center hover:border-yellow-400 transition-all"><div className="text-cyan-300 mb-4">{formatTime12(match.time)}</div><div className="font-bold text-2xl text-white mb-4">{match.home}</div><div className="text-5xl font-black text-yellow-400 mb-4">VS</div><div className="font-bold text-2xl text-white">{match.away}</div></div>))}</CardContent></Card>
         )}
 
-        {/* محتوى الهدافين بالكامل */}
         {activeTab === "scorers" && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {scorers.map((player, i) => (
               <Card key={i} className={`bg-[#1e2a4a] border-yellow-400/30 rounded-3xl relative overflow-hidden ${i === 0 ? "border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.2)] scale-[1.02] transform transition-transform" : ""}`}>
                 {i === 0 && <div className="absolute top-0 right-0 bg-yellow-400 text-black text-[10px] font-black px-3 py-1 rounded-bl-lg z-10">المركز الأول 👑</div>}
                 <CardContent className="p-6 flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    {player.imageUrl ? (
-                      <div className="relative">
-                         <img src={player.imageUrl} className={`rounded-full object-cover border-2 shadow-md ${i === 0 ? 'border-yellow-400 h-16 w-16' : 'border-white/20 h-12 w-12'}`} />
-                      </div>
-                    ) : (
-                      <div className={`rounded-full bg-[#0a1428] flex items-center justify-center text-2xl ${i === 0 ? 'h-16 w-16 border-2 border-yellow-400' : 'h-12 w-12'}`}>👤</div>
-                    )}
-                    <div>
-                      <h3 className={`font-bold text-white ${i === 0 ? 'text-2xl text-yellow-300' : 'text-xl'}`}>{player.player}</h3>
-                      <p className="text-cyan-300">{player.team}</p>
-                    </div>
-                  </div>
+                  <div className="flex items-center gap-4">{player.imageUrl ? <div className="relative"><img src={player.imageUrl} className={`rounded-full object-cover border-2 shadow-md ${i === 0 ? 'border-yellow-400 h-16 w-16' : 'border-white/20 h-12 w-12'}`} /></div> : <div className={`rounded-full bg-[#0a1428] flex items-center justify-center text-2xl ${i === 0 ? 'h-16 w-16 border-2 border-yellow-400' : 'h-12 w-12'}`}>👤</div>}<div><h3 className={`font-bold text-white ${i === 0 ? 'text-2xl text-yellow-300' : 'text-xl'}`}>{player.player}</h3><p className="text-cyan-300">{player.team}</p></div></div>
                   <Badge className={`text-black text-3xl px-6 py-3 font-black ${i === 0 ? 'bg-gradient-to-r from-yellow-300 to-yellow-500 scale-110' : 'bg-yellow-400'}`}>{player.goals}</Badge>
                 </CardContent>
               </Card>
@@ -484,25 +338,13 @@ export default function Page() {
           </div>
         )}
 
-        {/* محتوى الكروت بالكامل */}
         {activeTab === "cards" && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {cardsList.filter(c => c.yellow > 0 || c.red > 0).map((item, i) => (
               <Card key={i} className="bg-[#1e2a4a] border-yellow-400/30 rounded-3xl hover:border-yellow-400 transition-all">
                 <CardContent className="p-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-xl text-white">{item.player}</h3>
-                      <p className="text-cyan-300">{item.team}</p>
-                    </div>
-                    <Badge className={`${item.status === 'متاح' ? 'bg-emerald-500' : item.status === 'إيقاف' ? 'bg-amber-500' : 'bg-rose-500'} text-white font-bold text-sm px-3`}>
-                      {item.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-4 flex gap-4">
-                    <Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold text-lg">🟨 {item.yellow}</Badge>
-                    <Badge className="bg-red-500/20 text-red-300 px-4 py-2 font-bold text-lg">🟥 {item.red}</Badge>
-                  </div>
+                  <div className="flex justify-between items-start"><div><h3 className="font-bold text-xl text-white">{item.player}</h3><p className="text-cyan-300">{item.team}</p></div><Badge className={`${item.status === 'متاح' ? 'bg-emerald-500' : item.status === 'إيقاف' ? 'bg-amber-500' : 'bg-rose-500'} text-white font-bold text-sm px-3`}>{item.status}</Badge></div>
+                  <div className="mt-4 flex gap-4"><Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold text-lg">🟨 {item.yellow}</Badge><Badge className="bg-red-500/20 text-red-300 px-4 py-2 font-bold text-lg">🟥 {item.red}</Badge></div>
                 </CardContent>
               </Card>
             ))}
@@ -512,12 +354,8 @@ export default function Page() {
       </div>
 
       {!isSubscribed && (
-        <button 
-          onClick={handleSubscribe} 
-          className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 bg-yellow-400 text-black px-5 py-3 rounded-full font-black shadow-[0_0_20px_rgba(250,204,21,0.4)] flex items-center gap-3 hover:scale-105 transition-transform animate-bounce border-2 border-black"
-        >
-          <BellRing className="h-6 w-6" />
-          <span className="hidden sm:inline text-sm">تفعيل الإشعارات</span>
+        <button onClick={handleSubscribe} className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 bg-yellow-400 text-black px-5 py-3 rounded-full font-black shadow-[0_0_20px_rgba(250,204,21,0.4)] flex items-center gap-3 hover:scale-105 transition-transform animate-bounce border-2 border-black">
+          <BellRing className="h-6 w-6" /><span className="hidden sm:inline text-sm">تفعيل الإشعارات</span>
         </button>
       )}
     </div>
