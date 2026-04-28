@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Calendar, Clock, Trophy, Target, Shield, 
-  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Video 
+  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Video, Maximize, Minimize 
 } from "lucide-react";
 import { TEAM_NAMES, INITIAL_MATCHES } from "@/data/tournament";
 import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
@@ -73,6 +73,9 @@ export default function Page() {
   
   const [predForms, setPredForms] = useState<Record<string, any>>({});
   const [predictedMatches, setPredictedMatches] = useState<Record<string, boolean>>({});
+  
+  // 🔴 متغير تمدد الجدول
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) { if (Notification.permission === "granted") setIsSubscribed(true); }
@@ -412,14 +415,45 @@ export default function Page() {
           </Card>
         )}
 
-        {/* 5. تبويب الترتيب */}
+        {/* 5. تبويب الترتيب (الجدول القابل للتوسيع) */}
         {activeTab === "standings" && (
-          <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
-            <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب</CardTitle></CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-320px)]"><table className="w-full text-white text-right"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm">{h}</th>))}</tr></thead><tbody>{standings.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-emerald-400">{row.gf}</td><td className="px-4 py-4 text-center text-rose-400">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></ScrollArea>
-            </CardContent>
-          </Card>
+          <div className={isTableExpanded ? "fixed inset-0 z-[100] bg-[#0a1428]/95 backdrop-blur-md p-2 sm:p-6 flex flex-col" : ""}>
+            <Card className={`rounded-3xl border border-yellow-400/30 bg-[#13213a] shadow-xl flex flex-col transition-all duration-300 ${isTableExpanded ? "flex-1 h-full" : ""}`}>
+              <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4">
+                <CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب</CardTitle>
+                <Button size="sm" onClick={() => setIsTableExpanded(!isTableExpanded)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2">
+                  {isTableExpanded ? <><Minimize className="h-4 w-4" /> تصغير الجدول</> : <><Maximize className="h-4 w-4" /> توسيع الشاشة</>}
+                </Button>
+              </CardHeader>
+              <CardContent className={`p-0 flex-1 overflow-hidden ${isTableExpanded ? "h-full" : ""}`}>
+                <ScrollArea className={isTableExpanded ? "h-[calc(100vh-100px)] w-full" : "h-[calc(100vh-320px)] w-full"}>
+                  <div className="overflow-x-auto w-full pb-4">
+                    <table className="w-full text-white text-right min-w-[800px]">
+                      <thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-10">
+                        <tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr>
+                      </thead>
+                      <tbody>
+                        {standings.map(row => (
+                          <tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors">
+                            <td className="px-4 py-4"><Badge className={zoneColor(row.rank)}>{row.rank}</Badge></td>
+                            <td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td>
+                            <td className="px-4 py-4 text-center">{row.played}</td>
+                            <td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td>
+                            <td className="px-4 py-4 text-center">{row.draws}</td>
+                            <td className="px-4 py-4 text-center">{row.losses}</td>
+                            <td className="px-4 py-4 text-center text-emerald-400">{row.gf}</td>
+                            <td className="px-4 py-4 text-center text-rose-400">{row.ga}</td>
+                            <td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td>
+                            <td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* 6. تبويب النتائج السابقة */}
