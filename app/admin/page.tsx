@@ -113,7 +113,8 @@ export default function AdminPage() {
     const playerNameTrimmed = goalForm.player.trim(); const teamSelected = goalForm.team; const goalsToAdd = Number(goalForm.goalsCount); const imageToAdd = goalForm.imageUrl.trim();
     if (editingGoalId) { await updateDoc(doc(db, "goals", editingGoalId), { player: playerNameTrimmed, team: teamSelected, goals: goalsToAdd, imageUrl: imageToAdd }); setEditingGoalId(null); } 
     else { 
-      const existingPlayer = goals.find(g => g.player.trim().toLowerCase() === playerNameTrimmed.toLowerCase() && g.team === teamSelected);
+      // 🟢 تم تأمين الكود هنا لتجنب خطأ undefined
+      const existingPlayer = goals.find(g => String(g.player || "").trim().toLowerCase() === playerNameTrimmed.toLowerCase() && g.team === teamSelected);
       if (existingPlayer) { await updateDoc(doc(db, "goals", existingPlayer.id), { goals: (Number(existingPlayer.goals) || 0) + goalsToAdd, ...(imageToAdd && {imageUrl: imageToAdd}) }); } 
       else { await addDoc(collection(db, "goals"), { player: playerNameTrimmed, team: teamSelected, goals: goalsToAdd, imageUrl: imageToAdd }); }
     }
@@ -124,7 +125,8 @@ export default function AdminPage() {
 
   const addCard = async () => {
     if (!cardForm.player.trim()) return alert("اكتب اسم اللاعب");
-    const existingPlayer = cardEvents.find(c => c.player.trim().toLowerCase() === cardForm.player.trim().toLowerCase() && c.team === cardForm.team);
+    // 🟢 تم تأمين الكود هنا لتجنب خطأ undefined
+    const existingPlayer = cardEvents.find(c => String(c.player || "").trim().toLowerCase() === cardForm.player.trim().toLowerCase() && c.team === cardForm.team);
     if (existingPlayer) { await updateDoc(doc(db, "cards", existingPlayer.id), { yellow: (Number(existingPlayer.yellow) || 0) + (cardForm.type === "yellow" ? 1 : 0), red: (Number(existingPlayer.red) || 0) + (cardForm.type === "red" ? 1 : 0) }); } 
     else { await addDoc(collection(db, "cards"), { player: cardForm.player.trim(), team: cardForm.team, yellow: cardForm.type === "yellow" ? 1 : 0, red: cardForm.type === "red" ? 1 : 0 }); }
     setCardForm(p => ({ ...p, player: "" })); alert("✅ تم تسجيل البطاقة");
