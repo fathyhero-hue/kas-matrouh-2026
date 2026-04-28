@@ -35,18 +35,24 @@ function normalizeTeamName(name: string): string { return String(name || "").tri
 function getOriginalTeamName(norm: string): string { return CLEANED_TEAM_NAMES.find(t => normalizeTeamName(t) === norm) || norm; }
 
 function buildStandings(matchRows: any[], allTeams: string[]) {
-  const table = new Map<string, any>();
+  const table = new Map<string, StandingRow>();
   allTeams.forEach(team => table.set(normalizeTeamName(team), { team, played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, gd: 0, points: 0, rank: 0 }));
   matchRows.forEach(match => {
     const hg = Number(match.homeGoals) ?? 0; const ag = Number(match.awayGoals) ?? 0;
-    const hNorm = normalizeTeamName(match.teamA || match.home || "");
-    const aNorm = normalizeTeamName(match.teamB || match.away || "");
-    let home = table.get(hNorm); let away = table.get(aNorm);
-    if (home && away) {
-      home.played++; away.played++; home.gf += hg; home.ga += ag; away.gf += ag; away.ga += hg;
-      if (hg > ag) { home.wins++; home.points += 3; away.losses++; } else if (hg < ag) { away.wins++; away.points += 3; home.losses++; } else { home.draws++; away.draws++; home.points++; away.points++; }
-    }
+    const hNorm = normalizeTeamName(match.home || match.teamA || ""); const aNorm = normalizeTeamName(match.away || match.teamB || "");
+    let home = table.get(hNorm) || { team: getOriginalTeamName(hNorm), played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, gd: 0, points: 0, rank: 0 };
+    let away = table.get(aNorm) || { team: getOriginalTeamName(aNorm), played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, gd: 0, points: 0, rank: 0 };
+    home.played++; away.played++; home.gf += hg; home.ga += ag; away.gf += ag; away.ga += hg;
+    if (hg > ag) { home.wins++; home.points += 3; away.losses++; } else if (hg < ag) { away.wins++; away.points += 3; home.losses++; } else { home.draws++; away.draws++; home.points++; away.points++; }
+    table.set(hNorm, home); table.set(aNorm, away);
   });
+
+  // 🔴 خصم 3 نقاط إدارياً من فريق "17 فبراير"
+  const penalizedTeam = table.get(normalizeTeamName("17 فبراير"));
+  if (penalizedTeam) {
+    penalizedTeam.points -= 3;
+  }
+
   return Array.from(table.values()).map(row => ({ ...row, gd: row.gf - row.ga })).sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team, "ar")).map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
