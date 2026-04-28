@@ -286,7 +286,7 @@ export default function AdminPage() {
                   <tbody>
                     {predictions.map(p => (
                        <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
-                          <td className="p-4 font-bold">{p.matchName}</td>
+                          <td className="p-4 font-bold text-white">{p.matchName}</td>
                           <td className="p-4 font-bold text-white">{p.name}</td>
                           <td className="p-4 text-emerald-400 font-mono text-lg">{p.phone}</td>
                           <td className="p-4 text-center"><Badge className="bg-yellow-400 text-black text-xl px-4 py-1 font-black">{p.homeScore} - {p.awayScore}</Badge></td>
