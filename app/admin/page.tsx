@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift } from "lucide-react";
+import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
@@ -15,6 +15,16 @@ const ADMIN_PASSWORD = "hero123";
 
 const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
 const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
+
+// قائمة الرعاة المعتمدة عشان القائمة المنسدلة
+const SPONSORS = [
+  { name: "الفهد للديكور", src: "/alfahd.png" }, { name: "أحمد عبدالعاطي المحامي", src: "/abdelaty.png" }, { name: "دثار للزي العربي", src: "/dithar.png" },
+  { name: "معصرة فرجينيا", src: "/virginia.png" }, { name: "دبي للزي العربي", src: "/dubai.png" }, { name: "معرض الأمانة", src: "/alamana.png" },
+  { name: "تراث البادية", src: "/torath.png" }, { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" }, { name: "مياة حياة", src: "/hayah.png" },
+  { name: "القدس للأثاث", src: "/alquds.png" }, { name: "أيس كريم الملكة", src: "/almaleka.png" }, { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
+  { name: "M MART", src: "/mmart.png" }, { name: "هيرو سبورت", src: "/hero-sport.png" }, { name: "الفتح للفراشة", src: "/alfath.png" }, { name: "عادل العميري للديكور", src: "/alomairy.png" }
+];
+
 type StandingRow = { team: string; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; points: number; rank: number; };
 function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
 function getOriginalTeamName(norm: string): string { return CLEANED_TEAM_NAMES.find(t => normalizeTeamName(t) === norm) || norm; }
@@ -51,6 +61,7 @@ export default function AdminPage() {
   const [cardEvents, setCardEvents] = useState<any[]>([]);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
+  const [motmList, setMotmList] = useState<any[]>([]);
   
   const [tickerText, setTickerText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,15 +76,20 @@ export default function AdminPage() {
 
   const [matchForm, setMatchForm] = useState({
     teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0,
-    round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ", motm: "", motmImage: ""
+    round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ"
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [goalForm, setGoalForm] = useState({ player: "", team: CLEANED_TEAM_NAMES[0], goalsCount: 1, imageUrl: "" });
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [cardForm, setCardForm] = useState({ player: "", team: CLEANED_TEAM_NAMES[0], type: "yellow" as "yellow" | "red" });
-  
   const [mediaForm, setMediaForm] = useState({ title: "", url: "" });
+  
+  // 🔴 فورم إضافة رجل المباراة (بياخد أول راعي افتراضياً)
+  const [motmForm, setMotmForm] = useState({ 
+    player: "", team: CLEANED_TEAM_NAMES[0], imageUrl: "", 
+    sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src 
+  });
 
   const now = new Date();
   const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
@@ -90,6 +106,7 @@ export default function AdminPage() {
     const unsubCards = onSnapshot(collection(db, "cards"), (snap) => setCardEvents(snap.docs.map(d => ({ id: d.id, ...d.data(), team: cleanTeamString(d.data().team) }))));
     const unsubMedia = onSnapshot(collection(db, "media"), (snap) => setMediaItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubPredictions = onSnapshot(collection(db, "predictions"), (snap) => setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
+    const unsubMotm = onSnapshot(collection(db, "motm"), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
 
     const timerInterval = setInterval(() => {
@@ -100,7 +117,7 @@ export default function AdminPage() {
       });
     }, 60000); 
 
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubTicker(); clearInterval(timerInterval); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubTicker(); clearInterval(timerInterval); };
   }, [isAuth]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
@@ -111,10 +128,10 @@ export default function AdminPage() {
     const data = { ...matchForm, dayName, isLive: false };
     if (editingId) { await updateDoc(doc(db, "matches", editingId), data); setEditingId(null); alert("✅ تم تعديل المباراة بنجاح");} 
     else { await addDoc(collection(db, "matches"), data); alert("✅ تم إضافة المباراة بنجاح");}
-    setMatchForm({ teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ", motm: "", motmImage: "" });
+    setMatchForm({ teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
   };
 
-  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamB: match.teamB, homeGoals: match.homeGoals, awayGoals: match.awayGoals, round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ", motm: match.motm || "", motmImage: match.motmImage || "" }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamB: match.teamB, homeGoals: match.homeGoals, awayGoals: match.awayGoals, round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, "matches", id));
   const updateMatchLive = async (id: string, updates: any) => await updateDoc(doc(db, "matches", id), updates);
 
@@ -181,6 +198,14 @@ export default function AdminPage() {
   };
   const deleteMedia = async (id: string) => confirm("حذف هذا الفيديو؟") && await deleteDoc(doc(db, "media", id));
 
+  const addMotm = async () => {
+    if (!motmForm.player.trim() || !motmForm.sponsorName.trim()) return alert("يجب كتابة اسم اللاعب واسم الراعي!");
+    await addDoc(collection(db, "motm"), motmForm);
+    setMotmForm({ player: "", team: CLEANED_TEAM_NAMES[0], imageUrl: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src }); 
+    alert("✅ تم إضافة النجم بنجاح");
+  };
+  const deleteMotm = async (id: string) => confirm("حذف هذا اللاعب من قائمة نجوم المباريات؟") && await deleteDoc(doc(db, "motm", id));
+
   const deletePrediction = async (id: string) => confirm("حذف التوقع؟") && await deleteDoc(doc(db, "predictions", id));
   const deleteAllPredictions = async () => {
      if (!confirm("⚠️ تحذير: هل أنت متأكد من مسح جميع التوقعات السابقة لتبدأ جولة جديدة؟")) return;
@@ -227,7 +252,6 @@ export default function AdminPage() {
           <Button onClick={() => setIsAuth(false)} variant="outline" className="border-yellow-400 text-white hover:bg-yellow-400 hover:text-black">خروج <LogOut className="ml-2 h-4 w-4" /></Button>
         </header>
 
-        {/* نموذج إضافة وتعديل المباراة في الأعلى لتسهيل الوصول */}
         <Card className="border-yellow-400 bg-[#13213a] mb-8 mt-4 shadow-2xl">
           <CardHeader><CardTitle className="text-yellow-300">{editingId ? "تعديل مباراة" : "إضافة مباراة جديدة"}</CardTitle></CardHeader>
           <CardContent className="space-y-6 p-6 text-white">
@@ -239,10 +263,9 @@ export default function AdminPage() {
               <Input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({...p, date: e.target.value}))} className="text-white bg-[#1e2a4a] border-yellow-400 rounded-2xl p-4 font-bold" />
               <select value={matchForm.status} onChange={e => setMatchForm(p => ({...p, status: e.target.value}))} className="bg-[#1e2a4a] border border-red-500 rounded-2xl p-4 text-white font-bold"><option value="لم تبدأ">حالة المباراة: لم تبدأ</option><option value="انتهت">حالة المباراة: انتهت ✔️</option></select>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 border-t border-yellow-400/20 pt-6"><div><label className="block mb-2 text-emerald-400 font-bold"><Trophy className="inline h-4 w-4 mr-1"/> رجل المباراة (الاسم)</label><Input value={matchForm.motm} onChange={e => setMatchForm(p => ({...p, motm: e.target.value}))} placeholder="اسم النجم..." className="text-white bg-[#1e2a4a] border-emerald-500" /></div><div><label className="block mb-2 text-emerald-400 font-bold">رابط صورة اللاعب (اختياري)</label><Input value={matchForm.motmImage} onChange={e => setMatchForm(p => ({...p, motmImage: e.target.value}))} placeholder="رابط الصورة..." className="text-white bg-[#1e2a4a] border-emerald-500" /></div></div>
-            <div className="flex gap-4">
+            <div className="flex gap-4 mt-6">
               <Button onClick={saveMatch} className="flex-1 bg-yellow-400 text-black font-black py-7 text-xl hover:bg-yellow-500 transition-all">{editingId ? "حفظ التعديل" : "إضافة المباراة"}</Button>
-              {editingId && <Button onClick={() => {setEditingId(null); setMatchForm({ teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ", motm: "", motmImage: "" });}} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-7 px-8">إلغاء</Button>}
+              {editingId && <Button onClick={() => {setEditingId(null); setMatchForm({ teamA: CLEANED_TEAM_NAMES[0], teamB: CLEANED_TEAM_NAMES[1], homeGoals: 0, awayGoals: 0, round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });}} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-7 px-8">إلغاء</Button>}
             </div>
           </CardContent>
         </Card>
@@ -251,6 +274,7 @@ export default function AdminPage() {
           <TabsList className="flex flex-wrap justify-center bg-[#13213a] border border-yellow-400/50 p-1.5 rounded-2xl mb-8 gap-2 h-auto shadow-lg">
             <TabsTrigger value="live" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-red-400">مباشر</TabsTrigger>
             <TabsTrigger value="knockout" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">إقصائيات 🏆</TabsTrigger>
+            <TabsTrigger value="motm" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">نجوم 🌟</TabsTrigger>
             <TabsTrigger value="all" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">السابقة</TabsTrigger>
             <TabsTrigger value="today" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">اليوم</TabsTrigger>
             <TabsTrigger value="tomorrow" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">غداً</TabsTrigger>
@@ -262,7 +286,56 @@ export default function AdminPage() {
             <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 bg-black/40 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
           </TabsList>
 
-          {/* 🔴 تبويب الأدوار الإقصائية (شجرة الإدارة) */}
+          {/* 🔴 تبويب رجل المباراة (MOTM) والقائمة المنسدلة للرعاة */}
+          <TabsContent value="motm">
+            <Card className="border-yellow-400 bg-[#13213a]">
+              <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-2"><Star /> إدارة جوائز رجل المباراة (MOTM)</CardTitle></CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl items-center border border-yellow-400/20 shadow-inner">
+                  
+                  <Input value={motmForm.player} onChange={e => setMotmForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب (النجم)" className="bg-[#0a1428] border-yellow-400 text-white h-12" />
+                  
+                  <select value={motmForm.team} onChange={e => setMotmForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-xl p-3 text-white h-12 outline-none">
+                     {sortedTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  
+                  <Input value={motmForm.imageUrl} onChange={e => setMotmForm(p => ({...p, imageUrl: e.target.value}))} placeholder="صورة اللاعب (رابط URL)" className="bg-[#0a1428] border-yellow-400 text-white h-12" />
+                  
+                  {/* القائمة المنسدلة الذكية للرعاة مع مربع للوجو */}
+                  <div className="flex gap-2 h-12">
+                    <select 
+                      value={motmForm.sponsorName} 
+                      onChange={e => {
+                         const sp = SPONSORS.find(s => s.name === e.target.value);
+                         setMotmForm(p => ({...p, sponsorName: sp?.name || "", sponsorLogo: sp?.src || ""}));
+                      }} 
+                      className="bg-[#0a1428] border border-yellow-400 rounded-xl px-2 text-white flex-1 outline-none text-sm"
+                    >
+                      {SPONSORS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                    </select>
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border-2 border-yellow-400 shrink-0 p-1 overflow-hidden shadow-inner">
+                      {motmForm.sponsorLogo ? <img src={motmForm.sponsorLogo} className="max-h-full max-w-full object-contain" alt="لوجو الراعي" /> : null}
+                    </div>
+                  </div>
+
+                  <Button onClick={addMotm} className="bg-yellow-400 text-black font-black h-12 lg:col-span-4 mt-2 hover:scale-[1.01] transition-transform">إضافة النجم للقائمة 🌟</Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {motmList.map(m => (
+                    <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-yellow-400/30">
+                      <div className="flex items-center gap-4">
+                        {m.imageUrl ? <img src={m.imageUrl} className="h-12 w-12 rounded-full object-cover border-2 border-yellow-400" /> : <div className="h-12 w-12 rounded-full bg-[#0a1428] flex items-center justify-center text-xl border-2 border-yellow-400">👤</div>}
+                        <div><div className="font-bold text-white text-lg">{m.player}</div><div className="text-cyan-300 text-xs mt-1">{m.team} • برعاية {m.sponsorName}</div></div>
+                      </div>
+                      <Button size="sm" variant="destructive" onClick={() => deleteMotm(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="knockout">
             <div className="space-y-10">
               <div className="bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-4 sm:p-6 rounded-3xl border-2 border-yellow-400/50 shadow-xl relative overflow-hidden">
@@ -323,7 +396,6 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* التوقعات */}
           <TabsContent value="predictions">
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-white/10 pb-4">
@@ -390,7 +462,7 @@ export default function AdminPage() {
             ))}
           </TabsContent>
 
-          <TabsContent value="all"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader className="flex flex-col sm:flex-row justify-between gap-4"><CardTitle className="text-yellow-300">المباريات السابقة</CardTitle><Input placeholder="ابحث عن فريق..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader><CardContent className="space-y-3">{matches.filter(m => !m.isLive && (String(m.teamA || "").includes(searchTerm) || String(m.teamB || "").includes(searchTerm))).map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4 border border-yellow-400/30"><div><div className="font-bold text-white">{m.teamA} <span className="text-yellow-400 mx-1">{m.homeGoals} - {m.awayGoals}</span> {m.teamB}</div><div className="text-cyan-300 text-sm">{m.date} • {m.status || m.time} {m.motm && <span className="text-yellow-400 font-bold border-r border-white/20 pr-2 mr-2">🌟 {m.motm}</span>}</div></div><div className="flex gap-2 flex-wrap"><Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, status: m.status || "ستبدأ بعد قليل", liveMinute: m.liveMinute || 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 hover:bg-red-700 text-white"><Play className="ml-1 h-4 w-4" /> بث</Button><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black"><Edit className="ml-1 h-4 w-4" /> تعديل</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive"><Trash2 className="ml-1 h-4 w-4" /> حذف</Button></div></div>))}</CardContent></Card></TabsContent>
+          <TabsContent value="all"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader className="flex flex-col sm:flex-row justify-between gap-4"><CardTitle className="text-yellow-300">المباريات السابقة</CardTitle><Input placeholder="ابحث عن فريق..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader><CardContent className="space-y-3">{matches.filter(m => !m.isLive && (String(m.teamA || "").includes(searchTerm) || String(m.teamB || "").includes(searchTerm))).map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4 border border-yellow-400/30"><div><div className="font-bold text-white">{m.teamA} <span className="text-yellow-400 mx-1">{m.homeGoals} - {m.awayGoals}</span> {m.teamB}</div><div className="text-cyan-300 text-sm">{m.date} • {m.status || m.time}</div></div><div className="flex gap-2 flex-wrap"><Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, status: m.status || "ستبدأ بعد قليل", liveMinute: m.liveMinute || 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 hover:bg-red-700 text-white"><Play className="ml-1 h-4 w-4" /> بث</Button><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black"><Edit className="ml-1 h-4 w-4" /> تعديل</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive"><Trash2 className="ml-1 h-4 w-4" /> حذف</Button></div></div>))}</CardContent></Card></TabsContent>
           <TabsContent value="today"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300">مباريات اليوم</CardTitle></CardHeader><CardContent className="space-y-3">{matches.filter(m => m.date === todayStr && !m.isLive && m.status !== "انتهت").map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center border-l-4 border-yellow-400 gap-4"><div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div><div className="flex gap-2"><Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-emerald-600 text-white hover:bg-emerald-700"><Play className="ml-1 h-4 w-4" /> ابدأ البث</Button><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل النتيجة</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive">حذف</Button></div></div>))}</CardContent></Card></TabsContent>
           <TabsContent value="tomorrow"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300">مباريات غداً</CardTitle></CardHeader><CardContent className="space-y-3">{matches.filter(m => m.date === tomorrowStr && !m.isLive).map(m => (<div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 border-l-4 border-sky-400"><div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل</Button><Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive">حذف</Button></div></div>))}</CardContent></Card></TabsContent>
           <TabsContent value="goals"><Card className="border-yellow-400 bg-[#13213a]"><CardHeader><CardTitle className="text-yellow-300">إدارة الأهداف</CardTitle><Input placeholder="ابحث عن لاعب أو فريق..." value={goalSearchTerm} onChange={(e) => setGoalSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader><CardContent className="p-6 space-y-6"><div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-[#1e2a4a] rounded-2xl"><Input value={goalForm.player} onChange={e => setGoalForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" /><select value={goalForm.team} onChange={e => setGoalForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white">{sortedTeams.map(t => <option key={t} value={t}>{t}</option>)}</select><Input type="number" value={goalForm.goalsCount} onChange={e => setGoalForm(p => ({...p, goalsCount: Number(e.target.value)}))} placeholder="عدد الأهداف" className="bg-[#0a1428] border-yellow-400 text-white" /><Input value={goalForm.imageUrl} onChange={e => setGoalForm(p => ({...p, imageUrl: e.target.value}))} placeholder="رابط صورة اللاعب (اختياري)" className="bg-[#0a1428] border-yellow-400 text-white" /><Button onClick={addOrUpdateGoal} className="bg-yellow-400 text-black font-bold h-full">{editingGoalId ? "تعديل" : "إضافة"}</Button></div><div className="space-y-3">{filteredGoals.map(goal => (<Card key={goal.id} className="bg-[#1e2a4a] border border-yellow-400/30"><CardContent className="p-4 flex justify-between items-center text-white"><div className="flex items-center gap-4">{goal.imageUrl ? <img src={goal.imageUrl} className="h-10 w-10 rounded-full object-cover border border-yellow-400" /> : <div className="h-10 w-10 rounded-full bg-[#0a1428] flex items-center justify-center text-xl">👤</div>}<div><div className="font-bold">{goal.player}</div><div className="text-cyan-300 text-sm">{goal.team} — {goal.goals} هدف</div></div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEditGoal(goal)} className="bg-yellow-400 text-black"><Edit className="ml-2 h-4 w-4" /> تعديل</Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(goal.id)}><Trash2 className="ml-2 h-4 w-4" /> حذف</Button></div></CardContent></Card>))}</div></CardContent></Card></TabsContent>
