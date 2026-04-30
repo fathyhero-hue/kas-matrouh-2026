@@ -1,7 +1,21 @@
+const CACHE_NAME = 'matrouh-cup-cache-v1';
+const urlsToCache = ['/'];
+
 self.addEventListener('install', (event) => {
-  console.log('Service worker installed');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        return cache.addAll(urlsToCache);
+      })
+  );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass PWA checks
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        // لو لقى الداتا متخزنة يفتحها، لو ملقاش يطلبها من النت
+        return response || fetch(event.request);
+      })
+  );
 });

@@ -2,13 +2,14 @@
   "id": "/",
   "name": "كأس مطروح",
   "short_name": "كأس مطروح",
-  "description": "التطبيق الرسمي لمتابعة نتائج وأخبار بطولة كأس مطروح النسخة الثالثة",
+  "description": "التطبيق الرسمي لمتابعة نتائج وأخبار بطولة كأس مطروح",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a1428",
   "theme_color": "#0a1428",
   "orientation": "portrait",
-  "categories": ["sports", "entertainment", "news"],
+  "categories": ["sports", "entertainment"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/logo.png",
