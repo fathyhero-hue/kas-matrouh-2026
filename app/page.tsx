@@ -20,6 +20,15 @@ function formatTime12(time24: string): string {
   return `${hours % 12 || 12}:${minutes.toString().padStart(2, "0")} ${period}`;
 }
 
+// دالة لحساب اسم اليوم أوتوماتيكياً من التاريخ
+function getArabicDay(dateString: string): string {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return "";
+  const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  return days[d.getDay()];
+}
+
 const getYoutubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
   const match = url?.match(regExp);
@@ -54,6 +63,7 @@ function buildStandings(matchRows: any[], allTeams: string[]) {
 
 function zoneColor(rank: number) { return rank <= 8 ? "bg-emerald-500 text-white" : rank <= 24 ? "bg-sky-400 text-white" : "bg-rose-500 text-white"; }
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
+function sortMatchesAsc(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return a.date.localeCompare(b.date); return (a.time || "00:00").localeCompare(b.time || "00:00"); }); }
 
 export default function Page() {
   const [matches, setMatches] = useState<any[]>([]);
@@ -148,10 +158,10 @@ export default function Page() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
-  const liveMatches = sortMatches(matches.filter(m => m.isLive === true));
-  const finishedMatches = sortMatches(matches.filter(m => !m.isLive && (m.status === "انتهت" || m.date < todayStr)));
-  const todayMatches = sortMatches(matches.filter(m => !m.isLive && m.date === todayStr && m.status !== "انتهت"));
-  const tomorrowMatches = sortMatches(matches.filter(m => !m.isLive && m.date === tomorrowStr && m.status !== "انتهت"));
+  const liveMatches = sortMatchesAsc(matches.filter(m => m.isLive === true));
+  const finishedMatches = sortMatches(matches.filter(m => !m.isLive && (m.status === "انتهت" || m.date < todayStr))); 
+  const todayMatches = sortMatchesAsc(matches.filter(m => !m.isLive && m.date === todayStr && m.status !== "انتهت"));
+  const tomorrowMatches = sortMatchesAsc(matches.filter(m => !m.isLive && m.date === tomorrowStr && m.status !== "انتهت"));
 
   const standings = useMemo(() => buildStandings(finishedMatches, CLEANED_TEAM_NAMES), [finishedMatches]);
   
@@ -166,7 +176,6 @@ export default function Page() {
     return Array.from(map.values()).sort((a, b) => b.goals - a.goals);
   }, [goalEvents]);
 
-  // فلاتر البحث الجديدة
   const filteredScorers = useMemo(() => {
     return scorers.filter(s => !searchScorers || s.player.includes(searchScorers) || s.team.includes(searchScorers));
   }, [scorers, searchScorers]);
@@ -206,7 +215,6 @@ export default function Page() {
     return Array.from(map.values()).map(row => ({ ...row, status: row.red > 0 ? "طرد" : row.yellow >= 3 ? "إيقاف" : "متاح" })).sort((a, b) => b.red - a.red || b.yellow - a.yellow);
   }, [cardEvents]);
 
-  // فلتر بحث الكروت
   const filteredCardsList = useMemo(() => {
     return cardsList.filter(c => (!searchCards || c.player.includes(searchCards) || c.team.includes(searchCards)) && (c.yellow > 0 || c.red > 0));
   }, [cardsList, searchCards]);
@@ -251,7 +259,7 @@ export default function Page() {
           <p className="mt-3 text-2xl text-cyan-300">النسخة الثالثة ٢٠٢٦</p>
         </div>
 
-        {/* أزرار التبويبات (معدلة الأسماء) */}
+        {/* أزرار التبويبات */}
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
             { key: "knockout", label: "الأدوار الإقصائية", icon: "🏆" },
@@ -301,7 +309,7 @@ export default function Page() {
             <div className="mt-12 border-t border-yellow-400/20 pt-10">
               <h3 className="text-2xl font-black text-center text-yellow-300 mb-8">نتائج وجدول الإقصائيات المباشرة</h3>
               {["النهائي", "نصف النهائي", "دور الثمانية", "دور الستة عشر", "الملحق"].map((roundName) => {
-                const roundMatches = sortMatches(matches.filter(m => m.round === roundName));
+                const roundMatches = sortMatchesAsc(matches.filter(m => m.round === roundName));
                 if (roundMatches.length === 0) return null;
                 return (
                   <div key={roundName} className="mb-8"><div className="flex justify-center mb-4"><Badge className="bg-white/10 text-yellow-300 text-lg px-6 py-1 border border-yellow-400/30">{roundName}</Badge></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -316,7 +324,7 @@ export default function Page() {
                           }
                         }
                         return (
-                          <Card key={match.id} className={`bg-[#1e2a4a] border ${isFinished ? 'border-white/10' : 'border-yellow-400/30'} overflow-hidden shadow-md transition-transform hover:scale-[1.02]`}><CardContent className="p-4"><div className="text-center text-xs text-cyan-300 mb-4 font-bold border-b border-white/5 pb-2">{match.date} • {match.time}</div><div className="flex flex-col gap-2"><div className={`flex justify-between items-center p-3 rounded-xl ${homeWon ? 'bg-[#13213a] border border-cyan-500/50' : awayWon ? 'opacity-40 grayscale' : 'bg-[#0a1428]'}`}><span className="font-bold text-white">{match.teamA}</span><span className="font-black text-xl text-yellow-400">{match.homeGoals}</span></div><div className={`flex justify-between items-center p-3 rounded-xl ${awayWon ? 'bg-[#13213a] border border-cyan-500/50' : homeWon ? 'opacity-40 grayscale' : 'bg-[#0a1428]'}`}><span className="font-bold text-white">{match.teamB}</span><span className="font-black text-xl text-yellow-400">{match.awayGoals}</span></div></div>{(match.penaltiesHome && match.penaltiesHome.length > 0 && match.homeGoals === match.awayGoals && isFinished) && (<div className="text-center mt-3 pt-2 border-t border-white/5"><Badge className="bg-black/50 text-yellow-400 text-xs">ركلات ترجيح ({match.penaltiesHome.filter((p:string)=>p==='scored').length}) - ({match.penaltiesAway.filter((p:string)=>p==='scored').length})</Badge></div>)}</CardContent></Card>
+                          <Card key={match.id} className={`bg-[#1e2a4a] border ${isFinished ? 'border-white/10' : 'border-yellow-400/30'} overflow-hidden shadow-md transition-transform hover:scale-[1.02]`}><CardContent className="p-4"><div className="text-center text-xs sm:text-sm text-cyan-300 mb-4 font-bold border-b border-white/5 pb-2">{getArabicDay(match.date)} • {match.date} • {formatTime12(match.time)}</div><div className="flex flex-col gap-2"><div className={`flex justify-between items-center p-3 rounded-xl ${homeWon ? 'bg-[#13213a] border border-cyan-500/50' : awayWon ? 'opacity-40 grayscale' : 'bg-[#0a1428]'}`}><span className="font-bold text-white">{match.teamA}</span><span className="font-black text-xl text-yellow-400">{match.homeGoals}</span></div><div className={`flex justify-between items-center p-3 rounded-xl ${awayWon ? 'bg-[#13213a] border border-cyan-500/50' : homeWon ? 'opacity-40 grayscale' : 'bg-[#0a1428]'}`}><span className="font-bold text-white">{match.teamB}</span><span className="font-black text-xl text-yellow-400">{match.awayGoals}</span></div></div>{(match.penaltiesHome && match.penaltiesHome.length > 0 && match.homeGoals === match.awayGoals && isFinished) && (<div className="text-center mt-3 pt-2 border-t border-white/5"><Badge className="bg-black/50 text-yellow-400 text-xs">ركلات ترجيح ({match.penaltiesHome.filter((p:string)=>p==='scored').length}) - ({match.penaltiesAway.filter((p:string)=>p==='scored').length})</Badge></div>)}</CardContent></Card>
                         )
                       })}
                     </div></div>
@@ -330,8 +338,8 @@ export default function Page() {
         {activeTab === "motm_tab" && (
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {motmList.length > 0 ? motmList.map((m, i) => (
-              <div key={i} className="group relative"><div className="bg-[#13213a] rounded-t-3xl p-4 border-x border-t border-yellow-400/30 flex items-center justify-between"><div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">رجل المباراة برعاية</div><div className="flex items-center gap-2"><span className="text-xs font-black text-white">{m.sponsorName}</span><img src={m.sponsorLogo} className="h-6 w-6 object-contain" /></div></div><div className="relative aspect-square overflow-hidden border-x border-yellow-400/50 p-2 bg-gradient-to-b from-[#13213a] to-[#0a1428]"><img src={m.imageUrl} className="w-full h-full object-cover rounded-xl shadow-2xl transition-transform group-hover:scale-105" /></div><div className="bg-yellow-400 text-black rounded-b-3xl p-4 text-center border-x border-b border-yellow-400 shadow-xl"><div className="text-2xl font-black">{m.player}</div><div className="text-sm font-bold opacity-80">{m.team}</div></div></div>
-            )) : <p className="text-center col-span-full py-20 text-gray-500 font-bold text-xl">انتظروا جوائز النجوم بعد كل مباراة! 🌟</p>}
+              <div key={i} className="group relative"><div className="bg-[#13213a] rounded-t-3xl p-4 border-x border-t border-yellow-400/30 flex items-center justify-between"><div className="text-[10px] font-bold text-cyan-300 uppercase tracking-tighter">رجل المباراة برعاية</div><div className="flex items-center gap-2"><span className="text-xs font-black text-white">{m.sponsorName}</span><img src={m.sponsorLogo} className="h-6 w-6 object-contain" /></div></div><div className="relative aspect-square overflow-hidden border-x border-yellow-400/50 p-2 bg-gradient-to-b from-[#13213a] to-[#0a1428]"><img src={m.imageUrl} className="w-full h-full object-cover rounded-xl shadow-2xl transition-transform group-hover:scale-105" /></div><div className="bg-yellow-400 text-black rounded-b-3xl p-4 text-center border-x border-b border-yellow-400 shadow-xl"><div className="text-2xl font-black">{m.player}</div><div className="text-sm font-bold opacity-80">{m.team}</div></div></div>
+            )) : <p className="text-center col-span-full py-20 text-white font-bold text-xl">انتظروا جوائز النجوم بعد كل مباراة! 🌟</p>}
           </div>
         )}
 
@@ -378,7 +386,7 @@ export default function Page() {
           <Card className="rounded-3xl border-2 border-yellow-400/50 bg-[#13213a] shadow-xl"><CardHeader className="text-center border-b border-white/5"><div className="flex justify-center items-center gap-2 mb-2"><span className="animate-ping absolute h-3 w-3 rounded-full bg-cyan-400"></span><span className="text-cyan-400 font-black uppercase">Live Now</span></div><CardTitle className="text-3xl font-black text-white">المباريات الجارية</CardTitle></CardHeader><CardContent className="p-6 grid gap-6">{liveMatches.length > 0 ? liveMatches.map(match => { const isStartingSoon = match.status === "ستبدأ بعد قليل"; return (<div key={match.id} className={`relative rounded-3xl bg-gradient-to-r from-[#1e2a4a] to-[#25345a] border-2 ${isStartingSoon ? 'border-cyan-500/80 shadow-[0_0_30px_rgba(34,211,238,0.2)]' : 'border-white/10'} p-8 overflow-hidden`}><div className={`absolute top-0 inset-x-0 text-white text-center py-1 text-sm font-bold shadow-md ${isStartingSoon ? 'bg-cyan-500 text-black' : 'bg-yellow-400 text-black'}`}><span>{match.status} {!isStartingSoon && match.status !== "استراحة" && match.status !== "انتهت" && ` - الدقيقة ${match.liveMinute}'`}</span></div><div className="mt-6 flex justify-between items-center gap-6"><div className="flex-1 text-center md:text-right font-bold text-xl sm:text-2xl text-white">{match.teamA}</div><div className="flex items-center gap-6 bg-[#0a1428] px-8 py-4 rounded-3xl border border-white/5 shadow-inner"><span className="text-4xl sm:text-6xl font-black text-white">{match.homeGoals}</span><span className="text-2xl sm:text-3xl text-yellow-400 font-black">:</span><span className="text-4xl sm:text-6xl font-black text-white">{match.awayGoals}</span></div><div className="flex-1 text-center md:text-left font-bold text-xl sm:text-2xl text-white">{match.teamB}</div></div></div>)}) : <div className="py-20 text-center"><p className="text-xl text-white font-bold">لا توجد مباريات جارية حالياً</p></div>}</CardContent></Card>
         )}
 
-        {/* 6. تبويب الترتيب (بالعرض المقلوب للموبايل وكود التمرير المحسن) */}
+        {/* 6. تبويب الترتيب */}
         {activeTab === "standings" && (
           <>
             {!isTableExpanded && (
@@ -436,7 +444,7 @@ export default function Page() {
              <CardContent className="p-6 grid gap-4 md:grid-cols-2">
                {finishedMatches.filter(m => !search || m.teamA.includes(search) || m.teamB.includes(search)).map(match => (
                  <div key={match.id} className="bg-[#1e2a4a] p-6 rounded-3xl border border-white/5 text-center hover:border-yellow-400/50 transition-all">
-                    <div className="text-cyan-300 text-xs mb-3 font-bold">{match.date} • {match.round}</div>
+                    <div className="text-cyan-300 text-xs sm:text-sm mb-3 font-bold">{getArabicDay(match.date)} • {match.date} • {match.round}</div>
                     <div className="flex items-center justify-center gap-4">
                        <div className="flex-1 font-bold text-sm sm:text-xl text-white">{match.teamA}</div>
                        <div className="text-2xl sm:text-4xl font-black text-yellow-400 px-2">{match.homeGoals} - {match.awayGoals}</div>
@@ -448,18 +456,18 @@ export default function Page() {
            </Card>
         )}
 
-        {/* 8. تبويب اليوم (تعديل الألوان والحجم) */}
+        {/* 8. تبويب اليوم */}
         {activeTab === "today" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
              <CardHeader className="text-center border-b border-yellow-400/30 pb-6">
-                <Badge className="bg-yellow-400 text-black text-sm sm:text-lg px-6 py-2.5">مباريات اليوم • {todayStr}</Badge>
+                <Badge className="bg-yellow-400 text-black text-sm sm:text-lg px-6 py-2.5">مباريات اليوم • {getArabicDay(todayStr)} {todayStr}</Badge>
                 <CardTitle className="text-2xl sm:text-4xl font-black text-yellow-300 mt-4">مواجهات اليوم</CardTitle>
              </CardHeader>
              <CardContent className="p-4 sm:p-6 grid gap-6 mt-4">
                {todayMatches.length > 0 ? todayMatches.map(match => (
                  <div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-4 sm:p-6 hover:border-yellow-400 transition-all">
                     <div className="text-center mb-6">
-                       <div className="text-cyan-300 text-xs sm:text-sm font-bold">{match.dayName} • {match.date}</div>
+                       <div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
                        <div className="flex items-center justify-center gap-2 text-yellow-300 mt-2">
                           <Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span>
                        </div>
@@ -476,18 +484,18 @@ export default function Page() {
            </Card>
         )}
 
-        {/* 9. تبويب غداً (تعديل الألوان والحجم) */}
+        {/* 9. تبويب غداً */}
         {activeTab === "tomorrow" && (
            <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a]">
              <CardHeader className="text-center border-b border-yellow-400/30 pb-6">
-                <Badge className="bg-yellow-400 text-black text-sm sm:text-lg px-6 py-2.5">مباريات غداً • {tomorrowStr}</Badge>
+                <Badge className="bg-yellow-400 text-black text-sm sm:text-lg px-6 py-2.5">مباريات غداً • {getArabicDay(tomorrowStr)} {tomorrowStr}</Badge>
                 <CardTitle className="text-2xl sm:text-4xl font-black text-yellow-300 mt-4">مواجهات غداً</CardTitle>
              </CardHeader>
              <CardContent className="p-4 sm:p-6 grid gap-6 mt-4 md:grid-cols-2">
                {tomorrowMatches.map(match => (
                  <div key={match.id} className="rounded-3xl border border-yellow-400/30 bg-[#1e2a4a] p-4 sm:p-6 hover:border-yellow-400 transition-all">
                     <div className="text-center mb-6">
-                       <div className="text-cyan-300 text-xs sm:text-sm font-bold">{match.date}</div>
+                       <div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
                        <div className="flex items-center justify-center gap-2 text-yellow-300 mt-2">
                           <Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span>
                        </div>
@@ -551,6 +559,15 @@ export default function Page() {
              </div>
           </div>
         )}
+        
+        {/* 🔴 فوتر حقوق الملكية واسم المطور */}
+        <div className="mt-16 border-t border-white/5 pt-6 pb-2 flex flex-col items-center justify-center text-center">
+           <div className="text-gray-400 text-sm font-bold flex items-center gap-2">
+              <span>إعداد وتطوير</span>
+              <Badge className="bg-[#13213a] text-yellow-400 border border-yellow-400/20 px-3 py-1 font-black text-sm hover:scale-105 transition-transform cursor-default shadow-md">فتحي هيرو 🦅</Badge>
+           </div>
+           <div className="text-cyan-300 text-[10px] mt-2 opacity-60 font-bold tracking-wider">جميع الحقوق محفوظة © 2026 لبطولة كأس مطروح</div>
+        </div>
 
       </div>
 
