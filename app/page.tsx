@@ -141,17 +141,17 @@ export default function Page() {
   const [searchCards, setSearchCards] = useState("");
   const [loading, setLoading] = useState(true);
   
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [predForms, setPredForms] = useState<Record<string, any>>({});
   const [predictedMatches, setPredictedMatches] = useState<Record<string, boolean>>({});
   const [isTableExpanded, setIsTableExpanded] = useState(false);
   
   const [activeTotwRound, setActiveTotwRound] = useState("دور المجموعات"); 
-  
-  // 🔴 حالة الساعة المباشرة
   const [time, setTime] = useState<Date | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    if (typeof window !== "undefined" && "Notification" in window) { if (Notification.permission === "granted") setIsSubscribed(true); }
     const stored = localStorage.getItem('predictedMatches');
     if (stored) setPredictedMatches(JSON.parse(stored));
 
@@ -166,7 +166,6 @@ export default function Page() {
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
 
-    // تحديث الساعة المباشرة
     setTime(new Date());
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
@@ -339,7 +338,6 @@ export default function Page() {
 
   if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
 
-  // إعدادات الساعة
   const formattedTime = time ? time.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : "";
   const formattedDate = time ? time.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "";
 
@@ -347,7 +345,6 @@ export default function Page() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white relative pb-20 font-sans">
       <div className="mx-auto max-w-7xl p-3 sm:p-4 md:p-6 lg:p-8">
 
-        {/* 🔴 شريط الوقت والتاريخ المباشر الزجاجي 🔴 */}
         {time && (
           <div className="mb-4 rounded-3xl border border-white/10 bg-gradient-to-r from-[#1e2a4a] to-[#13213a] p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl relative overflow-hidden">
              <div className="absolute inset-0 bg-yellow-400/5 blur-3xl rounded-full pointer-events-none"></div>
@@ -368,13 +365,11 @@ export default function Page() {
           </div>
         )}
 
-        {/* شريط آخر تحديث */}
         <div className="mb-4 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
           <span className="shrink-0 rounded-2xl bg-yellow-400 px-5 py-2 text-sm font-black text-black shadow-[0_0_10px_rgba(250,204,21,0.5)]">آخر تحديث</span>
           <div className="flex-1 overflow-hidden"><div className="animate-marquee whitespace-nowrap text-lg font-bold text-yellow-300">{tickerText}</div></div>
         </div>
 
-        {/* شريط الرعاة */}
         <style dangerouslySetInnerHTML={{__html: `@keyframes infinite-scroll-rtl { 0% { transform: translateX(0); } 100% { transform: translateX(50%); } } .sponsor-track { display: flex; width: max-content; animation: infinite-scroll-rtl 40s linear infinite; } .sponsor-track:hover { animation-play-state: paused; }`}} />
         <div className="mb-6 bg-[#13213a] py-3 rounded-2xl border border-yellow-400/20 overflow-hidden relative shadow-sm" dir="rtl">
           <div className="sponsor-track items-center gap-10">
@@ -395,7 +390,6 @@ export default function Page() {
           </div>
         </div>
 
-        {/* الهيدر */}
         <div className="mb-6 rounded-3xl border border-yellow-400/40 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] p-6 text-center shadow-2xl relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 bg-[url('/pattern.png')] bg-repeat"></div>
           <div className="flex justify-center mb-6 relative z-10"><img src="/logo.png" alt="شعار البطولة" className="h-28 sm:h-36 w-auto drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" /></div>
@@ -403,7 +397,6 @@ export default function Page() {
           <p className="mt-3 text-xl text-cyan-300 font-bold relative z-10">النسخة الثالثة ٢٠٢٦</p>
         </div>
 
-        {/* مفتاح التحويل (شباب / ناشئين) */}
         <div className="flex justify-center mb-10 mt-4">
           <div className="bg-[#13213a] p-2 rounded-full border border-yellow-400/30 inline-flex shadow-xl gap-2 w-full max-w-md">
             <button onClick={() => { setActiveTournament('youth'); setActiveTab('standings'); }} className={`flex-1 py-3 rounded-full text-base sm:text-xl font-black transition-all ${activeTournament === 'youth' ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 الشباب</button>
@@ -411,7 +404,6 @@ export default function Page() {
           </div>
         </div>
 
-        {/* أزرار التبويبات */}
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
             { key: "totw", label: "تشكيلة الجولة", icon: "🏟️", extraClass: "bg-emerald-600 text-white border-none shadow-[0_0_15px_rgba(5,150,105,0.6)]" },
@@ -427,7 +419,7 @@ export default function Page() {
           ))}
         </div>
 
-        {/* تشكيلة الجولة (TOTW) */}
+        {/* التشكيلة */}
         {activeTab === "totw" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl">
@@ -459,7 +451,7 @@ export default function Page() {
           </div>
         )}
 
-        {/* فانتزي مطروح */}
+        {/* فانتزي */}
         {activeTab === "fantasy" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="bg-gradient-to-br from-emerald-900 to-[#13213a] rounded-3xl border-2 border-emerald-500 p-6 md:p-10 text-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
@@ -471,7 +463,6 @@ export default function Page() {
                   <Badge className="bg-teal-600 text-white px-4 py-2 text-sm font-bold">1 نقطة لتوقع الفائز فقط</Badge>
                 </div>
              </div>
-
              <div className="grid lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
                    <h3 className="text-2xl font-black text-yellow-300 flex items-center gap-2"><Target /> المباريات المتاحة للتوقع</h3>
@@ -504,7 +495,6 @@ export default function Page() {
                      </Card>
                    )) : <div className="text-center bg-[#1e2a4a] p-10 rounded-3xl border border-white/10"><p className="text-xl text-white font-bold mb-2">لا توجد مباريات متاحة للتوقع حالياً</p><p className="text-cyan-300">انتظرونا في المباريات القادمة!</p></div>}
                 </div>
-
                 <div>
                    <h3 className="text-2xl font-black text-yellow-300 flex items-center gap-2 mb-6"><Trophy /> لوحة شرف الجماهير</h3>
                    <Card className="bg-[#13213a] border-yellow-400/30 rounded-3xl overflow-hidden shadow-xl sticky top-4">
@@ -533,91 +523,20 @@ export default function Page() {
         {/* الشجرة الإقصائية */}
         {activeTab === "knockout" && (
           <div className="space-y-12 relative pb-10 animate-in fade-in duration-500">
-            <div className="text-center mb-8">
-               <h2 className="text-4xl font-black text-yellow-300 drop-shadow-lg">الطريق إلى النهائي 🏆</h2>
-               <p className="text-cyan-300 mt-2 font-bold text-lg">{activeTournament === 'youth' ? "مباريات إقصائيات الشباب" : "إقصائيات بطولة الناشئين"}</p>
-            </div>
+            <div className="text-center mb-8"><h2 className="text-4xl font-black text-yellow-300 drop-shadow-lg">الطريق إلى النهائي 🏆</h2><p className="text-cyan-300 mt-2 font-bold text-lg">{activeTournament === 'youth' ? "مباريات إقصائيات الشباب" : "إقصائيات بطولة الناشئين"}</p></div>
             {activeTournament === 'youth' ? (
               <>
-                <div className="bg-[#1e2a4a]/40 p-4 sm:p-6 rounded-3xl border border-cyan-500/30 shadow-xl">
-                   <div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-xl px-8 py-2 font-black">مباريات الملحق</Badge></div>
-                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                     <TreeMatchBox label="م 97" t1="اسماك باسط العوامي" t2="اصدقاء عز بوالمجدوبة" data={youthTree.p97} />
-                     <TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} />
-                     <TreeMatchBox label="م 99" t1="17 فبراير" t2="الفهود" data={youthTree.p99} />
-                     <TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} />
-                     <TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} />
-                     <TreeMatchBox label="م 102" t1="محاربي الصحراء" t2="اصدقاء خالد" data={youthTree.p102} />
-                     <TreeMatchBox label="م 103" t1="ام القبائل" t2="شباب القناشات" data={youthTree.p103} />
-                     <TreeMatchBox label="م 104" t1="اتحاد المثاني" t2="دبي للزي العربي" data={youthTree.p104} />
-                   </div>
-                </div>
-
-                <div className="bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-yellow-400/50 shadow-2xl">
-                   <div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">دور الـ 16</Badge></div>
-                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                     <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2={youthTree.p104.win || "الفائز (م 104)"} data={youthTree.r1} />
-                     <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز (م 97)"} data={youthTree.r2} />
-                     <TreeMatchBox label="م 3" t1={youthTree.getT(4)} t2={youthTree.p101.win || "الفائز (م 101)"} data={youthTree.r3} />
-                     <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز (م 100)"} data={youthTree.r4} />
-                     <TreeMatchBox label="م 5" t1={youthTree.getT(2)} t2={youthTree.p103.win || "الفائز (م 103)"} data={youthTree.r5} />
-                     <TreeMatchBox label="م 6" t1={youthTree.getT(7)} t2={youthTree.p98.win || "الفائز (م 98)"} data={youthTree.r6} />
-                     <TreeMatchBox label="م 7" t1={youthTree.getT(3)} t2={youthTree.p102.win || "الفائز (م 102)"} data={youthTree.r7} />
-                     <TreeMatchBox label="م 8" t1={youthTree.getT(6)} t2={youthTree.p99.win || "الفائز (م 99)"} data={youthTree.r8} />
-                   </div>
-                </div>
-
-                <div className="bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/40 shadow-xl">
-                   <div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black">دور الثمانية (ربع النهائي)</Badge></div>
-                   <div className="grid md:grid-cols-2 gap-8 lg:px-20">
-                     <TreeMatchBox label="مربع 1" t1={youthTree.r1.win || "الفائز (م 1)"} t2={youthTree.r2.win || "الفائز (م 2)"} data={youthTree.q1} />
-                     <TreeMatchBox label="مربع 2" t1={youthTree.r3.win || "الفائز (م 3)"} t2={youthTree.r4.win || "الفائز (م 4)"} data={youthTree.q2} />
-                     <TreeMatchBox label="مربع 3" t1={youthTree.r5.win || "الفائز (م 5)"} t2={youthTree.r6.win || "الفائز (م 6)"} data={youthTree.q3} />
-                     <TreeMatchBox label="مربع 4" t1={youthTree.r7.win || "الفائز (م 7)"} t2={youthTree.r8.win || "الفائز (م 8)"} data={youthTree.q4} />
-                   </div>
-                </div>
-
-                <div className="bg-[#1e2a4a] p-4 sm:p-6 rounded-3xl border border-yellow-400/60 shadow-2xl">
-                   <div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">نصف النهائي</Badge></div>
-                   <div className="grid md:grid-cols-2 gap-12 lg:px-40">
-                     <TreeMatchBox label="نصف 1" t1={youthTree.q1.win || "الفائز مربع 1"} t2={youthTree.q2.win || "الفائز مربع 2"} data={youthTree.s1} />
-                     <TreeMatchBox label="نصف 2" t1={youthTree.q3.win || "الفائز مربع 3"} t2={youthTree.q4.win || "الفائز مربع 4"} data={youthTree.s2} />
-                   </div>
-                </div>
-
-                <div className="relative pt-6 pb-6 px-4 text-center">
-                   <div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div>
-                   <div className="max-w-xl mx-auto relative z-10">
-                     <TreeMatchBox label="مباراة التتويج" t1={youthTree.s1.win || "الطرف الأول"} t2={youthTree.s2.win || "الطرف الثاني"} data={youthTree.f1} />
-                   </div>
-                </div>
+                <div className="bg-[#1e2a4a]/40 p-4 sm:p-6 rounded-3xl border border-cyan-500/30 shadow-xl"><div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-xl px-8 py-2 font-black">مباريات الملحق</Badge></div><div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"><TreeMatchBox label="م 97" t1="اسماك باسط العوامي" t2="اصدقاء عز بوالمجدوبة" data={youthTree.p97} /><TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} /><TreeMatchBox label="م 99" t1="17 فبراير" t2="الفهود" data={youthTree.p99} /><TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} /><TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} /><TreeMatchBox label="م 102" t1="محاربي الصحراء" t2="اصدقاء خالد" data={youthTree.p102} /><TreeMatchBox label="م 103" t1="ام القبائل" t2="شباب القناشات" data={youthTree.p103} /><TreeMatchBox label="م 104" t1="اتحاد المثاني" t2="دبي للزي العربي" data={youthTree.p104} /></div></div>
+                <div className="bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-yellow-400/50 shadow-2xl"><div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">دور الـ 16</Badge></div><div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"><TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2={youthTree.p104.win || "الفائز (م 104)"} data={youthTree.r1} /><TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز (م 97)"} data={youthTree.r2} /><TreeMatchBox label="م 3" t1={youthTree.getT(4)} t2={youthTree.p101.win || "الفائز (م 101)"} data={youthTree.r3} /><TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز (م 100)"} data={youthTree.r4} /><TreeMatchBox label="م 5" t1={youthTree.getT(2)} t2={youthTree.p103.win || "الفائز (م 103)"} data={youthTree.r5} /><TreeMatchBox label="م 6" t1={youthTree.getT(7)} t2={youthTree.p98.win || "الفائز (م 98)"} data={youthTree.r6} /><TreeMatchBox label="م 7" t1={youthTree.getT(3)} t2={youthTree.p102.win || "الفائز (م 102)"} data={youthTree.r7} /><TreeMatchBox label="م 8" t1={youthTree.getT(6)} t2={youthTree.p99.win || "الفائز (م 99)"} data={youthTree.r8} /></div></div>
+                <div className="bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/40 shadow-xl"><div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black">دور الثمانية (ربع النهائي)</Badge></div><div className="grid md:grid-cols-2 gap-8 lg:px-20"><TreeMatchBox label="مربع 1" t1={youthTree.r1.win || "الفائز (م 1)"} t2={youthTree.r2.win || "الفائز (م 2)"} data={youthTree.q1} /><TreeMatchBox label="مربع 2" t1={youthTree.r3.win || "الفائز (م 3)"} t2={youthTree.r4.win || "الفائز (م 4)"} data={youthTree.q2} /><TreeMatchBox label="مربع 3" t1={youthTree.r5.win || "الفائز (م 5)"} t2={youthTree.r6.win || "الفائز (م 6)"} data={youthTree.q3} /><TreeMatchBox label="مربع 4" t1={youthTree.r7.win || "الفائز (م 7)"} t2={youthTree.r8.win || "الفائز (م 8)"} data={youthTree.q4} /></div></div>
+                <div className="bg-[#1e2a4a] p-4 sm:p-6 rounded-3xl border border-yellow-400/60 shadow-2xl"><div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">نصف النهائي</Badge></div><div className="grid md:grid-cols-2 gap-12 lg:px-40"><TreeMatchBox label="نصف 1" t1={youthTree.q1.win || "الفائز مربع 1"} t2={youthTree.q2.win || "الفائز مربع 2"} data={youthTree.s1} /><TreeMatchBox label="نصف 2" t1={youthTree.q3.win || "الفائز مربع 3"} t2={youthTree.q4.win || "الفائز مربع 4"} data={youthTree.s2} /></div></div>
+                <div className="relative pt-6 pb-6 px-4 text-center"><div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div><div className="max-w-xl mx-auto relative z-10"><TreeMatchBox label="مباراة التتويج" t1={youthTree.s1.win || "الطرف الأول"} t2={youthTree.s2.win || "الطرف الثاني"} data={youthTree.f1} /></div></div>
               </>
             ) : (
               <>
-                <div className="bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-cyan-500/40 shadow-xl mb-10">
-                   <div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black border border-cyan-500">دور الثمانية (الناشئين)</Badge></div>
-                   <div className="grid md:grid-cols-2 gap-8 lg:px-20">
-                     <TreeMatchBox label="مربع 1" t1={juniorsTree.ja1} t2={juniorsTree.jb4} data={juniorsTree.q1} />
-                     <TreeMatchBox label="مربع 2" t1={juniorsTree.jb2} t2={juniorsTree.ja3} data={juniorsTree.q2} />
-                     <TreeMatchBox label="مربع 3" t1={juniorsTree.jb1} t2={juniorsTree.ja4} data={juniorsTree.q3} />
-                     <TreeMatchBox label="مربع 4" t1={juniorsTree.ja2} t2={juniorsTree.jb3} data={juniorsTree.q4} />
-                   </div>
-                </div>
-
-                <div className="bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-cyan-500/50 shadow-2xl">
-                   <div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-2xl px-10 py-2 font-black">نصف النهائي (الناشئين)</Badge></div>
-                   <div className="grid md:grid-cols-2 gap-12 lg:px-40">
-                     <TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} />
-                     <TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} />
-                   </div>
-                </div>
-
-                <div className="relative pt-10 pb-6 px-4 text-center">
-                   <div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div>
-                   <div className="max-w-xl mx-auto relative z-10">
-                     <TreeMatchBox label="مباراة التتويج" t1={juniorsTree.s1.win || "الفائز 1"} t2={juniorsTree.s2.win || "الفائز 2"} data={juniorsTree.f1} />
-                   </div>
-                </div>
+                <div className="bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-cyan-500/40 shadow-xl mb-10"><div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black border border-cyan-500">دور الثمانية (الناشئين)</Badge></div><div className="grid md:grid-cols-2 gap-8 lg:px-20"><TreeMatchBox label="مربع 1" t1={juniorsTree.ja1} t2={juniorsTree.jb4} data={juniorsTree.q1} /><TreeMatchBox label="مربع 2" t1={juniorsTree.jb2} t2={juniorsTree.ja3} data={juniorsTree.q2} /><TreeMatchBox label="مربع 3" t1={juniorsTree.jb1} t2={juniorsTree.ja4} data={juniorsTree.q3} /><TreeMatchBox label="مربع 4" t1={juniorsTree.ja2} t2={juniorsTree.jb3} data={juniorsTree.q4} /></div></div>
+                <div className="bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-cyan-500/50 shadow-2xl"><div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-2xl px-10 py-2 font-black">نصف النهائي (الناشئين)</Badge></div><div className="grid md:grid-cols-2 gap-12 lg:px-40"><TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} /><TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} /></div></div>
+                <div className="relative pt-10 pb-6 px-4 text-center"><div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div><div className="max-w-xl mx-auto relative z-10"><TreeMatchBox label="مباراة التتويج" t1={juniorsTree.s1.win || "الفائز 1"} t2={juniorsTree.s2.win || "الفائز 2"} data={juniorsTree.f1} /></div></div>
               </>
             )}
           </div>
@@ -634,17 +553,9 @@ export default function Page() {
               </div>
             ) : (
               <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] shadow-xl overflow-hidden">
-                 <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4">
-                    <CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب العام</CardTitle>
-                    <Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button>
-                 </CardHeader>
+                 <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب العام</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
                  <CardContent className="p-0">
-                    <div className="overflow-auto w-full max-h-[60vh] touch-pan-x touch-pan-y relative" dir="rtl">
-                      <table className="w-full text-white text-right min-w-[800px]">
-                        <thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-20 shadow-md"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr></thead>
-                        <tbody>{standingsYouth.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-cyan-400">{row.gf}</td><td className="px-4 py-4 text-center text-white">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody>
-                      </table>
-                    </div>
+                    <div className="overflow-auto w-full max-h-[60vh] touch-pan-x touch-pan-y relative" dir="rtl"><table className="w-full text-white text-right min-w-[800px]"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-20 shadow-md"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr></thead><tbody>{standingsYouth.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-cyan-400">{row.gf}</td><td className="px-4 py-4 text-center text-white">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></div>
                  </CardContent>
               </Card>
             )}
@@ -691,7 +602,7 @@ export default function Page() {
            </Card>
         )}
 
-        {/* ההدافين (FUT Cards) */}
+        {/* الهدافين (FUT Cards) */}
         {activeTab === "scorers" && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex flex-col sm:flex-row justify-between items-center bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/30 gap-4"><h2 className="text-2xl sm:text-3xl font-black text-yellow-300">قائمة الهدافين الذهبية</h2><div className="relative w-full sm:max-w-xs"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={searchScorers} onChange={e => setSearchScorers(e.target.value)} placeholder="بحث عن لاعب أو فريق..." className="pr-10 bg-[#1e2a4a] border-yellow-400 text-white rounded-xl" /></div></div>
@@ -842,7 +753,7 @@ export default function Page() {
           </div>
         )}
 
-        {/* البث المباشر والتايم لاين */}
+        {/* 🔴 3. البث المباشر (التايم لاين الديناميكي) 🔴 */}
         {activeTab === "live" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {liveMatches.length > 0 ? liveMatches.map(match => { 
@@ -870,15 +781,43 @@ export default function Page() {
                       <div className="flex-1 text-center md:text-left font-black text-2xl sm:text-3xl text-white drop-shadow-md">{match.teamB}</div>
                     </div>
                   </div>
+                  
                   {!isStartingSoon && (
                     <Card className="bg-[#13213a] border-yellow-400/30 rounded-3xl overflow-hidden shadow-xl">
-                      <CardHeader className="border-b border-white/5 py-4 bg-[#1e2a4a]"><CardTitle className="text-yellow-300 text-lg flex items-center gap-2 justify-center"><Activity className="h-5 w-5" /> التغطية المباشرة لأحداث المباراة</CardTitle></CardHeader>
+                      <CardHeader className="border-b border-white/5 py-4 bg-[#1e2a4a]">
+                        <CardTitle className="text-yellow-300 text-lg flex items-center gap-2 justify-center"><Activity className="h-5 w-5" /> التغطية المباشرة لأحداث المباراة</CardTitle>
+                      </CardHeader>
                       <CardContent className="p-6">
                         <div className="relative border-r-2 border-white/10 pr-6 space-y-6">
-                           <div className="relative"><span className="absolute -right-[33px] bg-[#0a1428] border-2 border-yellow-400 h-4 w-4 rounded-full mt-1.5"></span><div className="bg-[#1e2a4a] border border-white/5 p-4 rounded-2xl"><span className="text-yellow-400 font-black text-sm block mb-1">صافرة البداية ⏱️</span><p className="text-white text-sm font-bold">انطلاق أحداث الشوط الأول من المباراة!</p></div></div>
-                           {match.homeGoals > 0 && (<div className="relative"><span className="absolute -right-[33px] bg-emerald-500 border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span><div className="bg-emerald-900/30 border border-emerald-500/30 p-4 rounded-2xl"><span className="text-emerald-400 font-black text-sm block mb-1">هدف! ⚽</span><p className="text-white text-sm font-bold">تسجيل هدف لصالح فريق <span className="text-emerald-300">{match.teamA}</span></p></div></div>)}
-                           {match.awayGoals > 0 && (<div className="relative"><span className="absolute -right-[33px] bg-emerald-500 border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span><div className="bg-emerald-900/30 border border-emerald-500/30 p-4 rounded-2xl"><span className="text-emerald-400 font-black text-sm block mb-1">هدف! ⚽</span><p className="text-white text-sm font-bold">تسجيل هدف لصالح فريق <span className="text-emerald-300">{match.teamB}</span></p></div></div>)}
-                           <div className="relative"><span className="absolute -right-[33px] bg-cyan-500 border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.8)]"></span><div className="bg-cyan-900/20 border border-cyan-500/30 p-4 rounded-2xl"><span className="text-cyan-400 font-black text-sm block mb-1">مباشر الآن 🔴</span><p className="text-white text-sm font-bold">المباراة جارية في <span className="text-yellow-400">{match.status}</span> (الدقيقة {match.liveMinute})</p></div></div>
+                           <div className="relative">
+                              <span className="absolute -right-[33px] bg-[#0a1428] border-2 border-yellow-400 h-4 w-4 rounded-full mt-1.5"></span>
+                              <div className="bg-[#1e2a4a] border border-white/5 p-4 rounded-2xl">
+                                 <span className="text-yellow-400 font-black text-sm block mb-1">صافرة البداية ⏱️</span>
+                                 <p className="text-white text-sm font-bold">انطلاق أحداث الشوط الأول من المباراة!</p>
+                              </div>
+                           </div>
+                           
+                           {/* 🔴 قراءة الأحداث المدخلة من لوحة التحكم 🔴 */}
+                           {match.liveEvents && match.liveEvents.map((ev: any, idx: number) => (
+                             <div key={idx} className="relative animate-in fade-in duration-300">
+                                <span className={`absolute -right-[33px] border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 ${ev.type === 'goal' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : ev.type === 'yellow' ? 'bg-yellow-400' : ev.type === 'red' ? 'bg-red-500' : 'bg-cyan-400'}`}></span>
+                                <div className={`border p-4 rounded-2xl ${ev.type === 'goal' ? 'bg-emerald-900/30 border-emerald-500/30' : 'bg-[#1e2a4a] border-white/5'}`}>
+                                   <span className={`${ev.type === 'goal' ? 'text-emerald-400' : ev.type === 'yellow' ? 'text-yellow-400' : ev.type === 'red' ? 'text-red-400' : 'text-cyan-400'} font-black text-sm block mb-1`}>
+                                      {ev.type === 'goal' ? 'هدف! ⚽' : ev.type === 'yellow' ? 'إنذار 🟨' : ev.type === 'red' ? 'طرد 🟥' : 'تحديث 🎙️'}
+                                      <span className="text-gray-400 text-xs ml-2 border-r border-white/20 pr-2">الدقيقة {ev.minute}'</span>
+                                   </span>
+                                   <p className="text-white text-sm font-bold">{ev.text}</p>
+                                </div>
+                             </div>
+                           ))}
+
+                           <div className="relative">
+                              <span className="absolute -right-[33px] bg-cyan-500 border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.8)]"></span>
+                              <div className="bg-cyan-900/20 border border-cyan-500/30 p-4 rounded-2xl">
+                                 <span className="text-cyan-400 font-black text-sm block mb-1">مباشر الآن 🔴</span>
+                                 <p className="text-white text-sm font-bold">المباراة جارية في <span className="text-yellow-400">{match.status}</span> (الدقيقة {match.liveMinute})</p>
+                              </div>
+                           </div>
                         </div>
                       </CardContent>
                     </Card>

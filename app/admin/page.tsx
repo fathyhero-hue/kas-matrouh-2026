@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy } from "lucide-react";
+// تم إضافة Activity هنا لحل المشكلة 🔴
+import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
@@ -56,7 +57,6 @@ const getLabelSuggestions = (round: string) => {
   return [];
 };
 
-// توليد نص السوشيال ميديا للمباراة
 const generatePostContent = (match: any) => {
   return `🏆 بطولة كأس مطروح - النسخة الثالثة 🦅\n\n` +
          `🔥 انتهت المباراة المشتعلة بين:\n` +
@@ -81,7 +81,7 @@ export default function AdminPage() {
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [motmList, setMotmList] = useState<any[]>([]);
-  const [formationsList, setFormationsList] = useState<any[]>([]); // 🔴 بيانات التشكيلات
+  const [formationsList, setFormationsList] = useState<any[]>([]); 
 
   const [tickerText, setTickerText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -92,7 +92,6 @@ export default function AdminPage() {
   const [notifyBody, setNotifyBody] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // 🔴 نافذة السوشيال ميديا 🔴
   const [shareMatch, setShareMatch] = useState<any | null>(null);
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
@@ -114,12 +113,13 @@ export default function AdminPage() {
   const [cardForm, setCardForm] = useState({ player: "", team: currentTeamsList[0] || "", type: "yellow" as "yellow" | "red" });
   const [mediaForm, setMediaForm] = useState({ title: "", url: "" });
 
-  // 🔴 فورم التشكيلة (7 لاعبين)
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
   const [formationForm, setFormationForm] = useState({
     round: "دور المجموعات",
     players: [ {...defaultPlayer}, {...defaultPlayer}, {...defaultPlayer}, {...defaultPlayer}, {...defaultPlayer}, {...defaultPlayer}, {...defaultPlayer} ]
   });
+
+  const [liveEventForms, setLiveEventForms] = useState<Record<string, { minute?: number, type: string, text: string }>>({});
 
   useEffect(() => {
     setMatchForm(p => ({...p, teamA: "", teamB: "", matchLabel: ""}));
@@ -129,7 +129,6 @@ export default function AdminPage() {
     setEditingId(null); setEditingGoalId(null); setEditingMotmId(null);
   }, [activeTournament, currentTeamsList]);
 
-  // جلب التشكيلة الحالية عند تغيير الدور
   useEffect(() => {
     const existing = formationsList.find(f => f.round === formationForm.round);
     if(existing) setFormationForm({ round: existing.round, players: existing.players });
@@ -202,6 +201,31 @@ export default function AdminPage() {
     const match = matches.find(m => m.id === matchId);
     if(!match) return;
     await updateDoc(doc(db, getColl("matches"), matchId), { penaltiesHome: [...(match.penaltiesHome || ['none','none','none','none','none']), 'none'], penaltiesAway: [...(match.penaltiesAway || ['none','none','none','none','none']), 'none'] });
+  };
+
+  const addLiveEvent = async (matchId: string, currentLiveMinute: number) => {
+    const form = liveEventForms[matchId] || {};
+    if (!form.text || !form.text.trim()) return alert("يرجى كتابة تفاصيل الحدث!");
+    const minute = form.minute !== undefined ? form.minute : currentLiveMinute;
+    const type = form.type || 'info';
+    
+    const currentMatch = matches.find(m => m.id === matchId);
+    if(!currentMatch) return;
+    
+    const newEvent = { minute, type, text: form.text.trim() };
+    const updatedEvents = [...(currentMatch.liveEvents || []), newEvent];
+    
+    await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
+    setLiveEventForms(p => ({ ...p, [matchId]: { minute: currentLiveMinute, type: 'info', text: '' } }));
+  };
+
+  const deleteLiveEvent = async (matchId: string, eventIndex: number) => {
+    if(!confirm("هل تريد حذف هذا الحدث من التايم لاين؟")) return;
+    const currentMatch = matches.find(m => m.id === matchId);
+    if(!currentMatch) return;
+    const updatedEvents = [...(currentMatch.liveEvents || [])];
+    updatedEvents.splice(eventIndex, 1);
+    await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
   };
 
   const addOrUpdateGoal = async () => {
@@ -301,7 +325,6 @@ export default function AdminPage() {
 
   const deleteMotm = async (id: string) => confirm("حذف هذا اللاعب؟") && await deleteDoc(doc(db, getColl("motm"), id));
 
-  // 🔴 حفظ التشكيلة
   const saveFormation = async () => {
     const existing = formationsList.find(f => f.round === formationForm.round);
     if(existing) {
@@ -313,7 +336,6 @@ export default function AdminPage() {
     }
   };
 
-  // 🔴 تحديث لاعب في التشكيلة
   const updateFormationPlayer = (index: number, field: string, value: any) => {
     setFormationForm(prev => {
       const newPlayers = [...prev.players];
@@ -382,7 +404,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 🔴 مودال السوشيال ميديا 🔴 */}
         {shareMatch && (
           <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-gradient-to-br from-[#1e2a4a] to-[#13213a] border-2 border-emerald-500 p-6 rounded-3xl max-w-lg w-full shadow-[0_0_30px_rgba(16,185,129,0.4)]">
@@ -424,7 +445,6 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* أزرار التبويبات المحدثة 🔴 إضافة تاب التشكيلة للوحة */}
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
           <TabsList className="flex flex-wrap justify-center bg-[#13213a] border border-white/20 p-1.5 rounded-2xl mb-8 gap-2 h-auto shadow-lg">
             <TabsTrigger value="totw_admin" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">التشكيلة 🏟️</TabsTrigger>
@@ -442,7 +462,6 @@ export default function AdminPage() {
             <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 bg-black/40 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
           </TabsList>
 
-          {/* 🔴 1. تاب إدارة التشكيلة (TOTW Admin) 🔴 */}
           <TabsContent value="totw_admin">
             <Card className="border-emerald-500 bg-[#13213a] shadow-xl">
               <CardHeader className="border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -453,10 +472,7 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent className="p-6">
                  <div className="space-y-4">
-                   {[
-                     { pos: "حارس المرمى (GK)", idx: 0 }, { pos: "مدافع (CB)", idx: 1 }, { pos: "مدافع (CB)", idx: 2 },
-                     { pos: "خط وسط يسار (LM)", idx: 3 }, { pos: "خط وسط (CM)", idx: 4 }, { pos: "خط وسط يمين (RM)", idx: 5 }, { pos: "مهاجم (ST)", idx: 6 }
-                   ].map((item) => (
+                   {[ { pos: "حارس المرمى (GK)", idx: 0 }, { pos: "مدافع (CB)", idx: 1 }, { pos: "مدافع (CB)", idx: 2 }, { pos: "خط وسط يسار (LM)", idx: 3 }, { pos: "خط وسط (CM)", idx: 4 }, { pos: "خط وسط يمين (RM)", idx: 5 }, { pos: "مهاجم (ST)", idx: 6 } ].map((item) => (
                      <div key={item.idx} className="bg-[#1e2a4a] p-4 rounded-2xl border border-white/10 flex flex-col lg:flex-row gap-4 items-center">
                        <Badge className="bg-emerald-600 text-white w-full lg:w-32 justify-center py-2 shrink-0">{item.pos}</Badge>
                        <Input placeholder="اسم اللاعب" value={formationForm.players[item.idx].name} onChange={e => updateFormationPlayer(item.idx, 'name', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white font-bold" />
@@ -488,6 +504,42 @@ export default function AdminPage() {
                     <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={match.liveMinute || 0} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-8 items-center mb-8"><div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative"><h3 className="text-2xl font-bold text-white mb-6">{match.teamA}</h3><div className="flex items-center justify-center gap-4 mb-6"><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: (match.homeGoals || 0) + 1 })}><Plus /></Button><span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button></div><div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsHome || 0}</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div></div><div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div><div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative"><h3 className="text-2xl font-bold text-white mb-6">{match.teamB}</h3><div className="flex items-center justify-center gap-4 mb-6"><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: (match.awayGoals || 0) + 1 })}><Plus /></Button><span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button></div><div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsAway || 0}</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div></div></div>
+                  
+                  {/* 🔴 لوحة إدارة التايم لاين الجديدة 🔴 */}
+                  <div className="mt-8 bg-[#0a1428] p-6 rounded-3xl border-2 border-cyan-500/30">
+                    <h4 className="text-cyan-400 font-black mb-4 flex items-center gap-2"><Activity /> إضافة حدث للتايم لاين</h4>
+                    <div className="flex flex-col lg:flex-row gap-4">
+                      <div className="flex gap-2">
+                        <Input type="number" placeholder="الدقيقة" value={liveEventForms[match.id]?.minute ?? match.liveMinute ?? 0} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {type: 'info', text: ''}), minute: Number(e.target.value)}}))} className="w-24 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold text-center" />
+                        <select value={liveEventForms[match.id]?.type || 'info'} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: match.liveMinute||0, text: ''}), type: e.target.value}}))} className="bg-[#1e2a4a] border-cyan-500/50 rounded-xl px-4 text-white outline-none cursor-pointer font-bold">
+                          <option value="goal">هدف ⚽</option>
+                          <option value="yellow">إنذار 🟨</option>
+                          <option value="red">طرد 🟥</option>
+                          <option value="info">تحديث عام 🎙️</option>
+                        </select>
+                      </div>
+                      <Input placeholder="اكتب تفاصيل الحدث هنا (مثال: تسديدة صاروخية تسكن الشباك)..." value={liveEventForms[match.id]?.text || ''} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: match.liveMinute||0, type: 'info'}), text: e.target.value}}))} className="flex-1 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold" />
+                      <Button onClick={() => addLiveEvent(match.id, match.liveMinute || 0)} className="bg-cyan-500 hover:bg-cyan-600 text-black font-black w-full lg:w-auto px-8">نشر الحدث</Button>
+                    </div>
+
+                    {match.liveEvents && match.liveEvents.length > 0 && (
+                      <div className="mt-6 space-y-2">
+                        <h5 className="text-white/50 text-sm font-bold border-b border-white/10 pb-2 mb-4">الأحداث المسجلة حالياً</h5>
+                        {match.liveEvents.map((ev: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center bg-[#1e2a4a] p-3 rounded-xl border border-white/5 text-sm">
+                            <div className="flex items-center gap-3">
+                              <Badge className={`${ev.type === 'goal' ? 'bg-emerald-500 text-white' : ev.type === 'yellow' ? 'bg-yellow-400 text-black' : ev.type === 'red' ? 'bg-red-500 text-white' : 'bg-cyan-400 text-black'} font-black`}>
+                                الدقيقة {ev.minute}
+                              </Badge>
+                              <span className="text-white">{ev.text}</span>
+                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => deleteLiveEvent(match.id, idx)} className="text-red-400 hover:text-red-300 hover:bg-red-900/50 h-8 w-8 p-0"><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {match.status === "ضربات جزاء" && (<div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl mt-6"><div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><h4 className="text-xl font-bold text-yellow-400">إدارة ضربات الترجيح</h4><Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black"><Plus className="ml-2 h-4 w-4" /> إضافة ركلة إضافية</Button></div><div className="flex flex-col md:flex-row justify-between items-center bg-[#0a1428] p-4 rounded-xl gap-6"><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesHome || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'home', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div><div className="text-3xl font-black text-yellow-400 bg-[#1e2a4a] px-6 py-2 rounded-xl">{(match.penaltiesHome || []).filter((p:string) => p === 'scored').length} - {(match.penaltiesAway || []).filter((p:string) => p === 'scored').length}</div><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesAway || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'away', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div></div></div>)}
                 </CardContent>
               </Card>
@@ -597,7 +649,6 @@ export default function AdminPage() {
                       <div className="font-bold text-white">{m.teamA} <span className="text-yellow-400 mx-1">{m.homeGoals} - {m.awayGoals}</span> {m.teamB}</div>
                       <div className="text-cyan-300 text-sm">{getArabicDay(m.date)} • {m.date} • {m.status || m.time}</div>
                     </div>
-                    {/* 🔴 زرار المشاركة السريعة 🔴 */}
                     <div className="flex gap-2 flex-wrap items-center">
                       <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold"><Share2 className="ml-1 h-4 w-4" /> شير</Button>
                       <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, status: m.status || "ستبدأ بعد قليل", liveMinute: m.liveMinute || 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 hover:bg-red-700 text-white"><Play className="ml-1 h-4 w-4" /> بث</Button>
