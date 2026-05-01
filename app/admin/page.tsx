@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-// تم إضافة Activity هنا لحل المشكلة 🔴
 import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -487,6 +486,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* 🔴 الأزرار المعدلة في البث المباشر (أهداف وكروت حمراء) 🔴 */}
           <TabsContent value="live" className="space-y-6">
             {matches.filter(m => m.isLive).length === 0 && (<Card className="border-yellow-400 bg-[#13213a] border-dashed"><CardContent className="p-16 text-center"><p className="text-xl text-cyan-300 mb-4">لا توجد مباريات جارية الآن ({activeTournament === 'youth' ? 'الشباب' : 'الناشئين'})</p></CardContent></Card>)}
             {matches.filter(m => m.isLive).map(match => (
@@ -503,9 +503,41 @@ export default function AdminPage() {
                     <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 ${match.isTimerRunning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف التايمر</> : <><Play className="mr-2 h-5 w-5" /> تشغيل التايمر</>}</Button>
                     <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={match.liveMinute || 0} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
                   </div>
-                  <div className="grid md:grid-cols-3 gap-8 items-center mb-8"><div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative"><h3 className="text-2xl font-bold text-white mb-6">{match.teamA}</h3><div className="flex items-center justify-center gap-4 mb-6"><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: (match.homeGoals || 0) + 1 })}><Plus /></Button><span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button></div><div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsHome || 0}</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div></div><div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div><div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative"><h3 className="text-2xl font-bold text-white mb-6">{match.teamB}</h3><div className="flex items-center justify-center gap-4 mb-6"><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: (match.awayGoals || 0) + 1 })}><Plus /></Button><span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span><Button variant="outline" className="h-12 w-12 rounded-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button></div><div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsAway || 0}</span><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div></div></div>
+                  <div className="grid md:grid-cols-3 gap-8 items-center mb-8">
+                    <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative">
+                      <h3 className="text-2xl font-bold text-white mb-6">{match.teamA}</h3>
+                      <div className="flex items-center justify-center gap-4 mb-6">
+                        <Button variant="outline" className="h-12 w-12 rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: (match.homeGoals || 0) + 1 })}><Plus /></Button>
+                        <span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span>
+                        <Button variant="outline" className="h-12 w-12 rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button>
+                      </div>
+                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20">
+                        <span className="text-red-500 font-bold">طرد:</span>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
+                        <span className="font-bold text-xl text-red-500 px-2">{match.redCardsHome || 0}</span>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div>
+                    
+                    <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5 relative">
+                      <h3 className="text-2xl font-bold text-white mb-6">{match.teamB}</h3>
+                      <div className="flex items-center justify-center gap-4 mb-6">
+                        <Button variant="outline" className="h-12 w-12 rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: (match.awayGoals || 0) + 1 })}><Plus /></Button>
+                        <span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span>
+                        <Button variant="outline" className="h-12 w-12 rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button>
+                      </div>
+                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20">
+                        <span className="text-red-500 font-bold">طرد:</span>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
+                        <span className="font-bold text-xl text-red-500 px-2">{match.redCardsAway || 0}</span>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </div>
                   
-                  {/* 🔴 لوحة إدارة التايم لاين الجديدة 🔴 */}
+                  {/* إدارة التايم لاين */}
                   <div className="mt-8 bg-[#0a1428] p-6 rounded-3xl border-2 border-cyan-500/30">
                     <h4 className="text-cyan-400 font-black mb-4 flex items-center gap-2"><Activity /> إضافة حدث للتايم لاين</h4>
                     <div className="flex flex-col lg:flex-row gap-4">
@@ -720,6 +752,45 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* 🔴 الأزرار المعدلة في إدارة الإنذارات (الكروت) 🔴 */}
+          <TabsContent value="cards">
+            <Card className="border-yellow-400 bg-[#13213a]">
+              <CardHeader><CardTitle className="text-yellow-300">إدارة الإنذارات</CardTitle><Input placeholder="ابحث عن لاعب..." value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader>
+              <CardContent className="space-y-6 p-6">
+                <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl border ${activeTournament === 'juniors' ? 'border-cyan-500/30' : 'border-yellow-400/30'}`}>
+                  <Input value={cardForm.player} onChange={e => setCardForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" />
+                  <select value={cardForm.team} onChange={e => setCardForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                  <select value={cardForm.type} onChange={e => setCardForm(p => ({...p, type: e.target.value as "yellow" | "red"}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white"><option value="yellow">إنذار أصفر</option><option value="red">بطاقة حمراء</option></select>
+                  <Button onClick={addCard} className={`font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white hover:bg-cyan-600' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}>تسجيل البطاقة</Button>
+                </div>
+                <div className="space-y-3">{filteredCards.map(item => (
+                  <Card key={item.id} className="bg-[#1e2a4a] border border-white/10">
+                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-white">
+                      <div>
+                        <h3 className="font-bold text-lg sm:text-xl text-white">{item.player}</h3>
+                        <p className="text-cyan-300 text-sm font-bold">{item.team}</p>
+                      </div>
+                      <Badge className={`${item.status === 'متاح' ? 'bg-cyan-500' : item.status === 'إيقاف' ? 'bg-yellow-500' : 'bg-red-500'} text-black font-bold text-sm px-3`}>{item.status}</Badge>
+                      <div className="mt-4 flex gap-4">
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => updateCard(item.id, Math.max(0, item.yellow - 1), item.red)} className="bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"><Minus className="h-4 w-4" /></Button>
+                          <span className="px-4 py-1 bg-yellow-400/20 text-yellow-300 font-bold rounded">🟨 {item.yellow}</span>
+                          <Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow + 1, item.red)} className="bg-[#0a1428] border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"><Plus className="h-4 w-4" /></Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow, Math.max(0, item.red - 1))} className="bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white"><Minus className="h-4 w-4" /></Button>
+                          <span className="px-4 py-1 bg-red-500/20 text-red-300 font-bold rounded">🟥 {item.red}</span>
+                          <Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow, item.red + 1)} className="bg-[#0a1428] border-red-500 text-red-500 hover:bg-red-500 hover:text-white"><Plus className="h-4 w-4" /></Button>
+                        </div>
+                        <Button size="sm" variant="destructive" onClick={() => deleteCard(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}</div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="goals">
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader><CardTitle className="text-yellow-300">إدارة الأهداف وكروت الفيفا</CardTitle><Input placeholder="ابحث عن لاعب أو فريق..." value={goalSearchTerm} onChange={(e) => setGoalSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader>
@@ -750,21 +821,6 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div className="space-y-3">{filteredGoals.map(goal => (<Card key={goal.id} className="bg-[#1e2a4a] border border-white/10"><CardContent className="p-4 flex justify-between items-center text-white"><div className="flex items-center gap-4">{goal.imageUrl ? <img src={goal.imageUrl} className="h-10 w-10 rounded-full object-cover border border-yellow-400" /> : <div className="h-10 w-10 rounded-full bg-[#0a1428] flex items-center justify-center text-xl">👤</div>}<div><div className="font-bold">{goal.player} <span className="text-yellow-400 text-xs ml-1">({goal.rating || 99})</span></div><div className="text-cyan-300 text-sm">{goal.team} — {goal.goals} هدف</div></div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEditGoal(goal)} className="bg-yellow-400 text-black hover:bg-yellow-500"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(goal.id)}><Trash2 className="h-4 w-4" /></Button></div></CardContent></Card>))}</div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="cards">
-            <Card className="border-yellow-400 bg-[#13213a]">
-              <CardHeader><CardTitle className="text-yellow-300">إدارة الإنذارات</CardTitle><Input placeholder="ابحث عن لاعب..." value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader>
-              <CardContent className="space-y-6 p-6">
-                <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl border ${activeTournament === 'juniors' ? 'border-cyan-500/30' : 'border-yellow-400/30'}`}>
-                  <Input value={cardForm.player} onChange={e => setCardForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" />
-                  <select value={cardForm.team} onChange={e => setCardForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                  <select value={cardForm.type} onChange={e => setCardForm(p => ({...p, type: e.target.value as "yellow" | "red"}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white"><option value="yellow">إنذار أصفر</option><option value="red">بطاقة حمراء</option></select>
-                  <Button onClick={addCard} className={`font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white hover:bg-cyan-600' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}>تسجيل البطاقة</Button>
-                </div>
-                <div className="space-y-3">{filteredCards.map(item => (<Card key={item.id} className="bg-[#1e2a4a] border border-white/10"><CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-white"><div><div className="font-bold text-lg">{item.player}</div><div className="text-cyan-300">{item.team}</div></div><div className="flex items-center gap-6"><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={() => updateCard(item.id, Math.max(0, item.yellow - 1), item.red)} className="border-yellow-400 text-white"><Minus className="h-4 w-4" /></Button><span className="px-4 py-1 bg-yellow-400/20 text-yellow-300 font-bold rounded">🟨 {item.yellow}</span><Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow + 1, item.red)} className="border-yellow-400 text-white"><Plus className="h-4 w-4" /></Button></div><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow, Math.max(0, item.red - 1))} className="border-red-400 text-white"><Minus className="h-4 w-4" /></Button><span className="px-4 py-1 bg-red-500/20 text-red-300 font-bold rounded">🟥 {item.red}</span><Button size="sm" variant="outline" onClick={() => updateCard(item.id, item.yellow, item.red + 1)} className="border-red-400 text-white"><Plus className="h-4 w-4" /></Button></div><Button size="sm" variant="destructive" onClick={() => deleteCard(item.id)}><Trash2 className="h-4 w-4" /></Button></div></CardContent></Card>))}</div>
               </CardContent>
             </Card>
           </TabsContent>
