@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity } from "lucide-react";
+import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
@@ -227,6 +227,32 @@ export default function AdminPage() {
     await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
   };
 
+  // 🔴 الإشعارات السريعة اللحظية المضافة 🔴
+  const sendQuickNotification = async (title: string, body: string) => {
+    try {
+      const snap = await getDocs(collection(db, "subscribers"));
+      const tokens = snap.docs.map(doc => doc.data().token);
+      if (tokens.length === 0) return alert("لا يوجد مشتركون في خدمة الإشعارات حتى الآن.");
+      
+      const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, body, tokens }) });
+      if (res.ok) alert(`✅ تم إرسال الإشعار السريع بنجاح!`);
+    } catch (error) { console.error(error); alert("حدث خطأ أثناء إرسال الإشعار."); }
+  };
+
+  // 🔴 الإشعارات اليدوية من تبويب "الإشعارات 🔔" - تم إعادتها لإصلاح الخطأ 🔴
+  const sendNotification = async () => {
+    if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
+    setIsSending(true);
+    try {
+      const snap = await getDocs(collection(db, "subscribers"));
+      const tokens = snap.docs.map(doc => doc.data().token);
+      if (tokens.length === 0) { alert("مفيش حد اشترك في الإشعارات لسه!"); setIsSending(false); return; }
+      const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: notifyTitle, body: notifyBody, tokens }) });
+      if (res.ok) { alert(`✅ تم الإرسال لـ ${tokens.length} جهاز!`); setNotifyTitle(""); setNotifyBody(""); } 
+    } catch (error) { console.error(error); alert("حدث خطأ في الاتصال"); }
+    setIsSending(false);
+  };
+
   const addOrUpdateGoal = async () => {
     if (!goalForm.player.trim()) return alert("اكتب اسم اللاعب");
     const playerNameTrimmed = goalForm.player.trim(); 
@@ -285,6 +311,21 @@ export default function AdminPage() {
   };
   const updateCard = async (id: string, yellow: number, red: number) => await updateDoc(doc(db, getColl("cards"), id), { yellow, red });
   const deleteCard = async (id: string) => confirm("حذف هذه البطاقة؟") && await deleteDoc(doc(db, getColl("cards"), id));
+
+  const archiveAndResetCards = async () => {
+    if (!confirm("⚠️ هل أنت متأكد من تصفير جميع الكروت ونقلها للأرشيف؟ (يتم ذلك عادة قبل دور الـ 16)")) return;
+    let archivedCount = 0;
+    try {
+      for (const card of cardEvents) {
+        if (card.yellow > 0 || card.red > 0) {
+          await addDoc(collection(db, getColl("archived_cards")), { ...card, archivedAt: new Date().toISOString() });
+          await updateDoc(doc(db, getColl("cards"), card.id), { yellow: 0, red: 0 });
+          archivedCount++;
+        }
+      }
+      alert(`✅ تم نقل وتصفير ${archivedCount} سجل بطاقات بنجاح للبدء من جديد!`);
+    } catch (e) { alert("حدث خطأ أثناء الأرشفة."); }
+  };
 
   const addMedia = async () => {
     if (!mediaForm.title || !mediaForm.url) return alert("اكتب عنوان ورابط الفيديو");
@@ -354,19 +395,6 @@ export default function AdminPage() {
     if (!tickerText.trim()) return alert("اكتب الخبر أولاً");
     await setDoc(doc(db, "settings", "ticker"), { text: tickerText.trim() }); 
     alert("✅ تم نشر الخبر بنجاح");
-  };
-
-  const sendNotification = async () => {
-    if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
-    setIsSending(true);
-    try {
-      const snap = await getDocs(collection(db, "subscribers"));
-      const tokens = snap.docs.map(doc => doc.data().token);
-      if (tokens.length === 0) { alert("مفيش حد اشترك في الإشعارات لسه!"); setIsSending(false); return; }
-      const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: notifyTitle, body: notifyBody, tokens }) });
-      if (res.ok) { alert(`✅ تم الإرسال لـ ${tokens.length} جهاز!`); setNotifyTitle(""); setNotifyBody(""); } 
-    } catch (error) { console.error(error); alert("حدث خطأ في الاتصال"); }
-    setIsSending(false);
   };
 
   const safeGoalSearch = goalSearchTerm.toLowerCase(); 
@@ -486,7 +514,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* 🔴 الأزرار المعدلة في البث المباشر (أهداف وكروت حمراء) 🔴 */}
           <TabsContent value="live" className="space-y-6">
             {matches.filter(m => m.isLive).length === 0 && (<Card className="border-yellow-400 bg-[#13213a] border-dashed"><CardContent className="p-16 text-center"><p className="text-xl text-cyan-300 mb-4">لا توجد مباريات جارية الآن ({activeTournament === 'youth' ? 'الشباب' : 'الناشئين'})</p></CardContent></Card>)}
             {matches.filter(m => m.isLive).map(match => (
@@ -499,6 +526,15 @@ export default function AdminPage() {
                   <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white" onClick={() => updateMatchLive(match.id, { isLive: false })}>إغلاق البث</Button>
                 </div>
                 <CardContent className="p-6">
+                  
+                  <div className="flex flex-wrap justify-center gap-2 mb-6 bg-[#0a1428] p-3 rounded-2xl border border-cyan-500/30">
+                    <Button size="sm" onClick={() => sendQuickNotification("صافرة البداية ⏱️", `انطلاق مباراة ${match.teamA} ضد ${match.teamB}`)} className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold"><BellRing className="ml-1 h-4 w-4"/> بداية الماتش</Button>
+                    <Button size="sm" onClick={() => sendQuickNotification("هدف مبكر! ⚽", `تم تسجيل هدف لصالح فريق ${match.teamA}`)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"><Play className="ml-1 h-4 w-4"/> هدف ({match.teamA})</Button>
+                    <Button size="sm" onClick={() => sendQuickNotification("هدف مبكر! ⚽", `تم تسجيل هدف لصالح فريق ${match.teamB}`)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"><Play className="ml-1 h-4 w-4"/> هدف ({match.teamB})</Button>
+                    <Button size="sm" onClick={() => sendQuickNotification("طرد! 🟥", `حالة طرد في مباراة ${match.teamA} و ${match.teamB}`)} className="bg-red-600 hover:bg-red-700 text-white font-bold"><ShieldAlert className="ml-1 h-4 w-4"/> طرد</Button>
+                    <Button size="sm" onClick={() => sendQuickNotification("نهاية المباراة 🏁", `انتهت المباراة بنتيجة ${match.homeGoals} - ${match.awayGoals}`)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold">إنهاء</Button>
+                  </div>
+
                   <div className="flex justify-center items-center gap-6 mb-8 bg-[#13213a] p-4 rounded-2xl border border-white/5 flex-wrap">
                     <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 ${match.isTimerRunning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف التايمر</> : <><Play className="mr-2 h-5 w-5" /> تشغيل التايمر</>}</Button>
                     <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={match.liveMinute || 0} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
@@ -537,7 +573,6 @@ export default function AdminPage() {
                     </div>
                   </div>
                   
-                  {/* إدارة التايم لاين */}
                   <div className="mt-8 bg-[#0a1428] p-6 rounded-3xl border-2 border-cyan-500/30">
                     <h4 className="text-cyan-400 font-black mb-4 flex items-center gap-2"><Activity /> إضافة حدث للتايم لاين</h4>
                     <div className="flex flex-col lg:flex-row gap-4">
@@ -572,7 +607,16 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {match.status === "ضربات جزاء" && (<div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl mt-6"><div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4"><h4 className="text-xl font-bold text-yellow-400">إدارة ضربات الترجيح</h4><Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black"><Plus className="ml-2 h-4 w-4" /> إضافة ركلة إضافية</Button></div><div className="flex flex-col md:flex-row justify-between items-center bg-[#0a1428] p-4 rounded-xl gap-6"><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesHome || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'home', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div><div className="text-3xl font-black text-yellow-400 bg-[#1e2a4a] px-6 py-2 rounded-xl">{(match.penaltiesHome || []).filter((p:string) => p === 'scored').length} - {(match.penaltiesAway || []).filter((p:string) => p === 'scored').length}</div><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesAway || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'away', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div></div></div>)}
+                  {match.status === "ضربات جزاء" && (
+                    <div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl mt-6">
+                      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <h4 className="text-xl font-bold text-yellow-400">إدارة ضربات الترجيح</h4>
+                        <div className="text-gray-400 text-xs">⚠️ لن تضاف أهداف الترجيح لإحصائيات الهدافين أو ترتيب الفرق</div>
+                        <Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black"><Plus className="ml-2 h-4 w-4" /> إضافة ركلة إضافية</Button>
+                      </div>
+                      <div className="flex flex-col md:flex-row justify-between items-center bg-[#0a1428] p-4 rounded-xl gap-6"><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesHome || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'home', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div><div className="text-3xl font-black text-yellow-400 bg-[#1e2a4a] px-6 py-2 rounded-xl">{(match.penaltiesHome || []).filter((p:string) => p === 'scored').length} - {(match.penaltiesAway || []).filter((p:string) => p === 'scored').length}</div><div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesAway || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'away', i, p)} className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${p === 'scored' ? 'bg-emerald-500 border-emerald-400' : p === 'missed' ? 'bg-red-500 border-red-400' : 'bg-[#1e2a4a] border-gray-600'}`}>{p === 'scored' && <span className="text-white font-bold">✔</span>}{p === 'missed' && <span className="text-white font-bold">✖</span>}</button>))}</div></div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -752,10 +796,12 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* 🔴 الأزرار المعدلة في إدارة الإنذارات (الكروت) 🔴 */}
           <TabsContent value="cards">
             <Card className="border-yellow-400 bg-[#13213a]">
-              <CardHeader><CardTitle className="text-yellow-300">إدارة الإنذارات</CardTitle><Input placeholder="ابحث عن لاعب..." value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white" /></CardHeader>
+              <CardHeader className="flex flex-col sm:flex-row justify-between items-center border-b border-white/5 pb-4">
+                 <CardTitle className="text-yellow-300">إدارة الإنذارات</CardTitle>
+                 <Button variant="destructive" onClick={archiveAndResetCards} className="font-black"><ArchiveRestore className="ml-2 h-5 w-5" /> تصفير وأرشفة الإنذارات (قبل دور الـ 16)</Button>
+              </CardHeader>
               <CardContent className="space-y-6 p-6">
                 <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl border ${activeTournament === 'juniors' ? 'border-cyan-500/30' : 'border-yellow-400/30'}`}>
                   <Input value={cardForm.player} onChange={e => setCardForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" />
@@ -763,6 +809,9 @@ export default function AdminPage() {
                   <select value={cardForm.type} onChange={e => setCardForm(p => ({...p, type: e.target.value as "yellow" | "red"}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white"><option value="yellow">إنذار أصفر</option><option value="red">بطاقة حمراء</option></select>
                   <Button onClick={addCard} className={`font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white hover:bg-cyan-600' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}>تسجيل البطاقة</Button>
                 </div>
+                
+                <div className="relative w-full sm:max-w-xs mx-auto"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} placeholder="بحث عن لاعب..." className="pr-10 bg-[#1e2a4a] border-yellow-400 text-white rounded-xl" /></div>
+
                 <div className="space-y-3">{filteredCards.map(item => (
                   <Card key={item.id} className="bg-[#1e2a4a] border border-white/10">
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-white">
@@ -835,6 +884,7 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
+          {/* 🔴 تبويب الإشعارات بعد تصحيح الدالة 🔴 */}
           <TabsContent value="notify">
             <Card className="border-yellow-400 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] shadow-2xl">
               <CardHeader className="text-center pb-2"><BellRing className="mx-auto h-12 w-12 text-yellow-400 mb-4 animate-bounce" /><CardTitle className="text-3xl font-black text-yellow-300">إرسال إشعار عاجل 🚀</CardTitle></CardHeader>
