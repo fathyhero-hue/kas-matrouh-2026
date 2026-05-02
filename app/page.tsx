@@ -184,7 +184,11 @@ export default function Page() {
 
     // 🔴 حقن كود OneSignal 🔴
     if (typeof window !== "undefined") {
-      setNotificationPermission(Notification.permission);
+      
+      // ✅ التعديل السحري هنا: نتأكد إن المتصفح بيدعم الإشعارات عشان متصفح الفيسبوك ميعملش كراش للصفحة
+      if ("Notification" in window) {
+        setNotificationPermission(Notification.permission);
+      }
       
       // الشرط ده عشان نمنع الإيرور وإنت شغال على اللاب توب (localhost)
       if (window.location.hostname.includes("matrouhcup.online")) {
