@@ -186,18 +186,23 @@ export default function Page() {
     if (typeof window !== "undefined") {
       setNotificationPermission(Notification.permission);
       
-      (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
-      (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
-        await OneSignal.init({
-          appId: "d73de8b7-948e-494e-84f2-6c353efee89c",
+      // الشرط ده عشان نمنع الإيرور وإنت شغال على اللاب توب (localhost)
+      if (window.location.hostname.includes("matrouhcup.online")) {
+        (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
+        (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+          await OneSignal.init({
+            appId: "d73de8b7-948e-494e-84f2-6c353efee89c",
+          });
         });
-      });
 
-      if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) {
-        const script = document.createElement('script');
-        script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
-        script.defer = true;
-        document.head.appendChild(script);
+        if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) {
+          const script = document.createElement('script');
+          script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+      } else {
+         console.log("تم إيقاف الإشعارات مؤقتاً في وضع التطوير (Localhost)");
       }
     }
 
