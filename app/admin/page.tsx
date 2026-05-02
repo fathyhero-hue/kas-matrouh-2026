@@ -13,10 +13,6 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
-// 🔴🔴🔴 مفاتيح OneSignal 🔴🔴🔴
-const ONESIGNAL_APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c";
-const ONESIGNAL_REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittiky3vqzocua7mgejhhcm2c3b7cn3zrz235yp3mk6rqupnrbkzbakvd6y3432offaiaazjpojaix3q"; 
-
 const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
 const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
 
@@ -70,21 +66,15 @@ const generatePostContent = (match: any) => {
          `\n#كأس_مطروح_2026 #النسخة_الثالثة #مطروح_الرياضية #فتحي_هيرو 🦅`;
 };
 
-// 🔴 دالة مركزية للاتصال المباشر بـ OneSignal 🔴
+// 🔴 دالة الاتصال بالوسيط بتاعنا (عشان نتخطى حظر المتصفح CORS) 🔴
 const pushNotification = async (title: string, body: string) => {
   try {
-     const res = await fetch("https://onesignal.com/api/v1/notifications", {
+     const res = await fetch("/api/notify", {
         method: "POST",
         headers: {
-           "Content-Type": "application/json",
-           "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-           app_id: ONESIGNAL_APP_ID,
-           included_segments: ["Subscribed Users"],
-           headings: { en: title, ar: title },
-           contents: { en: body, ar: body }
-        })
+        body: JSON.stringify({ title, body })
      });
      return res.ok;
   } catch(e) { 
@@ -254,14 +244,14 @@ export default function AdminPage() {
     await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
   };
 
-  // 🔴 الإشعارات السريعة اللحظية المضافة 🔴
+  // 🔴 الإشعارات السريعة اللحظية 🔴
   const sendQuickNotification = async (title: string, body: string) => {
     const success = await pushNotification(title, body);
     if(success) alert(`✅ تم إرسال الإشعار السريع بنجاح لجميع المتابعين!`);
-    else alert("❌ حدث خطأ في الإرسال، تحقق من مفتاح الـ API.");
+    else alert("❌ حدث خطأ في الإرسال، راجع إعدادات ملف route.ts");
   };
 
-  // 🔴 الإشعارات اليدوية من تبويب "الإشعارات 🔔" 🔴
+  // 🔴 الإشعارات اليدوية 🔴
   const sendNotification = async () => {
     if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
     setIsSending(true);
@@ -270,7 +260,7 @@ export default function AdminPage() {
       alert(`✅ تم إرسال الإشعار لجميع الأجهزة!`);
       setNotifyTitle(""); setNotifyBody("");
     } else {
-      alert("❌ فشل الإرسال، تحقق من مفتاح الـ API.");
+      alert("❌ فشل الإرسال، راجع إعدادات ملف route.ts");
     }
     setIsSending(false);
   };
