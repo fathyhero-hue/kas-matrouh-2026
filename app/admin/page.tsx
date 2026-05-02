@@ -13,7 +13,7 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
-// 🔴🔴🔴 مفاتيح OneSignal (مهم جداً تحط الـ REST API هنا) 🔴🔴🔴
+// 🔴🔴🔴 مفاتيح OneSignal 🔴🔴🔴
 const ONESIGNAL_APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c";
 const ONESIGNAL_REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittiky3vqzocua7mgejhhcm2c3b7cn3zrz235yp3mk6rqupnrbkzbakvd6y3432offaiaazjpojaix3q"; 
 
@@ -72,10 +72,6 @@ const generatePostContent = (match: any) => {
 
 // 🔴 دالة مركزية للاتصال المباشر بـ OneSignal 🔴
 const pushNotification = async (title: string, body: string) => {
-  if (ONESIGNAL_REST_API_KEY === "YOUR_REST_API_KEY_HERE") {
-     alert("⚠️ تنبيه: لازم تحط مفتاح REST API الخاص بـ OneSignal في الكود عشان الإشعارات تتبعت!");
-     return false;
-  }
   try {
      const res = await fetch("https://onesignal.com/api/v1/notifications", {
         method: "POST",
@@ -91,7 +87,10 @@ const pushNotification = async (title: string, body: string) => {
         })
      });
      return res.ok;
-  } catch(e) { console.error(e); return false; }
+  } catch(e) { 
+     console.error(e); 
+     return false; 
+  }
 };
 
 export default function AdminPage() {
@@ -259,7 +258,7 @@ export default function AdminPage() {
   const sendQuickNotification = async (title: string, body: string) => {
     const success = await pushNotification(title, body);
     if(success) alert(`✅ تم إرسال الإشعار السريع بنجاح لجميع المتابعين!`);
-    else alert("❌ حدث خطأ، تأكد إنك حطيت مفتاح الـ REST API في كود الإدارة.");
+    else alert("❌ حدث خطأ في الإرسال، تحقق من مفتاح الـ API.");
   };
 
   // 🔴 الإشعارات اليدوية من تبويب "الإشعارات 🔔" 🔴
@@ -271,7 +270,7 @@ export default function AdminPage() {
       alert(`✅ تم إرسال الإشعار لجميع الأجهزة!`);
       setNotifyTitle(""); setNotifyBody("");
     } else {
-      alert("❌ فشل الإرسال، تأكد إنك حطيت مفتاح الـ REST API في كود الإدارة.");
+      alert("❌ فشل الإرسال، تحقق من مفتاح الـ API.");
     }
     setIsSending(false);
   };
