@@ -1,24 +1,23 @@
 import { NextResponse } from "next/server";
 
-// 🔴 المفاتيح الخاصة ببطولة كأس مطروح 🔴
 const ONESIGNAL_APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c";
 const ONESIGNAL_REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittiky3vqzocua7mgejhhcm2c3b7cn3zrz235yp3mk6rqupnrbkzbakvd6y3432offaiaazjpojaix3q";
 
 export async function POST(req: Request) {
   try {
-    // استلام عنوان وتفاصيل الإشعار من لوحة الإدارة
     const { title, body } = await req.json();
 
-    // إرسال الطلب لـ OneSignal
     const res = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+        // 🔴 التعديل الأول: استخدام Key بدل Basic عشان المفاتيح الجديدة 🔴
+        "Authorization": `Key ${ONESIGNAL_REST_API_KEY}`
       },
       body: JSON.stringify({
         app_id: ONESIGNAL_APP_ID,
-        included_segments: ["Subscribed Users"], // إرسال لكل المشتركين
+        // 🔴 التعديل التاني: تحديث اسم الشريحة للاسم المعتمد 🔴
+        included_segments: ["Total Subscriptions"], 
         headings: { en: title, ar: title },
         contents: { en: body, ar: body }
       })
