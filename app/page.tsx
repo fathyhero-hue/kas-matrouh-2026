@@ -174,7 +174,7 @@ export default function Page() {
   const [activeTotwRound, setActiveTotwRound] = useState("دور المجموعات"); 
   const [time, setTime] = useState<Date | null>(null);
 
-  // 🔴 حالة الإشعارات للمستخدم
+  // حالة الإشعارات
   const [notificationPermission, setNotificationPermission] = useState("default");
 
   useEffect(() => {
@@ -182,8 +182,23 @@ export default function Page() {
     const stored = localStorage.getItem('predictedMatches');
     if (stored) setPredictedMatches(JSON.parse(stored));
 
-    if (typeof window !== "undefined" && "Notification" in window) {
+    // 🔴 حقن كود OneSignal 🔴
+    if (typeof window !== "undefined") {
       setNotificationPermission(Notification.permission);
+      
+      (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
+      (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+        await OneSignal.init({
+          appId: "d73de8b7-948e-494e-84f2-6c353efee89c",
+        });
+      });
+
+      if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) {
+        const script = document.createElement('script');
+        script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+        script.defer = true;
+        document.head.appendChild(script);
+      }
     }
 
     const suffix = activeTournament === "juniors" ? "_juniors" : "";
@@ -204,27 +219,15 @@ export default function Page() {
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubTicker(); clearInterval(clockTimer); };
   }, [activeTournament]);
 
-  // 🔴 دالة تفعيل الإشعارات للمستخدم
-  const handleSubscribe = async () => {
-    if (!("Notification" in window)) {
-      alert("متصفحك الحالي لا يدعم ميزة الإشعارات الفورية.");
-      return;
-    }
-    try {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      
-      if (permission === "granted") {
-        // عند استخدام Firebase Cloud Messaging (FCM) فعلياً، سيتم إضافة الكود هنا
-        // const currentToken = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' });
-        // await addDoc(collection(db, "subscribers"), { token: currentToken, timestamp: new Date().toISOString() });
-        
-        alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك كل التحديثات والأهداف لايف من المخرج.");
-      } else {
-        alert("❌ تم رفض الصلاحية. يرجى تفعيل الإشعارات يدوياً من إعدادات المتصفح أو التطبيق.");
-      }
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
+  // 🔴 طلب صلاحية الإشعارات عبر OneSignal
+  const handleSubscribe = () => {
+    if (typeof window !== "undefined" && (window as any).OneSignalDeferred) {
+      (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+        await OneSignal.Slidedown.promptPush();
+        setTimeout(() => {
+          if ("Notification" in window) setNotificationPermission(Notification.permission);
+        }, 4000);
+      });
     }
   };
 
@@ -509,7 +512,6 @@ export default function Page() {
           ))}
         </div>
 
-        {/* 🔴 تبويب الإعدادات الجديد للمستخدم 🔴 */}
         {activeTab === "settings" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl mx-auto">
             <div className="text-center mb-8">
@@ -782,6 +784,7 @@ export default function Page() {
           </div>
         )}
 
+        {/* 🔴 تبويب الإنذارات */}
         {activeTab === "cards" && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex flex-col sm:flex-row justify-between items-center bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/30 gap-4">
@@ -820,6 +823,7 @@ export default function Page() {
           </div>
         )}
 
+        {/* 🔴 الإحصائيات الشاملة */}
         {activeTab === "stats" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {topMotmPlayer && (
@@ -896,67 +900,12 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 البث المباشر */}
-        {activeTab === "live" && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            {liveMatches.length > 0 ? liveMatches.map(match => { 
-              const isStartingSoon = match.status === "ستبدأ بعد قليل"; 
-              return (
-                <div key={match.id} className="space-y-4">
-                  <div className={`relative rounded-3xl bg-gradient-to-r from-[#1e2a4a] to-[#25345a] border-2 ${isStartingSoon ? 'border-cyan-500/80 shadow-[0_0_30px_rgba(34,211,238,0.2)]' : 'border-red-500/80 shadow-[0_0_30px_rgba(239,68,68,0.2)]'} p-8 overflow-hidden`}>
-                    <div className="absolute top-4 left-4 flex items-center gap-2"><span className="relative flex h-3 w-3"><span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isStartingSoon ? 'bg-cyan-400' : 'bg-red-400'} opacity-75`}></span><span className={`relative inline-flex rounded-full h-3 w-3 ${isStartingSoon ? 'bg-cyan-500' : 'bg-red-500'}`}></span></span><span className="text-white text-xs font-bold uppercase tracking-widest opacity-70">LIVE</span></div>
-                    <div className={`absolute top-0 inset-x-0 text-white text-center py-1.5 text-sm font-black shadow-md ${isStartingSoon ? 'bg-cyan-500 text-black' : 'bg-yellow-400 text-black'}`}><span>{match.status} {!isStartingSoon && match.status !== "استراحة" && match.status !== "انتهت" && match.status !== "ضربات جزاء" && ` - الدقيقة ${match.liveMinute}'`}</span></div>
-                    <div className="mt-8 flex justify-between items-center gap-6 relative z-10">
-                      <div className="flex-1 text-center md:text-right font-black text-2xl sm:text-3xl text-white drop-shadow-md">{match.teamA}</div>
-                      <div className="flex flex-col items-center">
-                         <div className="flex items-center gap-6 bg-[#0a1428]/80 backdrop-blur-sm px-8 py-4 rounded-3xl border border-white/10 shadow-2xl">
-                           <span className="text-5xl sm:text-7xl font-black text-white">{match.homeGoals}</span>
-                           <span className="text-3xl sm:text-4xl text-yellow-400 font-black animate-pulse">:</span>
-                           <span className="text-5xl sm:text-7xl font-black text-white">{match.awayGoals}</span>
-                         </div>
-                         {(match.redCardsHome > 0 || match.redCardsAway > 0) && (
-                           <div className="flex justify-between w-full mt-3 px-4">
-                             <div className="text-red-500 font-bold text-sm">{match.redCardsHome > 0 ? `🟥 ${match.redCardsHome} طرد` : ''}</div>
-                             <div className="text-red-500 font-bold text-sm">{match.redCardsAway > 0 ? `🟥 ${match.redCardsAway} طرد` : ''}</div>
-                           </div>
-                         )}
-                      </div>
-                      <div className="flex-1 text-center md:text-left font-black text-2xl sm:text-3xl text-white drop-shadow-md">{match.teamB}</div>
-                    </div>
-                  </div>
-                  {!isStartingSoon && (
-                    <Card className="bg-[#13213a] border-yellow-400/30 rounded-3xl overflow-hidden shadow-xl">
-                      <CardHeader className="border-b border-white/5 py-4 bg-[#1e2a4a]"><CardTitle className="text-yellow-300 text-lg flex items-center gap-2 justify-center"><Activity className="h-5 w-5" /> التغطية المباشرة لأحداث المباراة</CardTitle></CardHeader>
-                      <CardContent className="p-6">
-                        <div className="relative border-r-2 border-white/10 pr-6 space-y-6">
-                           <div className="relative"><span className="absolute -right-[33px] bg-[#0a1428] border-2 border-yellow-400 h-4 w-4 rounded-full mt-1.5"></span><div className="bg-[#1e2a4a] border border-white/5 p-4 rounded-2xl"><span className="text-yellow-400 font-black text-sm block mb-1">صافرة البداية ⏱️</span><p className="text-white text-sm font-bold">انطلاق أحداث الشوط الأول من المباراة!</p></div></div>
-                           {match.liveEvents && match.liveEvents.map((ev: any, idx: number) => (
-                             <div key={idx} className="relative animate-in fade-in duration-300">
-                                <span className={`absolute -right-[33px] border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 ${ev.type === 'goal' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : ev.type === 'yellow' ? 'bg-yellow-400' : ev.type === 'red' ? 'bg-red-500' : 'bg-cyan-400'}`}></span>
-                                <div className={`border p-4 rounded-2xl ${ev.type === 'goal' ? 'bg-emerald-900/30 border-emerald-500/30' : 'bg-[#1e2a4a] border-white/5'}`}>
-                                   <span className={`${ev.type === 'goal' ? 'text-emerald-400' : ev.type === 'yellow' ? 'text-yellow-400' : ev.type === 'red' ? 'text-red-400' : 'text-cyan-400'} font-black text-sm block mb-1`}>
-                                      {ev.type === 'goal' ? 'هدف! ⚽' : ev.type === 'yellow' ? 'إنذار 🟨' : ev.type === 'red' ? 'طرد 🟥' : 'تحديث 🎙️'}
-                                      <span className="text-gray-400 text-xs ml-2 border-r border-white/20 pr-2">الدقيقة {ev.minute}'</span>
-                                   </span>
-                                   <p className="text-white text-sm font-bold">{ev.text}</p>
-                                </div>
-                             </div>
-                           ))}
-                           <div className="relative"><span className="absolute -right-[33px] bg-cyan-500 border-2 border-[#13213a] h-4 w-4 rounded-full mt-1.5 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.8)]"></span><div className="bg-cyan-900/20 border border-cyan-500/30 p-4 rounded-2xl"><span className="text-cyan-400 font-black text-sm block mb-1">مباشر الآن 🔴</span><p className="text-white text-sm font-bold">المباراة جارية في <span className="text-yellow-400">{match.status}</span> (الدقيقة {match.liveMinute})</p></div></div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              )
-            }) : (
-              <Card className="rounded-3xl border-2 border-yellow-400/50 bg-[#13213a] shadow-xl"><CardHeader className="text-center border-b border-white/5"><div className="flex justify-center items-center gap-2 mb-2"><span className="text-cyan-400 font-black uppercase tracking-widest">Live Coverage</span></div><CardTitle className="text-3xl font-black text-white">المباريات الجارية</CardTitle></CardHeader><CardContent className="p-20 text-center"><p className="text-2xl text-cyan-300 font-bold">لا توجد مباريات جارية حالياً</p><p className="text-gray-400 mt-2">انتظرونا في المواعيد القادمة لتغطية حية للأحداث ⚽</p></CardContent></Card>
-            )}
-          </div>
-        )}
-
+        {/* فوتر حقوق الملكية */}
         <div className="mt-16 border-t border-white/5 pt-6 pb-2 flex flex-col items-center justify-center text-center">
-           <div className="text-gray-400 text-sm font-bold flex items-center gap-2"><span>إعداد وتطوير</span><Badge className="bg-[#13213a] text-yellow-400 border border-yellow-400/20 px-3 py-1 font-black text-sm hover:scale-105 transition-transform cursor-default shadow-md">فتحي هيرو 🦅</Badge></div>
+           <div className="text-gray-400 text-sm font-bold flex items-center gap-2">
+              <span>إعداد وتطوير</span>
+              <Badge className="bg-[#13213a] text-yellow-400 border border-yellow-400/20 px-3 py-1 font-black text-sm hover:scale-105 transition-transform cursor-default shadow-md">فتحي هيرو 🦅</Badge>
+           </div>
            <div className="text-cyan-300 text-[10px] mt-2 opacity-60 font-bold tracking-wider">جميع الحقوق محفوظة © 2026 لبطولة كأس مطروح</div>
         </div>
 

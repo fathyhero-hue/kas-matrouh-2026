@@ -13,6 +13,10 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
+// 🔴🔴🔴 مفاتيح OneSignal (مهم جداً تحط الـ REST API هنا) 🔴🔴🔴
+const ONESIGNAL_APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c";
+const ONESIGNAL_REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittiky3vqzocua7mgejhhcm2c3b7cn3zrz235yp3mk6rqupnrbkzbakvd6y3432offaiaazjpojaix3q"; 
+
 const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
 const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
 
@@ -64,6 +68,30 @@ const generatePostContent = (match: any) => {
          (match.matchLabel ? `📌 ${match.matchLabel} - ${match.round}\n` : `📌 ${match.round}\n`) +
          ((match.redCardsHome > 0 || match.redCardsAway > 0) ? `\n🟥 حالات الطرد: ${match.redCardsHome + match.redCardsAway}\n` : "") +
          `\n#كأس_مطروح_2026 #النسخة_الثالثة #مطروح_الرياضية #فتحي_هيرو 🦅`;
+};
+
+// 🔴 دالة مركزية للاتصال المباشر بـ OneSignal 🔴
+const pushNotification = async (title: string, body: string) => {
+  if (ONESIGNAL_REST_API_KEY === "YOUR_REST_API_KEY_HERE") {
+     alert("⚠️ تنبيه: لازم تحط مفتاح REST API الخاص بـ OneSignal في الكود عشان الإشعارات تتبعت!");
+     return false;
+  }
+  try {
+     const res = await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+           "Content-Type": "application/json",
+           "Authorization": `Basic ${ONESIGNAL_REST_API_KEY}`
+        },
+        body: JSON.stringify({
+           app_id: ONESIGNAL_APP_ID,
+           included_segments: ["Subscribed Users"],
+           headings: { en: title, ar: title },
+           contents: { en: body, ar: body }
+        })
+     });
+     return res.ok;
+  } catch(e) { console.error(e); return false; }
 };
 
 export default function AdminPage() {
@@ -229,27 +257,22 @@ export default function AdminPage() {
 
   // 🔴 الإشعارات السريعة اللحظية المضافة 🔴
   const sendQuickNotification = async (title: string, body: string) => {
-    try {
-      const snap = await getDocs(collection(db, "subscribers"));
-      const tokens = snap.docs.map(doc => doc.data().token);
-      if (tokens.length === 0) return alert("لا يوجد مشتركون في خدمة الإشعارات حتى الآن.");
-      
-      const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, body, tokens }) });
-      if (res.ok) alert(`✅ تم إرسال الإشعار السريع بنجاح!`);
-    } catch (error) { console.error(error); alert("حدث خطأ أثناء إرسال الإشعار."); }
+    const success = await pushNotification(title, body);
+    if(success) alert(`✅ تم إرسال الإشعار السريع بنجاح لجميع المتابعين!`);
+    else alert("❌ حدث خطأ، تأكد إنك حطيت مفتاح الـ REST API في كود الإدارة.");
   };
 
-  // 🔴 الإشعارات اليدوية من تبويب "الإشعارات 🔔" - تم إعادتها لإصلاح الخطأ 🔴
+  // 🔴 الإشعارات اليدوية من تبويب "الإشعارات 🔔" 🔴
   const sendNotification = async () => {
     if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
     setIsSending(true);
-    try {
-      const snap = await getDocs(collection(db, "subscribers"));
-      const tokens = snap.docs.map(doc => doc.data().token);
-      if (tokens.length === 0) { alert("مفيش حد اشترك في الإشعارات لسه!"); setIsSending(false); return; }
-      const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: notifyTitle, body: notifyBody, tokens }) });
-      if (res.ok) { alert(`✅ تم الإرسال لـ ${tokens.length} جهاز!`); setNotifyTitle(""); setNotifyBody(""); } 
-    } catch (error) { console.error(error); alert("حدث خطأ في الاتصال"); }
+    const success = await pushNotification(notifyTitle, notifyBody);
+    if (success) {
+      alert(`✅ تم إرسال الإشعار لجميع الأجهزة!`);
+      setNotifyTitle(""); setNotifyBody("");
+    } else {
+      alert("❌ فشل الإرسال، تأكد إنك حطيت مفتاح الـ REST API في كود الإدارة.");
+    }
     setIsSending(false);
   };
 
@@ -884,7 +907,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          {/* 🔴 تبويب الإشعارات بعد تصحيح الدالة 🔴 */}
           <TabsContent value="notify">
             <Card className="border-yellow-400 bg-gradient-to-br from-[#1e2a4a] to-[#13213a] shadow-2xl">
               <CardHeader className="text-center pb-2"><BellRing className="mx-auto h-12 w-12 text-yellow-400 mb-4 animate-bounce" /><CardTitle className="text-3xl font-black text-yellow-300">إرسال إشعار عاجل 🚀</CardTitle></CardHeader>
