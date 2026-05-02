@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Clock, Trophy, Target, Shield, 
-  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive 
+  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, Settings, CheckCircle2, BellOff 
 } from "lucide-react";
 import { TEAM_NAMES } from "@/data/tournament";
 import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
@@ -89,7 +89,6 @@ const getWinnerData = (t1: string, t2: string, round: string, labelId: string, a
   return { win: w, match: m };
 };
 
-// 🔴 دالة عرض النتيجة الذكية لدعم ضربات الجزاء للجمهور
 const renderMatchScore = (match: any) => {
   const isPlayed = match && match.status === "انتهت";
   const isLive = match && match.isLive;
@@ -155,7 +154,7 @@ export default function Page() {
   const [matches, setMatches] = useState<any[]>([]);
   const [goalEvents, setGoalEvents] = useState<any[]>([]);
   const [cardEvents, setCardEvents] = useState<any[]>([]);
-  const [archivedCards, setArchivedCards] = useState<any[]>([]); // 🔴 جلب أرشيف الكروت
+  const [archivedCards, setArchivedCards] = useState<any[]>([]);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [motmList, setMotmList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
@@ -170,15 +169,22 @@ export default function Page() {
   const [predForms, setPredForms] = useState<Record<string, any>>({});
   const [predictedMatches, setPredictedMatches] = useState<Record<string, boolean>>({});
   const [isTableExpanded, setIsTableExpanded] = useState(false);
-  const [showArchivedCards, setShowArchivedCards] = useState(false); // 🔴 زر تبديل الأرشيف
+  const [showArchivedCards, setShowArchivedCards] = useState(false); 
   
   const [activeTotwRound, setActiveTotwRound] = useState("دور المجموعات"); 
   const [time, setTime] = useState<Date | null>(null);
+
+  // 🔴 حالة الإشعارات للمستخدم
+  const [notificationPermission, setNotificationPermission] = useState("default");
 
   useEffect(() => {
     setLoading(true);
     const stored = localStorage.getItem('predictedMatches');
     if (stored) setPredictedMatches(JSON.parse(stored));
+
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
 
     const suffix = activeTournament === "juniors" ? "_juniors" : "";
 
@@ -197,6 +203,30 @@ export default function Page() {
 
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubTicker(); clearInterval(clockTimer); };
   }, [activeTournament]);
+
+  // 🔴 دالة تفعيل الإشعارات للمستخدم
+  const handleSubscribe = async () => {
+    if (!("Notification" in window)) {
+      alert("متصفحك الحالي لا يدعم ميزة الإشعارات الفورية.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === "granted") {
+        // عند استخدام Firebase Cloud Messaging (FCM) فعلياً، سيتم إضافة الكود هنا
+        // const currentToken = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' });
+        // await addDoc(collection(db, "subscribers"), { token: currentToken, timestamp: new Date().toISOString() });
+        
+        alert("✅ تم تفعيل الإشعارات بنجاح! هتوصلك كل التحديثات والأهداف لايف من المخرج.");
+      } else {
+        alert("❌ تم رفض الصلاحية. يرجى تفعيل الإشعارات يدوياً من إعدادات المتصفح أو التطبيق.");
+      }
+    } catch (error) {
+      console.error("Error requesting notification permission:", error);
+    }
+  };
 
   const submitPrediction = async (matchId: string, matchName: string) => { 
     const form = predForms[matchId];
@@ -363,7 +393,6 @@ export default function Page() {
     };
   }, [finishedMatches, cardEvents, scorers, activeTournament]);
 
-  // 🔴 تبديل مصدر الإنذارات (الحالية أو الأرشيف) 🔴
   const activeCardsSource = showArchivedCards ? archivedCards : cardEvents;
   
   const cardsList = useMemo(() => {
@@ -461,16 +490,67 @@ export default function Page() {
           {[
             { key: "totw", label: "تشكيلة الجولة", icon: "🏟️", extraClass: "bg-emerald-600 text-white border-none shadow-[0_0_15px_rgba(5,150,105,0.6)]" },
             { key: "fantasy", label: "توقع واكسب", icon: "🎁", extraClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-none shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
-            { key: "knockout", label: "الأدوار الإقصائية", icon: "🏆", extraClass: "" }, { key: "live", label: "مباشر", icon: "🔴", extraClass: "" }, { key: "standings", label: "الترتيب", icon: "📊", extraClass: "" }, 
-            { key: "today", label: "مباريات اليوم", icon: "📅", extraClass: "" }, { key: "tomorrow", label: "مباريات غداً", icon: "📆", extraClass: "" }, { key: "all", label: "النتائج", icon: "⚽", extraClass: "" }, 
-            { key: "scorers", label: "الهدافين", icon: "🥇", extraClass: "" }, { key: "cards", label: "الكروت", icon: "🟨", extraClass: "" }, { key: "stats", label: "إحصائيات", icon: "📈", extraClass: "" }, 
-            { key: "motm_tab", label: "رجل المباراة", icon: "🌟", extraClass: "" }, { key: "media", label: "ميديا", icon: "🎥", extraClass: "" }
+            { key: "knockout", label: "الأدوار الإقصائية", icon: "🏆", extraClass: "" }, 
+            { key: "live", label: "مباشر", icon: "🔴", extraClass: "" }, 
+            { key: "standings", label: "الترتيب", icon: "📊", extraClass: "" }, 
+            { key: "today", label: "مباريات اليوم", icon: "📅", extraClass: "" }, 
+            { key: "tomorrow", label: "مباريات غداً", icon: "📆", extraClass: "" }, 
+            { key: "all", label: "النتائج", icon: "⚽", extraClass: "" }, 
+            { key: "scorers", label: "الهدافين", icon: "🥇", extraClass: "" }, 
+            { key: "cards", label: "الكروت", icon: "🟨", extraClass: "" }, 
+            { key: "stats", label: "إحصائيات", icon: "📈", extraClass: "" }, 
+            { key: "motm_tab", label: "رجل المباراة", icon: "🌟", extraClass: "" }, 
+            { key: "media", label: "ميديا", icon: "🎥", extraClass: "" },
+            { key: "settings", label: "الإعدادات", icon: "⚙️", extraClass: "bg-gray-800 text-white shadow-lg border-gray-600" }
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`flex-1 sm:flex-none px-5 py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all border ${activeTab === tab.key ? (tab.extraClass || "bg-yellow-400 text-black border-yellow-400 shadow-lg scale-105") : "bg-[#1e2a4a] text-white border-yellow-400/30 hover:bg-[#25345a]"}`}>
               <span className={`text-lg ${tab.key === "live" && activeTab === "live" ? "animate-pulse" : ""}`}>{tab.icon}</span> <span className="ml-1">{tab.label}</span>
             </button>
           ))}
         </div>
+
+        {/* 🔴 تبويب الإعدادات الجديد للمستخدم 🔴 */}
+        {activeTab === "settings" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl mx-auto">
+            <div className="text-center mb-8">
+               <h2 className="text-4xl font-black text-yellow-300 drop-shadow-lg">إعدادات المستخدم ⚙️</h2>
+               <p className="text-cyan-300 mt-2 font-bold text-lg">تحكم في تجربتك داخل منصة كأس مطروح</p>
+            </div>
+
+            <Card className="bg-[#13213a] border-yellow-400/30 rounded-3xl overflow-hidden shadow-2xl">
+              <CardHeader className="border-b border-white/5 bg-[#1e2a4a] py-6">
+                <CardTitle className="text-2xl text-white flex items-center gap-3">
+                  <BellRing className="h-6 w-6 text-yellow-400" /> الإشعارات والتنبيهات الفورية
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex-1 text-center md:text-right">
+                    <h3 className="text-xl font-bold text-white mb-2">تلقي أحداث المباريات مباشرة</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">
+                      فعل الإشعارات عشان يوصلك تنبيه فوري على موبايلك بصافرة البداية، الأهداف الحاسمة، الكروت الحمراء، وكل الأخبار العاجلة اللي بيبعتها مخرج البطولة أول بأول من أرض الملعب.
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    {notificationPermission === "granted" ? (
+                      <div className="bg-emerald-500/20 border border-emerald-500 text-emerald-400 px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                        <CheckCircle2 className="h-5 w-5" /> الإشعارات مفعلة
+                      </div>
+                    ) : notificationPermission === "denied" ? (
+                      <div className="bg-red-500/20 border border-red-500 text-red-400 px-6 py-3 rounded-2xl font-black flex items-center gap-2">
+                        <BellOff className="h-5 w-5" /> محظورة من المتصفح
+                      </div>
+                    ) : (
+                      <Button onClick={handleSubscribe} className="bg-yellow-400 hover:bg-yellow-500 text-black font-black px-8 py-6 rounded-2xl text-lg shadow-[0_0_20px_rgba(250,204,21,0.4)] transition-transform hover:scale-105">
+                        <BellRing className="mr-2 h-5 w-5 animate-bounce" /> تفعيل الآن
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {activeTab === "totw" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -614,7 +694,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 النتائج السابقة بدعم عرض ضربات الجزاء */}
         {activeTab === "all" && (
            <Card className={`rounded-3xl border ${activeTournament === 'juniors' ? 'border-cyan-500/30' : 'border-yellow-400/30'} bg-[#13213a] animate-in fade-in duration-500`}>
              <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4"><div><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>النتائج السابقة</CardTitle><Badge className="bg-cyan-500 mt-2 font-bold text-white">إجمالي المباريات: {finishedMatches.length}</Badge></div><div className="relative w-full sm:max-w-xs"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث عن فريق..." className="pr-10 bg-[#1e2a4a] border-yellow-400 text-white rounded-xl" /></div></CardHeader>
@@ -703,7 +782,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 تبويب الإنذارات المعدل للأرشفة */}
         {activeTab === "cards" && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex flex-col sm:flex-row justify-between items-center bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/30 gap-4">
@@ -742,7 +820,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 الإحصائيات الشاملة */}
         {activeTab === "stats" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {topMotmPlayer && (
