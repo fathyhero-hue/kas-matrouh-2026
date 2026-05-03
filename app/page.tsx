@@ -43,7 +43,9 @@ const cleanTeamString = (name: any) => String(name || "").replace(/النجيل�
 const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
 type StandingRow = { team: string; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; points: number; rank: number; };
 
-function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
+function normalizeTeamName(name: string): string { 
+    return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); 
+}
 
 function buildStandings(matchRows: any[], allTeams: string[]) {
   const table = new Map<string, StandingRow>();
@@ -92,15 +94,16 @@ const getWinnerData = (t1: string, t2: string, round: string, labelId: string, a
 const renderMatchScore = (match: any) => {
   const isPlayed = match && match.status === "انتهت";
   const isLive = match && match.isLive;
-  if (!isPlayed && !isLive) return 'VS';
+  const hasGoals = match && match.homeGoals !== undefined && match.awayGoals !== undefined && match.homeGoals !== "" && match.awayGoals !== "";
+  if (!isPlayed && !isLive && !hasGoals) return 'VS';
 
   const hPen = (match.penaltiesHome || []).filter((p:any)=>p==='scored').length;
   const aPen = (match.penaltiesAway || []).filter((p:any)=>p==='scored').length;
   const hasPenalties = hPen > 0 || aPen > 0 || match.status === "ضربات جزاء";
 
   return (
-    <div className="flex flex-col items-center">
-      <span className="text-lg sm:text-2xl font-black">{match.homeGoals} - {match.awayGoals}</span>
+    <div className="flex flex-col items-center" dir="ltr">
+      <span className="text-lg sm:text-2xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
       {hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({hPen} - {aPen} ر.ت)</span>}
     </div>
   );
@@ -135,7 +138,7 @@ const MiniFutCard = ({ player, position }: { player: any, position: string }) =>
         </div>
         <div className="absolute top-3 md:top-5 w-full flex justify-center z-10 left-0">
           <div className="w-10 h-10 md:w-[60px] md:h-[60px] rounded-full border-2 border-yellow-400 overflow-hidden bg-[#1e2a4a] shadow-inner">
-            {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.name} /> : <span className="text-xl md:text-3xl opacity-40 text-white flex justify-center mt-1">👤</span>}
+            {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.name} loading="lazy" /> : <span className="text-xl md:text-3xl opacity-40 text-white flex justify-center mt-1">👤</span>}
           </div>
         </div>
         <div className="absolute bottom-2 md:bottom-3 w-full text-center z-20 px-1">
@@ -173,8 +176,6 @@ export default function Page() {
   
   const [activeTotwRound, setActiveTotwRound] = useState("دور المجموعات"); 
   const [time, setTime] = useState<Date | null>(null);
-
-  // حالة الإشعارات
   const [notificationPermission, setNotificationPermission] = useState("default");
 
   useEffect(() => {
@@ -182,15 +183,11 @@ export default function Page() {
     const stored = localStorage.getItem('predictedMatches');
     if (stored) setPredictedMatches(JSON.parse(stored));
 
-    // 🔴 حقن كود OneSignal 🔴
     if (typeof window !== "undefined") {
-      
-      // ✅ التعديل السحري هنا: نتأكد إن المتصفح بيدعم الإشعارات عشان متصفح الفيسبوك ميعملش كراش للصفحة
       if ("Notification" in window) {
         setNotificationPermission(Notification.permission);
       }
       
-      // الشرط ده عشان نمنع الإيرور وإنت شغال على اللاب توب (localhost)
       if (window.location.hostname.includes("matrouhcup.online")) {
         (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
         (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
@@ -205,8 +202,6 @@ export default function Page() {
           script.defer = true;
           document.head.appendChild(script);
         }
-      } else {
-         console.log("تم إيقاف الإشعارات مؤقتاً في وضع التطوير (Localhost)");
       }
     }
 
@@ -222,13 +217,15 @@ export default function Page() {
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
 
-    setTime(new Date());
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubTicker(); clearInterval(clockTimer); };
+    return () => { 
+        unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); 
+        unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); 
+        unsubTicker(); clearInterval(clockTimer); 
+    };
   }, [activeTournament]);
 
-  // 🔴 طلب صلاحية الإشعارات عبر OneSignal
   const handleSubscribe = () => {
     if (typeof window !== "undefined" && (window as any).OneSignalDeferred) {
       (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
@@ -255,10 +252,26 @@ export default function Page() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
-  const liveMatches = sortMatchesAsc(matches.filter(m => m.isLive === true));
-  const finishedMatches = [...matches].sort((a, b) => b.date.localeCompare(a.date) || (b.time || "00:00").localeCompare(a.time || "00:00")).filter(m => !m.isLive && (m.status === "انتهت" || m.date < todayStr)); 
-  const todayMatches = sortMatchesAsc(matches.filter(m => !m.isLive && m.date === todayStr && m.status !== "انتهت"));
-  const tomorrowMatches = sortMatchesAsc(matches.filter(m => !m.isLive && m.date === tomorrowStr && m.status !== "انتهت"));
+  const liveMatchesList = matches.filter(m => {
+    if (m.isLive === true) return true;
+    if (m.date === todayStr && m.time) {
+      const now = time || new Date();
+      const [hours, minutes] = m.time.split(':').map(Number);
+      const matchTime = new Date();
+      matchTime.setHours(hours, minutes, 0, 0);
+      const diffMins = (matchTime.getTime() - now.getTime()) / 60000;
+      if (diffMins <= 30 && !m.streamClosed) {
+        return true;
+      }
+    }
+    return false;
+  });
+  const liveMatches = sortMatchesAsc(liveMatchesList);
+  const liveMatchIds = new Set(liveMatchesList.map(m => m.id));
+
+  const finishedMatches = [...matches].sort((a, b) => b.date.localeCompare(a.date) || (b.time || "00:00").localeCompare(a.time || "00:00")).filter(m => !liveMatchIds.has(m.id) && (m.status === "انتهت" || m.date < todayStr));
+  const todayMatches = sortMatchesAsc(matches.filter(m => !liveMatchIds.has(m.id) && m.date === todayStr && m.status !== "انتهت"));
+  const tomorrowMatches = sortMatchesAsc(matches.filter(m => !liveMatchIds.has(m.id) && m.date === tomorrowStr && m.status !== "انتهت"));
 
   const standingsYouth = useMemo(() => buildStandings(finishedMatches, CLEANED_TEAM_NAMES), [finishedMatches]);
   const standingsJunA = useMemo(() => buildStandings(finishedMatches, JUNIORS_GROUP_A), [finishedMatches]);
@@ -313,10 +326,12 @@ export default function Page() {
   const scorers = useMemo(() => {
     const map = new Map<string, any>();
     goalEvents.forEach(e => { 
-      const playerStr = String(e.player || "").trim(); const teamStr = String(e.team || "").trim();
-      if(!playerStr) return; 
+      const playerStr = normalizeTeamName(e.player || ""); 
+      const playerOriginal = String(e.player || "").trim();
+      const teamStr = String(e.team || "").trim();
+      if(!playerOriginal) return; 
       const key = `${playerStr}__${normalizeTeamName(teamStr)}`; 
-      if (!map.has(key)) { map.set(key, { player: playerStr, team: teamStr, goals: 0, imageUrl: e.imageUrl || "", rating: e.rating || 99, pac: e.pac || 99, sho: e.sho || 99, pas: e.pas || 99, dri: e.dri || 99, def: e.def || 99, phy: e.phy || 99 }); }
+      if (!map.has(key)) { map.set(key, { player: playerOriginal, team: teamStr, goals: 0, imageUrl: e.imageUrl || "", rating: e.rating || 99, pac: e.pac || 99, sho: e.sho || 99, pas: e.pas || 99, dri: e.dri || 99, def: e.def || 99, phy: e.phy || 99 }); }
       map.get(key)!.goals += Number(e.goals) || 1; 
       if (e.imageUrl && !map.get(key)!.imageUrl) map.get(key)!.imageUrl = e.imageUrl;
       if (e.rating) Object.assign(map.get(key)!, { rating: e.rating, pac: e.pac, sho: e.sho, pas: e.pas, dri: e.dri, def: e.def, phy: e.phy });
@@ -410,9 +425,11 @@ export default function Page() {
   const cardsList = useMemo(() => {
     const map = new Map<string, any>();
     activeCardsSource.forEach(e => { 
-      const playerStr = String(e.player || "").trim(); if(!playerStr) return;
+      const playerStr = normalizeTeamName(e.player || ""); 
+      const playerOriginal = String(e.player || "").trim();
+      if(!playerOriginal) return;
       const key = `${playerStr}__${normalizeTeamName(e.team)}`; 
-      if (!map.has(key)) map.set(key, { player: playerStr, team: e.team, yellow: 0, red: 0 }); 
+      if (!map.has(key)) map.set(key, { player: playerOriginal, team: e.team, yellow: 0, red: 0 }); 
       const item = map.get(key)!; item.yellow += Number(e.yellow) || 0; item.red += Number(e.red) || 0; 
     });
     return Array.from(map.values()).map(row => ({ ...row, status: row.red > 0 ? "طرد" : row.yellow >= 3 ? "إيقاف" : "متاح" })).sort((a, b) => b.red - a.red || b.yellow - a.yellow);
@@ -426,8 +443,10 @@ export default function Page() {
 
   const currentFormation = useMemo(() => {
     const form = formationsList.find(f => f.round === activeTotwRound);
-    if (!form) return { players: Array(7).fill(null) };
-    return form;
+    if (!form || !form.players) return { players: Array(7).fill(null) };
+    const playersArr = Array.isArray(form.players) ? form.players : Array(7).fill(null);
+    while(playersArr.length < 7) playersArr.push(null);
+    return { ...form, players: playersArr };
   }, [formationsList, activeTotwRound]);
 
   if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
@@ -477,7 +496,7 @@ export default function Page() {
                   { name: "القدس للأثاث", src: "/alquds.png" }, { name: "أيس كريم الملكة", src: "/almaleka.png" }, { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
                   { name: "M MART", src: "/mmart.png" }, { name: "هيرو سبورت", src: "/hero-sport.png" }, { name: "الفتح للفراشة", src: "/alfath.png" }, { name: "عادل العميري للديكور", src: "/alomairy.png" }
                 ].map((sponsor, idx) => (
-                  <img key={idx} src={sponsor.src} alt={sponsor.name} title={sponsor.name} className="h-10 w-24 object-contain drop-shadow-sm transition-transform hover:scale-110 cursor-pointer" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <img key={idx} src={sponsor.src} alt={sponsor.name} title={sponsor.name} className="h-10 w-24 object-contain drop-shadow-sm transition-transform hover:scale-110 cursor-pointer" onError={(e) => (e.currentTarget.style.display = 'none')} loading="lazy" />
                 ))}
               </div>
             ))}
@@ -683,6 +702,57 @@ export default function Page() {
           </div>
         )}
 
+        {activeTab === "live" && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="text-center mb-8">
+              <Badge className="bg-red-500 text-white text-xl px-8 py-2 font-black shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                <span className="animate-pulse inline-block mr-2">🔴</span> البث المباشر والمباريات الجارية
+              </Badge>
+            </div>
+            {liveMatches.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                {liveMatches.map((match: any) => (
+                  <Card key={match.id} className="bg-[#13213a] border-red-500/50 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                    <CardHeader className="bg-[#1e2a4a] border-b border-red-500/20 text-center py-3">
+                      <div className="text-cyan-300 text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
+                      <div className="text-yellow-300 font-bold mt-1 text-lg flex justify-center items-center gap-2">
+                        <Clock className="h-4 w-4" /> {formatTime12(match.time)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamA}</div>
+                        <div className="bg-[#0a1428] rounded-2xl py-3 px-6 border-2 border-red-500/50 text-red-400 shadow-inner">
+                          {renderMatchScore(match)}
+                        </div>
+                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamB}</div>
+                      </div>
+                      {(match.liveLink || match.streamUrl || match.videoId) && (
+                         <div className="mt-6 flex justify-center">
+                            <Button className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl flex items-center gap-2 px-6 shadow-lg hover:scale-105 transition-transform" onClick={() => window.open(match.liveLink || match.streamUrl || match.videoId, '_blank')}>
+                               <Play className="h-5 w-5" /> مشاهدة البث
+                            </Button>
+                         </div>
+                      )}
+                      {match.status && match.status !== "جارية" && match.status !== "انتهت" && (
+                        <div className="text-center mt-4">
+                          <Badge className="bg-yellow-400 text-black font-bold">{match.status}</Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-[#13213a] rounded-3xl border border-white/10 shadow-lg">
+                <div className="text-6xl mb-4 opacity-50">📺</div>
+                <h3 className="text-2xl font-black text-white mb-2">لا توجد مباريات في البث المباشر حالياً</h3>
+                <p className="text-cyan-300 font-bold">المباريات تظهر هنا تلقائياً قبل بدايتها بـ 30 دقيقة</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "standings" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {activeTournament === 'juniors' ? (
@@ -767,7 +837,7 @@ export default function Page() {
                        </div>
                        <div className="absolute top-10 w-full flex justify-center z-10 left-0">
                           <div className="w-[140px] h-[140px] rounded-full border-4 border-yellow-400 overflow-hidden bg-[#1e2a4a] shadow-[0_5px_15px_rgba(0,0,0,0.5)] flex items-center justify-center">
-                            {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.player} /> : <span className="text-7xl opacity-40 text-white">👤</span>}
+                            {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.player} loading="lazy" /> : <span className="text-7xl opacity-40 text-white">👤</span>}
                           </div>
                        </div>
                        <div className="absolute top-[210px] left-0 w-full flex flex-col items-center z-20">
@@ -793,7 +863,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 تبويب الإنذارات */}
         {activeTab === "cards" && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex flex-col sm:flex-row justify-between items-center bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/30 gap-4">
@@ -832,7 +901,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* 🔴 الإحصائيات الشاملة */}
         {activeTab === "stats" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {topMotmPlayer && (
@@ -847,7 +915,7 @@ export default function Page() {
                <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Target className="mx-auto mb-4 text-cyan-400 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أقوى هجوم</h4><div className="text-xl font-black text-white">{statsData.bestAttack?.team || "—"}</div><Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">{statsData.bestAttack?.gf || 0} هدف</Badge></Card>
                <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Zap className="mx-auto mb-4 text-yellow-400 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أضعف هجوم</h4><div className="text-xl font-black text-white">{statsData.worstAttack?.team || "—"}</div><Badge className="mt-2 bg-yellow-500/10 text-yellow-400 border-none">{statsData.worstAttack?.gf || 0} هدف</Badge></Card>
                <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Shield className="mx-auto mb-4 text-cyan-400 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أقوى دفاع</h4><div className="text-xl font-black text-white">{statsData.bestDefense?.team || "—"}</div><Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">استقبل {statsData.bestDefense?.ga || 0}</Badge></Card>
-               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><ShieldAlert className="mx-auto mb-4 text-yellow-500 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أضعف دفاع</h4><div className="text-xl font-black text-white">{statsData.worstDefense?.team || "—"}</div><Badge className="mt-2 bg-yellow-500/10 text-yellow-500 border-none">استقبل {statsData.worstDefense?.ga || 0}</Badge></Card>
+               <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><ShieldAlert className="mx-auto mb-4 text-yellow-500 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أضعف دفاع</h4><div className="text-xl font-black text-white">{statsData.worstDefense?.team || "—"}</div><Badge className="mt-2 bg-yellow-500/10 text-yellow-400 border-none">استقبل {statsData.worstDefense?.ga || 0}</Badge></Card>
             </div>
           </div>
         )}
@@ -868,7 +936,7 @@ export default function Page() {
                     </div>
                     <div className="absolute top-10 w-full flex justify-center z-10 left-0">
                        <div className="w-[140px] h-[140px] rounded-full border-4 border-yellow-400 overflow-hidden bg-[#1e2a4a] shadow-[0_5px_15px_rgba(0,0,0,0.5)] flex items-center justify-center">
-                         {m.imageUrl ? ( <img src={m.imageUrl} className="w-full h-full object-cover" alt={m.player} /> ) : ( <span className="text-7xl opacity-40 text-white">👤</span> )}
+                         {m.imageUrl ? ( <img src={m.imageUrl} className="w-full h-full object-cover" alt={m.player} loading="lazy" /> ) : ( <span className="text-7xl opacity-40 text-white">👤</span> )}
                        </div>
                     </div>
                     <div className="absolute top-[210px] left-0 w-full flex flex-col items-center z-20">
@@ -881,7 +949,7 @@ export default function Page() {
                       </div>
                       <div className="w-[85%] h-[1px] bg-[#3e2d14] opacity-20 my-2"></div>
                       <div className="flex justify-center items-center gap-6 mt-1">
-                        {m.sponsorLogo ? <img src={m.sponsorLogo} alt="Sponsor" className="w-8 h-6 object-contain drop-shadow-sm" /> : <Star className="w-6 h-6 opacity-60" />}
+                        {m.sponsorLogo ? <img src={m.sponsorLogo} alt="Sponsor" className="w-8 h-6 object-contain drop-shadow-sm" loading="lazy" /> : <Star className="w-6 h-6 opacity-60" />}
                         <img src="/logo.png" className="w-6 h-7 object-contain opacity-90 drop-shadow-sm" alt="Matrouh Cup" />
                         <div className="text-[10px] font-black uppercase tracking-wider bg-[#3e2d14] text-[#f8e596] px-2 py-1 rounded-sm truncate max-w-[80px] shadow-sm">{m.team}</div>
                       </div>
@@ -909,7 +977,6 @@ export default function Page() {
           </div>
         )}
 
-        {/* فوتر حقوق الملكية */}
         <div className="mt-16 border-t border-white/5 pt-6 pb-2 flex flex-col items-center justify-center text-center">
            <div className="text-gray-400 text-sm font-bold flex items-center gap-2">
               <span>إعداد وتطوير</span>
