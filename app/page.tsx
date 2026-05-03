@@ -91,6 +91,19 @@ const getWinnerData = (t1: string, t2: string, round: string, labelId: string, a
   return { win: w, match: m };
 };
 
+const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
+  <div className="flex-1 flex flex-col items-center gap-3">
+    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/5 border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
+      {logoUrl ? (
+        <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
+      ) : (
+        <span className="opacity-40">🛡️</span>
+      )}
+    </div>
+    <div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div>
+  </div>
+);
+
 const renderMatchScore = (match: any) => {
   const isPlayed = match && match.status === "انتهت";
   const isLive = match && match.isLive;
@@ -103,7 +116,7 @@ const renderMatchScore = (match: any) => {
 
   return (
     <div className="flex flex-col items-center" dir="ltr">
-      <span className="text-lg sm:text-2xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
+      <span className="text-xl sm:text-3xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
       {hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({hPen} - {aPen} ر.ت)</span>}
     </div>
   );
@@ -162,7 +175,7 @@ export default function Page() {
   const [motmList, setMotmList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
-  const [rostersList, setRostersList] = useState<any[]>([]); // New State for Rosters
+  const [rostersList, setRostersList] = useState<any[]>([]); 
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   
   const [search, setSearch] = useState("");
@@ -179,7 +192,6 @@ export default function Page() {
   const [time, setTime] = useState<Date | null>(null);
   const [notificationPermission, setNotificationPermission] = useState("default");
 
-  // Roster specific states
   const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
   const [rosterAccessTeam, setRosterAccessTeam] = useState("");
   const [rosterAccessPassword, setRosterAccessPassword] = useState("");
@@ -262,22 +274,29 @@ export default function Page() {
     } catch(e) { alert("حدث خطأ، حاول مرة أخرى."); }
   };
 
-  // --- Roster Logic ---
+  // --- Strict Security Roster Logic ---
   const handleRosterLogin = () => {
-    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق");
-    if(!rosterAccessPassword) return alert("الرجاء إدخال كلمة المرور السري");
+    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق أولاً.");
+    if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري.");
 
     const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
     
-    if (existingTeam) {
-        if (existingTeam.isSubmitted) {
-            return alert("تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
-        }
-        if (existingTeam.password && existingTeam.password !== rosterAccessPassword) {
-            return alert("كلمة المرور غير صحيحة!");
-        }
+    // Security check 1: Admin must have created the roster and set a password
+    if (!existingTeam || !existingTeam.password) {
+        return alert("❌ لم تقم إدارة البطولة بتعيين رقم سري لهذا الفريق بعد. يرجى التواصل مع اللجنة المنظمة.");
+    }
+
+    // Security check 2: Strict password matching
+    if (existingTeam.password !== rosterAccessPassword) {
+        return alert("❌ الرقم السري غير صحيح! يرجى التأكد من الرقم الممنوح لك من الإدارة.");
+    }
+
+    // Security check 3: Prevent editing if already submitted
+    if (existingTeam.isSubmitted) {
+        return alert("⚠️ تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
     }
     
+    // Passed all checks, allow entry
     setUnlockedRoster(rosterAccessTeam);
     if (existingTeam && existingTeam.players) {
         const loadedPlayers = [...existingTeam.players];
@@ -954,13 +973,13 @@ export default function Page() {
              <CardContent className="p-6 grid gap-4 md:grid-cols-2">
                {finishedMatches.filter(m => !search || String(m.teamA || "").includes(search.trim()) || String(m.teamB || "").includes(search.trim())).map(match => (
                  <div key={match.id} className={`bg-[#1e2a4a] p-6 rounded-3xl border border-white/5 text-center transition-all hover:scale-[1.01] ${activeTournament === 'juniors' ? 'hover:border-cyan-400/50' : 'hover:border-yellow-400/50'}`}>
-                   <div className="text-cyan-300 text-xs sm:text-sm mb-3 font-bold">{getArabicDay(match.date)} • {match.date} • {match.round}</div>
-                   <div className="flex items-center justify-center gap-4">
-                     <div className="flex-1 font-bold text-sm sm:text-xl text-white">{match.teamA}</div>
-                     <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/5 text-yellow-400 shadow-inner">
+                   <div className="text-cyan-300 text-xs sm:text-sm mb-3 font-bold border-b border-white/5 pb-2">{getArabicDay(match.date)} • {match.date} • {match.round}</div>
+                   <div className="flex items-center justify-center gap-2 sm:gap-6 mt-4">
+                     <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                     <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/5 text-yellow-400 shadow-inner shrink-0">
                         {renderMatchScore(match)}
                      </div>
-                     <div className="flex-1 font-bold text-sm sm:text-xl text-white">{match.teamB}</div>
+                     <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
                    </div>
                  </div>
                ))}
@@ -973,7 +992,14 @@ export default function Page() {
              <CardHeader className="text-center border-b border-white/10 pb-6"><Badge className={`${activeTournament === 'juniors' ? 'bg-cyan-500 text-white' : 'bg-yellow-400 text-black'} text-sm sm:text-lg px-6 py-2.5`}>مباريات اليوم • {getArabicDay(todayStr)} {todayStr}</Badge><CardTitle className={`text-2xl sm:text-4xl font-black mt-4 ${activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}`}>مواجهات اليوم</CardTitle></CardHeader>
              <CardContent className="p-4 sm:p-6 grid gap-6 mt-4">
                {todayMatches.length > 0 ? todayMatches.map(match => (
-                 <div key={match.id} className={`rounded-3xl border border-white/10 bg-[#1e2a4a] p-4 sm:p-6 transition-all ${activeTournament === 'juniors' ? 'hover:border-cyan-400' : 'hover:border-yellow-400'}`}><div className="text-center mb-6"><div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span></div></div><div className="flex items-center justify-center gap-2 sm:gap-6 text-lg sm:text-2xl font-bold"><div className="flex-1 text-center text-white text-sm sm:text-xl">{match.teamA}</div><div className="text-yellow-400 font-black px-2 text-xl sm:text-3xl">VS</div><div className="flex-1 text-center text-white text-sm sm:text-xl">{match.teamB}</div></div></div>
+                 <div key={match.id} className={`rounded-3xl border border-white/10 bg-[#1e2a4a] p-4 sm:p-6 transition-all ${activeTournament === 'juniors' ? 'hover:border-cyan-400' : 'hover:border-yellow-400'}`}>
+                   <div className="text-center mb-6"><div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span></div></div>
+                   <div className="flex items-center justify-center gap-2 sm:gap-6">
+                     <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                     <div className="text-yellow-400 font-black px-2 text-xl sm:text-3xl shrink-0">VS</div>
+                     <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                   </div>
+                 </div>
                )) : <p className="text-center py-10 text-white font-bold text-lg sm:text-xl">لا توجد مباريات قادمة اليوم</p>}
              </CardContent>
            </Card>
@@ -984,7 +1010,14 @@ export default function Page() {
              <CardHeader className="text-center border-b border-white/10 pb-6"><Badge className={`${activeTournament === 'juniors' ? 'bg-cyan-500 text-white' : 'bg-yellow-400 text-black'} text-sm sm:text-lg px-6 py-2.5`}>مباريات غداً • {getArabicDay(tomorrowStr)} {tomorrowStr}</Badge><CardTitle className={`text-2xl sm:text-4xl font-black mt-4 ${activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}`}>مواجهات غداً</CardTitle></CardHeader>
              <CardContent className="p-4 sm:p-6 grid gap-6 mt-4 md:grid-cols-2">
                {tomorrowMatches.map(match => (
-                 <div key={match.id} className={`rounded-3xl border border-white/10 bg-[#1e2a4a] p-4 sm:p-6 transition-all ${activeTournament === 'juniors' ? 'hover:border-cyan-400' : 'hover:border-yellow-400'}`}><div className="text-center mb-6"><div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span></div></div><div className="flex items-center justify-center gap-2 sm:gap-6 text-lg sm:text-2xl font-bold"><div className="flex-1 text-center text-white text-sm sm:text-xl">{match.teamA}</div><div className="text-yellow-400 font-black px-2 text-xl sm:text-3xl">VS</div><div className="flex-1 text-center text-white text-sm sm:text-xl">{match.teamB}</div></div></div>
+                 <div key={match.id} className={`rounded-3xl border border-white/10 bg-[#1e2a4a] p-4 sm:p-6 transition-all ${activeTournament === 'juniors' ? 'hover:border-cyan-400' : 'hover:border-yellow-400'}`}>
+                   <div className="text-center mb-6"><div className="text-cyan-300 text-xs sm:text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div><div className="flex items-center justify-center gap-2 text-yellow-300 mt-2"><Clock className="h-4 w-4 sm:h-5 sm:w-5" /><span className="text-lg sm:text-2xl font-bold">{formatTime12(match.time)}</span></div></div>
+                   <div className="flex items-center justify-center gap-2 sm:gap-6">
+                     <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                     <div className="text-yellow-400 font-black px-2 text-xl sm:text-3xl shrink-0">VS</div>
+                     <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                   </div>
+                 </div>
                ))}
                {tomorrowMatches.length === 0 && <p className="text-center py-10 text-white font-bold text-lg sm:text-xl col-span-full">لا توجد مباريات مسجلة غداً</p>}
              </CardContent>
@@ -1147,57 +1180,6 @@ export default function Page() {
                    })}
                  </div>
                ) : <p className="text-center text-white py-10 font-bold">لا توجد فيديوهات حالياً</p>}
-          </div>
-        )}
-
-        {activeTab === "live" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="text-center mb-8">
-              <Badge className="bg-red-500 text-white text-xl px-8 py-2 font-black shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-                <span className="animate-pulse inline-block mr-2">🔴</span> البث المباشر والمباريات الجارية
-              </Badge>
-            </div>
-            {liveMatches.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {liveMatches.map((match: any) => (
-                  <Card key={match.id} className="bg-[#13213a] border-red-500/50 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-                    <CardHeader className="bg-[#1e2a4a] border-b border-red-500/20 text-center py-3">
-                      <div className="text-cyan-300 text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
-                      <div className="text-yellow-300 font-bold mt-1 text-lg flex justify-center items-center gap-2">
-                        <Clock className="h-4 w-4" /> {formatTime12(match.time)}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamA}</div>
-                        <div className="bg-[#0a1428] rounded-2xl py-3 px-6 border-2 border-red-500/50 text-red-400 shadow-inner">
-                          {renderMatchScore(match)}
-                        </div>
-                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamB}</div>
-                      </div>
-                      {(match.liveLink || match.streamUrl || match.videoId) && (
-                         <div className="mt-6 flex justify-center">
-                            <Button className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl flex items-center gap-2 px-6 shadow-lg hover:scale-105 transition-transform" onClick={() => window.open(match.liveLink || match.streamUrl || match.videoId, '_blank')}>
-                               <Play className="h-5 w-5" /> مشاهدة البث
-                            </Button>
-                         </div>
-                      )}
-                      {match.status && match.status !== "جارية" && match.status !== "انتهت" && (
-                        <div className="text-center mt-4">
-                          <Badge className="bg-yellow-400 text-black font-bold">{match.status}</Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-20 bg-[#13213a] rounded-3xl border border-white/10 shadow-lg">
-                <div className="text-6xl mb-4 opacity-50">📺</div>
-                <h3 className="text-2xl font-black text-white mb-2">لا توجد مباريات في البث المباشر حالياً</h3>
-                <p className="text-cyan-300 font-bold">المباريات تظهر هنا تلقائياً قبل بدايتها بـ 30 دقيقة</p>
-              </div>
-            )}
           </div>
         )}
 

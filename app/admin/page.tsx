@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert, ClipboardList, Lock, Unlock, Phone, CheckCircle2, Shield } from "lucide-react";
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
 
@@ -80,6 +80,37 @@ const pushNotification = async (title: string, body: string) => {
   }
 };
 
+const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
+  <div className="flex-1 flex flex-col items-center gap-3">
+    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/5 border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
+      {logoUrl ? (
+        <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
+      ) : (
+        <span className="opacity-40">🛡️</span>
+      )}
+    </div>
+    <div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div>
+  </div>
+);
+
+const renderMatchScore = (match: any) => {
+  const isPlayed = match && match.status === "انتهت";
+  const isLive = match && match.isLive;
+  const hasGoals = match && match.homeGoals !== undefined && match.awayGoals !== undefined && match.homeGoals !== "" && match.awayGoals !== "";
+  if (!isPlayed && !isLive && !hasGoals) return 'VS';
+
+  const hPen = (match.penaltiesHome || []).filter((p:any)=>p==='scored').length;
+  const aPen = (match.penaltiesAway || []).filter((p:any)=>p==='scored').length;
+  const hasPenalties = hPen > 0 || aPen > 0 || match.status === "ضربات جزاء";
+
+  return (
+    <div className="flex flex-col items-center" dir="ltr">
+      <span className="text-xl sm:text-3xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
+      {hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({hPen} - {aPen} ر.ت)</span>}
+    </div>
+  );
+};
+
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
@@ -107,7 +138,6 @@ export default function AdminPage() {
   const [isSending, setIsSending] = useState(false);
 
   const [shareMatch, setShareMatch] = useState<any | null>(null);
-
   const [time, setTime] = useState<Date | null>(null);
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
@@ -115,7 +145,7 @@ export default function AdminPage() {
   const currentTeamsList = activeTournament === 'youth' ? sortedTeams : sortedJuniorsTeams;
 
   const [matchForm, setMatchForm] = useState({
-    teamA: "", teamB: "", homeGoals: 0, awayGoals: 0, matchLabel: "",
+    teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "",
     round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ"
   });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -150,12 +180,12 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    setMatchForm(p => ({...p, teamA: "", teamB: "", matchLabel: ""}));
+    setMatchForm(p => ({...p, teamA: "", teamALogo: "", teamB: "", teamBLogo: "", matchLabel: ""}));
     setGoalForm(p => ({...p, team: currentTeamsList[0] || "", player: "", goalsCount: 1, imageUrl: ""}));
     setCardForm(p => ({...p, team: currentTeamsList[0] || "", player: ""}));
     setMotmForm(p => ({...p, team: currentTeamsList[0] || "", player: "", imageUrl: ""}));
     setEditingId(null); setEditingGoalId(null); setEditingMotmId(null); setEditingRosterId(null);
-  }, [activeTournament]);
+  }, [activeTournament, currentTeamsList]);
 
   useEffect(() => {
     const existing = formationsList.find(f => f.round === formationForm.round);
@@ -280,12 +310,18 @@ export default function AdminPage() {
       await addDoc(collection(db, getColl("matches")), data); 
       alert("✅ تم إضافة المباراة بنجاح");
     }
-    setMatchForm({ teamA: "", teamB: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
+    setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
   };
 
   const startEdit = (match: any) => { 
     setEditingId(match.id); 
-    setMatchForm({ teamA: match.teamA, teamB: match.teamB, homeGoals: match.homeGoals, awayGoals: match.awayGoals, matchLabel: match.matchLabel || "", round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); 
+    setMatchForm({ 
+      teamA: match.teamA, teamALogo: match.teamALogo || "", 
+      teamB: match.teamB, teamBLogo: match.teamBLogo || "", 
+      homeGoals: match.homeGoals, awayGoals: match.awayGoals, 
+      matchLabel: match.matchLabel || "", round: match.round, 
+      date: match.date, time: match.time, status: match.status || "لم تبدأ" 
+    }); 
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
@@ -551,7 +587,10 @@ export default function AdminPage() {
           <CardHeader><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>{editingId ? "تعديل مباراة" : `إضافة مباراة (${activeTournament === 'youth' ? 'شباب' : 'ناشئين'})`}</CardTitle></CardHeader>
           <CardContent className="space-y-6 p-6 text-white">
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
-               <div><Input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} /></div>
+               <div className="space-y-2">
+                 <Input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
+                 <Input value={matchForm.teamALogo} onChange={e => setMatchForm(p => ({...p, teamALogo: e.target.value}))} placeholder="رابط شعار الفريق الأول (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" />
+               </div>
                <div className="flex flex-col items-center justify-center mt-2 md:mt-0">
                  <div className="text-3xl text-yellow-400 font-black mb-2">VS</div>
                  <Input value={matchForm.matchLabel} onChange={e => setMatchForm(p => ({...p, matchLabel: e.target.value}))} placeholder="رقم (مثال: م 97)" className="bg-[#0a1428] border-white/20 text-yellow-300 h-8 w-32 text-center text-xs font-bold" />
@@ -559,7 +598,10 @@ export default function AdminPage() {
                    {getLabelSuggestions(matchForm.round).map(l => (<Badge key={l} className="cursor-pointer bg-white/10 border-white/5 hover:bg-yellow-400 hover:text-black text-[10px] py-1" onClick={() => setMatchForm(p => ({...p, matchLabel: l}))}>{l}</Badge>))}
                  </div>
                </div>
-               <div><Input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} /></div>
+               <div className="space-y-2">
+                 <Input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
+                 <Input value={matchForm.teamBLogo} onChange={e => setMatchForm(p => ({...p, teamBLogo: e.target.value}))} placeholder="رابط شعار الفريق الثاني (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" />
+               </div>
             </div>
             <div className="grid grid-cols-2 gap-6 mt-4"><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamA || 'الأول'}</label><Input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm(p => ({...p, homeGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black" /></div><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamB || 'الثاني'}</label><Input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm(p => ({...p, awayGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black" /></div></div>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -570,7 +612,7 @@ export default function AdminPage() {
             </div>
             <div className="flex gap-4 mt-6">
               <Button onClick={saveMatch} className={`flex-1 font-black py-7 text-xl transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white hover:bg-cyan-600' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}>{editingId ? "حفظ التعديل" : "إضافة المباراة"}</Button>
-              {editingId && <Button onClick={() => {setEditingId(null); setMatchForm({ teamA: "", teamB: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });}} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-7 px-8">إلغاء</Button>}
+              {editingId && <Button onClick={() => {setEditingId(null); setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });}} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-7 px-8">إلغاء</Button>}
             </div>
           </CardContent>
         </Card>
@@ -714,12 +756,20 @@ export default function AdminPage() {
               <Card key={match.id} className={`bg-[#1e2a4a] border-2 ${match.status === 'ستبدأ بعد قليل' ? 'border-emerald-500/80 shadow-lg' : 'border-red-500/80 shadow-lg'} overflow-hidden`}>
                 <div className={`${match.status === 'ستبدأ بعد قليل' ? 'bg-emerald-600' : 'bg-red-600'} text-white px-6 py-3 flex flex-wrap justify-between items-center gap-4`}>
                   <div className="flex items-center gap-4">
-                    <span className={`font-black text-lg ${match.status === 'ستبدأ بعد قليل' ? '' : 'animate-pulse'}`}>{match.status === 'ستبدأ بعد قليل' ? '🟩' : '🔴'} {match.teamA} ضد {match.teamB}</span>
+                    <span className={`font-black text-lg ${match.status === 'ستبدأ بعد قليل' ? '' : 'animate-pulse'}`}>{match.status === 'ستبدأ بعد قليل' ? '🟩' : '🔴'} البث المباشر</span>
                     <select value={match.status || "الشوط الأول"} onChange={(e) => updateMatchLive(match.id, { status: e.target.value })} className="bg-black/40 border-none text-white font-bold rounded-lg px-3 py-1 text-sm outline-none cursor-pointer"><option value="ستبدأ بعد قليل">ستبدأ بعد قليل</option><option value="الشوط الأول">الشوط الأول</option><option value="استراحة">استراحة</option><option value="الشوط الثاني">الشوط الثاني</option><option value="وقت إضافي">وقت إضافي</option><option value="ضربات جزاء">ضربات جزاء</option><option value="انتهت">انتهت</option></select>
                   </div>
                   <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20" onClick={() => updateMatchLive(match.id, { isLive: false, streamClosed: true, isTimerRunning: false })}>إغلاق البث</Button>
                 </div>
                 <CardContent className="p-6">
+                  <div className="flex items-center justify-center gap-2 sm:gap-6 mb-8">
+                     <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                     <div className="bg-[#0a1428] rounded-2xl py-2 px-4 sm:py-3 sm:px-6 border-2 border-red-500/50 text-red-400 shadow-inner shrink-0">
+                        {renderMatchScore(match)}
+                     </div>
+                     <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                  </div>
+
                   <div className="flex flex-wrap justify-center gap-2 mb-6 bg-[#0a1428] p-3 rounded-2xl border border-cyan-500/30">
                     <Button size="sm" onClick={() => sendQuickNotification("صافرة البداية ⏱️", `انطلاق مباراة ${match.teamA} ضد ${match.teamB}`)} className="bg-cyan-600 text-white font-bold">بداية الماتش</Button>
                     <Button size="sm" onClick={() => sendQuickNotification("هدف مبكر! ⚽", `هدف لصالح فريق ${match.teamA}`)} className="bg-emerald-600 text-white font-bold">هدف ({match.teamA})</Button>
@@ -816,10 +866,18 @@ export default function AdminPage() {
                           <div key={match.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col justify-between gap-4 border border-yellow-400/30 shadow-md">
                             <div>
                                {match.matchLabel && <div className="text-center mb-2"><Badge className="bg-yellow-400 text-black font-black text-xs">{match.matchLabel}</Badge></div>}
-                               <div className="font-bold text-white text-center text-lg">{match.teamA} <span className="text-yellow-400 mx-2">{match.homeGoals} - {match.awayGoals}</span> {match.teamB}</div>
-                               <div className="text-cyan-300 text-center mt-2 text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
+                               
+                               <div className="flex items-center justify-center gap-2 mb-2 mt-4">
+                                  <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                                  <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/10 text-yellow-400 shrink-0">
+                                    <span className="font-black text-lg">{match.homeGoals} - {match.awayGoals}</span>
+                                  </div>
+                                  <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                               </div>
+
+                               <div className="text-cyan-300 text-center mt-4 text-sm font-bold border-t border-white/5 pt-2">{getArabicDay(match.date)} • {match.date}</div>
                             </div>
-                            <div className="flex gap-2 justify-center flex-wrap mt-2 pt-3 border-t border-white/10">
+                            <div className="flex gap-2 justify-center flex-wrap mt-2">
                                <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1">بث</Button>
                                <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1">تعديل</Button>
                                <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1">حذف</Button>
@@ -879,14 +937,19 @@ export default function AdminPage() {
                 <CardTitle className="text-yellow-300">السابقة</CardTitle>
                 <Input placeholder="بحث..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm border-yellow-400 bg-[#1e2a4a]" />
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 {matches.filter(m => !liveMatchIds.has(m.id) && (String(m.teamA || "").includes(searchTerm) || String(m.teamB || "").includes(searchTerm))).map(m => (
-                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4 border border-yellow-400/30">
-                    <div>
-                      <div className="font-bold text-white">{m.teamA} <span className="text-yellow-400 mx-1">{m.homeGoals} - {m.awayGoals}</span> {m.teamB}</div>
-                      <div className="text-cyan-300 text-sm">{m.date} • {m.status || m.time}</div>
+                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col justify-between gap-4 border border-yellow-400/30">
+                    <div className="flex items-center justify-center gap-2 sm:gap-6 pt-2">
+                       <TeamMatchDisplay teamName={m.teamA} logoUrl={m.teamALogo} />
+                       <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/10 text-yellow-400 shrink-0">
+                         <span className="font-black text-xl">{m.homeGoals} - {m.awayGoals}</span>
+                       </div>
+                       <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2">{m.date} • {m.status || m.time}</div>
+                    
+                    <div className="flex gap-2 justify-center mt-2">
                       <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white">شير</Button>
                       <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white">بث</Button>
                       <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل</Button>
@@ -899,20 +962,34 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="today">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {matches.filter(m => m.date === todayStr && !liveMatchIds.has(m.id) && m.status !== "انتهت").map(m => (
-                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border-l-4 border-yellow-400 mb-2">
-                    <div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div>
-                    <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); }} className="bg-emerald-600">بدأ</Button>
+                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl border-l-4 border-yellow-400 flex flex-col justify-between gap-4">
+                     <div className="flex items-center justify-center gap-2 pt-2">
+                       <TeamMatchDisplay teamName={m.teamA} logoUrl={m.teamALogo} />
+                       <span className="text-yellow-400 font-black text-xl">VS</span>
+                       <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
+                     </div>
+                     <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
+                     <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); }} className="bg-emerald-600 w-full font-bold">بدء المباراة الآن</Button>
                   </div>
                 ))}
+             </div>
           </TabsContent>
 
           <TabsContent value="tomorrow">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {matches.filter(m => m.date === tomorrowStr && !liveMatchIds.has(m.id)).map(m => (
-                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center mb-2 border-l-4 border-sky-400">
-                    <div><div className="font-bold text-white">{m.teamA} vs {m.teamB}</div><div className="text-cyan-300 text-sm">{m.time}</div></div>
+                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl border-l-4 border-sky-400 flex flex-col justify-between gap-4">
+                     <div className="flex items-center justify-center gap-2 pt-2">
+                       <TeamMatchDisplay teamName={m.teamA} logoUrl={m.teamALogo} />
+                       <span className="text-sky-400 font-black text-xl">VS</span>
+                       <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
+                     </div>
+                     <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
                   </div>
                 ))}
+             </div>
           </TabsContent>
 
           <TabsContent value="predictions">
