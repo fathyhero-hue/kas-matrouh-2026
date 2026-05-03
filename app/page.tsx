@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Clock, Trophy, Target, Shield, 
-  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, Settings, CheckCircle2, BellOff 
+  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, Settings, CheckCircle2, BellOff, ClipboardList, Lock, Unlock, Phone 
 } from "lucide-react";
 import { TEAM_NAMES } from "@/data/tournament";
 import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
@@ -162,6 +162,7 @@ export default function Page() {
   const [motmList, setMotmList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
+  const [rostersList, setRostersList] = useState<any[]>([]); // New State for Rosters
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   
   const [search, setSearch] = useState("");
@@ -177,6 +178,17 @@ export default function Page() {
   const [activeTotwRound, setActiveTotwRound] = useState("دور المجموعات"); 
   const [time, setTime] = useState<Date | null>(null);
   const [notificationPermission, setNotificationPermission] = useState("default");
+
+  // Roster specific states
+  const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
+  const [rosterAccessTeam, setRosterAccessTeam] = useState("");
+  const [rosterAccessPassword, setRosterAccessPassword] = useState("");
+  const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
+  const [selectedRosterToView, setSelectedRosterToView] = useState<any>(null);
+  const [rosterForm, setRosterForm] = useState({
+    managerName: "", managerPhone: "",
+    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -215,13 +227,14 @@ export default function Page() {
     const unsubMotm = onSnapshot(collection(db, `motm${suffix}`), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubRosters = onSnapshot(collection(db, `team_rosters${suffix}`), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
     return () => { 
         unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); 
-        unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); 
+        unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters();
         unsubTicker(); clearInterval(clockTimer); 
     };
   }, [activeTournament]);
@@ -248,6 +261,70 @@ export default function Page() {
       setPredictedMatches(p => { const np = {...p, [matchId]: true}; localStorage.setItem('predictedMatches', JSON.stringify(np)); return np; });
     } catch(e) { alert("حدث خطأ، حاول مرة أخرى."); }
   };
+
+  // --- Roster Logic ---
+  const handleRosterLogin = () => {
+    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق");
+    if(!rosterAccessPassword) return alert("الرجاء إدخال كلمة المرور السري");
+
+    const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
+    
+    if (existingTeam) {
+        if (existingTeam.isSubmitted) {
+            return alert("تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
+        }
+        if (existingTeam.password && existingTeam.password !== rosterAccessPassword) {
+            return alert("كلمة المرور غير صحيحة!");
+        }
+    }
+    
+    setUnlockedRoster(rosterAccessTeam);
+    if (existingTeam && existingTeam.players) {
+        const loadedPlayers = [...existingTeam.players];
+        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
+        setRosterForm({ managerName: existingTeam.managerName || "", managerPhone: existingTeam.managerPhone || "", players: loadedPlayers.slice(0,12) });
+    } else {
+        setRosterForm({ managerName: "", managerPhone: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
+    }
+  };
+
+  const updateRosterPlayer = (index: number, field: string, value: string) => {
+    setRosterForm(prev => {
+        const newPlayers = [...prev.players];
+        newPlayers[index] = { ...newPlayers[index], [field]: value };
+        return { ...prev, players: newPlayers };
+    });
+  };
+
+  const submitFinalRoster = async () => {
+    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
+    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
+    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
+
+    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
+        try {
+            const suffix = activeTournament === "juniors" ? "_juniors" : "";
+            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
+                teamName: unlockedRoster,
+                managerName: rosterForm.managerName,
+                managerPhone: rosterForm.managerPhone,
+                players: rosterForm.players,
+                password: rosterAccessPassword,
+                isSubmitted: true,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
+            setUnlockedRoster(null);
+            setRosterAccessTeam("");
+            setRosterAccessPassword("");
+            setRosterViewMode('list');
+        } catch(e) {
+            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
+        }
+    }
+  };
+  // --------------------
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
@@ -277,6 +354,8 @@ export default function Page() {
   const standingsJunA = useMemo(() => buildStandings(finishedMatches, JUNIORS_GROUP_A), [finishedMatches]);
   const standingsJunB = useMemo(() => buildStandings(finishedMatches, JUNIORS_GROUP_B), [finishedMatches]);
   
+  const activeTeamsList = activeTournament === 'youth' ? CLEANED_TEAM_NAMES : [...JUNIORS_GROUP_A, ...JUNIORS_GROUP_B];
+
   const youthTree = useMemo(() => {
     const getT = (rank: number) => standingsYouth.length >= rank ? standingsYouth[rank - 1].team : `المركز ${rank}`;
     const p97 = getWinnerData("اسماك باسط العوامي", "اصدقاء عز بوالمجدوبة", "الملحق", "م 97", matches);
@@ -519,18 +598,19 @@ export default function Page() {
 
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
+            { key: "rosters", label: "قوائم الفرق", icon: "📋", extraClass: "bg-gradient-to-r from-blue-600 to-indigo-700 text-white border-none shadow-[0_0_15px_rgba(59,130,246,0.6)]" },
             { key: "totw", label: "تشكيلة الجولة", icon: "🏟️", extraClass: "bg-emerald-600 text-white border-none shadow-[0_0_15px_rgba(5,150,105,0.6)]" },
             { key: "fantasy", label: "توقع واكسب", icon: "🎁", extraClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-none shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
-            { key: "knockout", label: "الأدوار الإقصائية", icon: "🏆", extraClass: "" }, 
+            { key: "knockout", label: "الإقصائيات", icon: "🏆", extraClass: "" }, 
             { key: "live", label: "مباشر", icon: "🔴", extraClass: "" }, 
             { key: "standings", label: "الترتيب", icon: "📊", extraClass: "" }, 
-            { key: "today", label: "مباريات اليوم", icon: "📅", extraClass: "" }, 
-            { key: "tomorrow", label: "مباريات غداً", icon: "📆", extraClass: "" }, 
+            { key: "today", label: "اليوم", icon: "📅", extraClass: "" }, 
+            { key: "tomorrow", label: "غداً", icon: "📆", extraClass: "" }, 
             { key: "all", label: "النتائج", icon: "⚽", extraClass: "" }, 
             { key: "scorers", label: "الهدافين", icon: "🥇", extraClass: "" }, 
             { key: "cards", label: "الكروت", icon: "🟨", extraClass: "" }, 
             { key: "stats", label: "إحصائيات", icon: "📈", extraClass: "" }, 
-            { key: "motm_tab", label: "رجل المباراة", icon: "🌟", extraClass: "" }, 
+            { key: "motm_tab", label: "نجوم الماتش", icon: "🌟", extraClass: "" }, 
             { key: "media", label: "ميديا", icon: "🎥", extraClass: "" },
             { key: "settings", label: "الإعدادات", icon: "⚙️", extraClass: "bg-gray-800 text-white shadow-lg border-gray-600" }
           ].map(tab => (
@@ -539,6 +619,150 @@ export default function Page() {
             </button>
           ))}
         </div>
+
+        {activeTab === "rosters" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-center mb-6">
+               <div className="bg-[#13213a] p-1.5 rounded-2xl border border-white/10 inline-flex shadow-lg gap-1 w-full max-w-md">
+                 <button onClick={() => { setRosterViewMode('list'); setSelectedRosterToView(null); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'list' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}><ClipboardList className="inline-block mr-1 h-5 w-5" /> عرض القوائم المشاركة</button>
+                 <button onClick={() => { setRosterViewMode('register'); setUnlockedRoster(null); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}><Lock className="inline-block mr-1 h-5 w-5" /> تسجيل وتعديل قائمة</button>
+               </div>
+            </div>
+
+            {rosterViewMode === 'list' && !selectedRosterToView && (
+              <div className="space-y-6">
+                 <div className="text-center mb-6">
+                    <h2 className="text-3xl font-black text-yellow-300">القوائم الرسمية للفرق المشاركة</h2>
+                    <p className="text-cyan-300 mt-2 font-bold">اضغط على اسم الفريق لعرض قائمة الـ 12 لاعب المعتمدة من الإدارة</p>
+                 </div>
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {activeTeamsList.map(teamName => {
+                       const rosterData = rostersList.find(r => r.id === teamName);
+                       const isSubmitted = rosterData && rosterData.isSubmitted;
+                       return (
+                         <Card 
+                            key={teamName} 
+                            onClick={() => isSubmitted && setSelectedRosterToView(rosterData)}
+                            className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:border-blue-400 hover:scale-105 shadow-lg' : 'bg-[#13213a] border-white/5 opacity-60 cursor-not-allowed'}`}
+                         >
+                            <CardContent className="p-6 flex flex-col items-center text-center justify-center h-full gap-3">
+                               <Shield className={`h-8 w-8 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
+                               <span className="font-black text-white text-lg">{teamName}</span>
+                               {isSubmitted ? (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-2 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
+                               ) : (
+                                  <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-2 font-bold px-3">لم تسجل بعد</Badge>
+                               )}
+                            </CardContent>
+                         </Card>
+                       );
+                    })}
+                 </div>
+              </div>
+            )}
+
+            {rosterViewMode === 'list' && selectedRosterToView && (
+               <div className="animate-in zoom-in duration-300 max-w-3xl mx-auto">
+                 <Button onClick={() => setSelectedRosterToView(null)} variant="outline" className="mb-6 bg-white/5 border-white/20 text-white hover:bg-white/10 font-bold">العودة للقوائم ↩</Button>
+                 <Card className="bg-gradient-to-b from-[#1e2a4a] to-[#13213a] border border-blue-500/50 rounded-3xl shadow-2xl overflow-hidden">
+                    <CardHeader className="bg-blue-900/40 border-b border-blue-500/30 text-center py-8 relative">
+                       <div className="absolute top-4 right-4"><Badge className="bg-emerald-500 text-white font-black"><CheckCircle2 className="h-4 w-4 mr-1 inline-block"/> معتمدة</Badge></div>
+                       <Shield className="h-16 w-16 mx-auto text-blue-400 mb-4" />
+                       <CardTitle className="text-4xl font-black text-white tracking-wide">{selectedRosterToView.teamName}</CardTitle>
+                       <div className="mt-4 flex flex-col sm:flex-row justify-center gap-4 text-cyan-300 font-bold">
+                          <span className="flex items-center justify-center gap-2"><Users className="h-5 w-5"/> المسئول: {selectedRosterToView.managerName}</span>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="flex items-center justify-center gap-2" dir="ltr"><Phone className="h-5 w-5"/> {selectedRosterToView.managerPhone}</span>
+                       </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                       <table className="w-full text-right text-white text-lg">
+                          <thead className="bg-[#0a1428]">
+                             <tr><th className="p-4 w-20 text-center text-cyan-400 border-b border-white/5">الرقم</th><th className="p-4 text-cyan-400 border-b border-white/5">اسم اللاعب</th></tr>
+                          </thead>
+                          <tbody>
+                             {selectedRosterToView.players.map((p: any, i: number) => (
+                               <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                 <td className="p-4 text-center font-black text-yellow-400">{p.number}</td>
+                                 <td className="p-4 font-bold">{p.name}</td>
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </CardContent>
+                 </Card>
+               </div>
+            )}
+
+            {rosterViewMode === 'register' && !unlockedRoster && (
+               <Card className="max-w-xl mx-auto bg-[#13213a] border border-emerald-500/30 rounded-3xl shadow-2xl">
+                 <CardHeader className="text-center border-b border-white/5 pb-6">
+                    <Lock className="mx-auto h-12 w-12 text-emerald-400 mb-4" />
+                    <CardTitle className="text-2xl font-black text-white">تسجيل دخول لمسئول الفريق</CardTitle>
+                    <p className="text-gray-400 text-sm mt-2 font-bold">يرجى اختيار فريقك وإدخال الرقم السري الممنوح لك من الإدارة لملء القائمة.</p>
+                 </CardHeader>
+                 <CardContent className="p-8 space-y-6">
+                    <div>
+                       <label className="block text-cyan-300 font-bold mb-2">اختر فريقك</label>
+                       <select value={rosterAccessTeam} onChange={e => setRosterAccessTeam(e.target.value)} className="w-full bg-[#1e2a4a] border border-emerald-500/50 rounded-xl p-4 text-white font-bold outline-none cursor-pointer">
+                          <option value="">-- اضغط للاختيار --</option>
+                          {activeTeamsList.map(t => <option key={t} value={t}>{t}</option>)}
+                       </select>
+                    </div>
+                    <div>
+                       <label className="block text-cyan-300 font-bold mb-2">الرقم السري للفريق</label>
+                       <Input type="password" value={rosterAccessPassword} onChange={e => setRosterAccessPassword(e.target.value)} placeholder="••••••••" className="bg-[#1e2a4a] border-emerald-500/50 text-white font-black text-center text-xl h-14 tracking-widest" />
+                    </div>
+                    <Button onClick={handleRosterLogin} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-7 text-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-transform hover:scale-105">تسجيل الدخول للقائمة <Unlock className="ml-2 h-5 w-5" /></Button>
+                 </CardContent>
+               </Card>
+            )}
+
+            {rosterViewMode === 'register' && unlockedRoster && (
+               <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
+                  <div className="bg-yellow-400/10 border border-yellow-400 text-yellow-300 p-4 rounded-2xl mb-6 text-center font-bold">
+                     ⚠️ تنبيه هام: يرجى مراجعة الأسماء والأرقام بدقة. بمجرد ضغط "حفظ واعتماد" سيتم قفل القائمة ولن تتمكن من تعديلها مجدداً إلا من خلال إدارة البطولة.
+                  </div>
+                  <Card className="bg-[#13213a] border border-blue-500/30 rounded-3xl shadow-2xl overflow-hidden">
+                     <CardHeader className="bg-[#1e2a4a] border-b border-blue-500/20 py-6">
+                        <CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-3"><ClipboardList className="text-blue-400"/> استمارة قائمة: {unlockedRoster}</CardTitle>
+                     </CardHeader>
+                     <CardContent className="p-6 md:p-8 space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
+                           <div>
+                              <label className="block text-cyan-300 font-bold mb-2">اسم المدير الفني / مسئول الفريق</label>
+                              <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
+                           </div>
+                           <div>
+                              <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
+                              <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
+                           </div>
+                        </div>
+
+                        <div>
+                           <h3 className="text-xl font-black text-yellow-300 mb-4 border-b border-white/10 pb-2">أسماء اللاعبين (12 لاعب)</h3>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                              {rosterForm.players.map((player, index) => (
+                                 <div key={index} className="flex gap-3 items-center bg-[#1e2a4a] p-2 pr-4 rounded-xl border border-white/5 focus-within:border-blue-400 transition-colors">
+                                    <span className="text-gray-400 font-black w-6">{index + 1}.</span>
+                                    <Input placeholder="اسم اللاعب" value={player.name} onChange={e => updateRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-transparent border-none text-white font-bold focus-visible:ring-0 px-0" />
+                                    <div className="h-8 w-px bg-white/10 mx-1"></div>
+                                    <Input type="number" placeholder="الرقم" value={player.number} onChange={e => updateRosterPlayer(index, 'number', e.target.value)} className="w-20 bg-[#0a1428] border-none text-yellow-400 font-black text-center focus-visible:ring-0" />
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-4">
+                           <Button onClick={submitFinalRoster} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-8 text-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-transform hover:scale-105">حفظ واعتماد القائمة نهائياً ✔️</Button>
+                           <Button onClick={() => setUnlockedRoster(null)} variant="outline" className="bg-transparent border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-8 px-8 font-bold text-lg">إلغاء الخروج</Button>
+                        </div>
+                     </CardContent>
+                  </Card>
+               </div>
+            )}
+          </div>
+        )}
 
         {activeTab === "settings" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl mx-auto">
@@ -698,57 +922,6 @@ export default function Page() {
                 <div className="bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-cyan-500/50 shadow-2xl"><div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-2xl px-10 py-2 font-black">نصف النهائي (الناشئين)</Badge></div><div className="grid md:grid-cols-2 gap-12 lg:px-40"><TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} /><TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} /></div></div>
                 <div className="relative pt-10 pb-6 px-4 text-center"><div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div><div className="max-w-xl mx-auto relative z-10"><TreeMatchBox label="مباراة التتويج" t1={juniorsTree.s1.win || "الفائز 1"} t2={juniorsTree.s2.win || "الفائز 2"} data={juniorsTree.f1} /></div></div>
               </>
-            )}
-          </div>
-        )}
-
-        {activeTab === "live" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="text-center mb-8">
-              <Badge className="bg-red-500 text-white text-xl px-8 py-2 font-black shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-                <span className="animate-pulse inline-block mr-2">🔴</span> البث المباشر والمباريات الجارية
-              </Badge>
-            </div>
-            {liveMatches.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {liveMatches.map((match: any) => (
-                  <Card key={match.id} className="bg-[#13213a] border-red-500/50 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-                    <CardHeader className="bg-[#1e2a4a] border-b border-red-500/20 text-center py-3">
-                      <div className="text-cyan-300 text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
-                      <div className="text-yellow-300 font-bold mt-1 text-lg flex justify-center items-center gap-2">
-                        <Clock className="h-4 w-4" /> {formatTime12(match.time)}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-center gap-4 mb-4">
-                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamA}</div>
-                        <div className="bg-[#0a1428] rounded-2xl py-3 px-6 border-2 border-red-500/50 text-red-400 shadow-inner">
-                          {renderMatchScore(match)}
-                        </div>
-                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamB}</div>
-                      </div>
-                      {(match.liveLink || match.streamUrl || match.videoId) && (
-                         <div className="mt-6 flex justify-center">
-                            <Button className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl flex items-center gap-2 px-6 shadow-lg hover:scale-105 transition-transform" onClick={() => window.open(match.liveLink || match.streamUrl || match.videoId, '_blank')}>
-                               <Play className="h-5 w-5" /> مشاهدة البث
-                            </Button>
-                         </div>
-                      )}
-                      {match.status && match.status !== "جارية" && match.status !== "انتهت" && (
-                        <div className="text-center mt-4">
-                          <Badge className="bg-yellow-400 text-black font-bold">{match.status}</Badge>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-20 bg-[#13213a] rounded-3xl border border-white/10 shadow-lg">
-                <div className="text-6xl mb-4 opacity-50">📺</div>
-                <h3 className="text-2xl font-black text-white mb-2">لا توجد مباريات في البث المباشر حالياً</h3>
-                <p className="text-cyan-300 font-bold">المباريات تظهر هنا تلقائياً قبل بدايتها بـ 30 دقيقة</p>
-              </div>
             )}
           </div>
         )}
@@ -974,6 +1147,57 @@ export default function Page() {
                    })}
                  </div>
                ) : <p className="text-center text-white py-10 font-bold">لا توجد فيديوهات حالياً</p>}
+          </div>
+        )}
+
+        {activeTab === "live" && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="text-center mb-8">
+              <Badge className="bg-red-500 text-white text-xl px-8 py-2 font-black shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                <span className="animate-pulse inline-block mr-2">🔴</span> البث المباشر والمباريات الجارية
+              </Badge>
+            </div>
+            {liveMatches.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2">
+                {liveMatches.map((match: any) => (
+                  <Card key={match.id} className="bg-[#13213a] border-red-500/50 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                    <CardHeader className="bg-[#1e2a4a] border-b border-red-500/20 text-center py-3">
+                      <div className="text-cyan-300 text-sm font-bold">{getArabicDay(match.date)} • {match.date}</div>
+                      <div className="text-yellow-300 font-bold mt-1 text-lg flex justify-center items-center gap-2">
+                        <Clock className="h-4 w-4" /> {formatTime12(match.time)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-center gap-4 mb-4">
+                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamA}</div>
+                        <div className="bg-[#0a1428] rounded-2xl py-3 px-6 border-2 border-red-500/50 text-red-400 shadow-inner">
+                          {renderMatchScore(match)}
+                        </div>
+                        <div className="flex-1 text-center font-bold text-xl sm:text-2xl text-white">{match.teamB}</div>
+                      </div>
+                      {(match.liveLink || match.streamUrl || match.videoId) && (
+                         <div className="mt-6 flex justify-center">
+                            <Button className="bg-red-600 hover:bg-red-700 text-white font-black rounded-xl flex items-center gap-2 px-6 shadow-lg hover:scale-105 transition-transform" onClick={() => window.open(match.liveLink || match.streamUrl || match.videoId, '_blank')}>
+                               <Play className="h-5 w-5" /> مشاهدة البث
+                            </Button>
+                         </div>
+                      )}
+                      {match.status && match.status !== "جارية" && match.status !== "انتهت" && (
+                        <div className="text-center mt-4">
+                          <Badge className="bg-yellow-400 text-black font-bold">{match.status}</Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-[#13213a] rounded-3xl border border-white/10 shadow-lg">
+                <div className="text-6xl mb-4 opacity-50">📺</div>
+                <h3 className="text-2xl font-black text-white mb-2">لا توجد مباريات في البث المباشر حالياً</h3>
+                <p className="text-cyan-300 font-bold">المباريات تظهر هنا تلقائياً قبل بدايتها بـ 30 دقيقة</p>
+              </div>
+            )}
           </div>
         )}
 

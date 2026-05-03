@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert } from "lucide-react";
+import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert, ClipboardList, Lock, Unlock, Phone, CheckCircle2, Shield } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
@@ -85,7 +85,7 @@ export default function AdminPage() {
   const [passwordInput, setPasswordInput] = useState("");
   
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
-  const [activeTab, setActiveTab] = useState("live");
+  const [activeTab, setActiveTab] = useState("rosters");
 
   const [matches, setMatches] = useState<any[]>([]);
   const matchesRef = useRef<any[]>([]);
@@ -95,6 +95,7 @@ export default function AdminPage() {
   const [predictions, setPredictions] = useState<any[]>([]);
   const [motmList, setMotmList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
+  const [rostersList, setRostersList] = useState<any[]>([]); 
 
   const [tickerText, setTickerText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -136,6 +137,13 @@ export default function AdminPage() {
 
   const [liveEventForms, setLiveEventForms] = useState<Record<string, { minute?: number, type: string, text: string }>>({});
 
+  // Roster Admin States
+  const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
+  const [rosterFormAdmin, setRosterFormAdmin] = useState({
+    managerName: "", managerPhone: "", password: "", isSubmitted: false,
+    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
+  });
+
   useEffect(() => {
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(clockTimer);
@@ -146,7 +154,7 @@ export default function AdminPage() {
     setGoalForm(p => ({...p, team: currentTeamsList[0] || "", player: "", goalsCount: 1, imageUrl: ""}));
     setCardForm(p => ({...p, team: currentTeamsList[0] || "", player: ""}));
     setMotmForm(p => ({...p, team: currentTeamsList[0] || "", player: "", imageUrl: ""}));
-    setEditingId(null); setEditingGoalId(null); setEditingMotmId(null);
+    setEditingId(null); setEditingGoalId(null); setEditingMotmId(null); setEditingRosterId(null);
   }, [activeTournament]);
 
   useEffect(() => {
@@ -174,6 +182,7 @@ export default function AdminPage() {
     const unsubPredictions = onSnapshot(collection(db, getColl("predictions")), (snap) => setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
     const unsubMotm = onSnapshot(collection(db, getColl("motm")), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubForms = onSnapshot(collection(db, getColl("formations")), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubRosters = onSnapshot(collection(db, getColl("team_rosters")), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
 
     const timerInterval = setInterval(() => {
@@ -186,13 +195,79 @@ export default function AdminPage() {
 
     return () => { 
         unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); 
-        unsubPredictions(); unsubMotm(); unsubForms(); unsubTicker(); 
+        unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubTicker(); 
         clearInterval(timerInterval); 
     };
   }, [isAuth, activeTournament]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
 
+  // Admin Roster Functions
+  const startEditRoster = (teamName: string) => {
+    const existing = rostersList.find(r => r.id === teamName);
+    let loadedPlayers = Array.from({ length: 12 }, () => ({ name: "", number: "" }));
+    if (existing && existing.players) {
+        loadedPlayers = [...existing.players];
+        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
+    }
+    setRosterFormAdmin({
+        managerName: existing?.managerName || "",
+        managerPhone: existing?.managerPhone || "",
+        password: existing?.password || "",
+        isSubmitted: existing?.isSubmitted || false,
+        players: loadedPlayers.slice(0,12)
+    });
+    setEditingRosterId(teamName);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const updateAdminRosterPlayer = (index: number, field: string, value: string) => {
+    setRosterFormAdmin(prev => {
+        const newPlayers = [...prev.players];
+        newPlayers[index] = { ...newPlayers[index], [field]: value };
+        return { ...prev, players: newPlayers };
+    });
+  };
+
+  const saveRosterAdmin = async () => {
+    if(!editingRosterId) return;
+    try {
+        await setDoc(doc(db, getColl("team_rosters"), editingRosterId), {
+            teamName: editingRosterId,
+            managerName: rosterFormAdmin.managerName,
+            managerPhone: rosterFormAdmin.managerPhone,
+            password: rosterFormAdmin.password,
+            isSubmitted: rosterFormAdmin.isSubmitted,
+            players: rosterFormAdmin.players,
+            updatedAt: new Date().toISOString()
+        }, { merge: true });
+        alert("تم حفظ بيانات القائمة بنجاح! ✔️");
+        setEditingRosterId(null);
+    } catch(e) {
+        alert("حدث خطأ أثناء الحفظ.");
+    }
+  };
+
+  const deleteRoster = async (teamName: string) => {
+    if(confirm(`⚠️ هل أنت متأكد من مسح قائمة فريق ${teamName} بالكامل؟`)) {
+        await deleteDoc(doc(db, getColl("team_rosters"), teamName));
+        alert("تم مسح القائمة بنجاح.");
+    }
+  };
+
+  const unlockRoster = async (teamName: string) => {
+    if(confirm(`هل تريد فتح القفل لقائمة فريق ${teamName} ليتمكن المدير من التعديل عليها؟`)) {
+        await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: false });
+        alert("تم فتح القائمة بنجاح. يمكن للمدير التعديل الآن. 🔓");
+    }
+  };
+
+  const lockRoster = async (teamName: string) => {
+    await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
+    alert("تم قفل القائمة واعتمادها. 🔒");
+  };
+
+  // Match & Stats Functions
   const saveMatch = async () => {
     if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!");
     const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()];
@@ -502,6 +577,7 @@ export default function AdminPage() {
 
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
           <TabsList className="flex flex-wrap justify-center bg-[#13213a] border border-white/20 p-1.5 rounded-2xl mb-8 gap-2 h-auto shadow-lg">
+            <TabsTrigger value="rosters" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-blue-400 border border-blue-500/30">القوائم 📋</TabsTrigger>
             <TabsTrigger value="totw_admin" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">التشكيلة 🏟️</TabsTrigger>
             <TabsTrigger value="live" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-red-400">مباشر</TabsTrigger>
             <TabsTrigger value="knockout" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">إقصائيات 🏆</TabsTrigger>
@@ -513,9 +589,99 @@ export default function AdminPage() {
             <TabsTrigger value="goals" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
             <TabsTrigger value="cards" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
             <TabsTrigger value="media" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">ميديا</TabsTrigger>
-            <TabsTrigger value="ticker" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
             <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 bg-black/40 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
+            <TabsTrigger value="ticker" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="rosters">
+            <Card className="border-blue-500 bg-[#13213a] shadow-xl">
+               <CardHeader className="border-b border-white/5 pb-4">
+                  <CardTitle className="text-blue-400 flex items-center gap-2"><ClipboardList /> إدارة قوائم الفرق</CardTitle>
+               </CardHeader>
+               <CardContent className="p-6">
+                  {editingRosterId ? (
+                     <div className="animate-in fade-in duration-300 bg-[#1e2a4a] border border-blue-500/50 p-6 rounded-3xl">
+                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
+                           <h3 className="text-2xl font-black text-white flex items-center gap-2"><Edit className="text-yellow-400"/> تعديل قائمة: <span className="text-yellow-400">{editingRosterId}</span></h3>
+                           <Button variant="outline" onClick={() => setEditingRosterId(null)} className="border-red-500 text-white hover:bg-red-500 font-bold">إلغاء</Button>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-6 mb-8 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
+                           <div>
+                              <label className="block text-cyan-300 text-sm font-bold mb-2">اسم المسئول</label>
+                              <Input placeholder="الاسم" value={rosterFormAdmin.managerName} onChange={e => setRosterFormAdmin(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold" />
+                           </div>
+                           <div>
+                              <label className="block text-cyan-300 text-sm font-bold mb-2">رقم التليفون</label>
+                              <Input dir="ltr" placeholder="01xxxxxxxxx" value={rosterFormAdmin.managerPhone} onChange={e => setRosterFormAdmin(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold text-right" />
+                           </div>
+                           <div>
+                              <label className="block text-yellow-400 text-sm font-bold mb-2">الباسورد السري (لإعطائه للمدير)</label>
+                              <Input placeholder="كلمة المرور" value={rosterFormAdmin.password} onChange={e => setRosterFormAdmin(p => ({...p, password: e.target.value}))} className="bg-[#1e2a4a] border-yellow-500/40 text-white font-bold text-center tracking-wider" />
+                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 mb-8 bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
+                           <input type="checkbox" id="isSubmittedCheck" checked={rosterFormAdmin.isSubmitted} onChange={e => setRosterFormAdmin(p => ({...p, isSubmitted: e.target.checked}))} className="w-6 h-6 rounded border-blue-500 text-blue-600 focus:ring-blue-500 bg-[#0a1428] cursor-pointer" />
+                           <label htmlFor="isSubmittedCheck" className="text-white font-bold text-lg cursor-pointer select-none">
+                              قفل القائمة واعتمادها (منع المدير من التعديل) 🔒
+                           </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                           {rosterFormAdmin.players.map((player, index) => (
+                              <div key={index} className="flex gap-3 items-center bg-[#0a1428] p-2 pr-4 rounded-xl border border-white/5 focus-within:border-blue-400">
+                                 <span className="text-gray-500 font-black w-6">{index + 1}.</span>
+                                 <Input placeholder="اسم اللاعب" value={player.name} onChange={e => updateAdminRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-transparent border-none text-white font-bold focus-visible:ring-0 px-0" />
+                                 <div className="h-8 w-px bg-white/10 mx-1"></div>
+                                 <Input type="number" placeholder="رقم" value={player.number} onChange={e => updateAdminRosterPlayer(index, 'number', e.target.value)} className="w-16 bg-[#1e2a4a] border-none text-yellow-400 font-black text-center focus-visible:ring-0" />
+                              </div>
+                           ))}
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-white/10">
+                           <Button onClick={saveRosterAdmin} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-7 text-xl shadow-lg">حفظ التعديلات الإدارية ✔️</Button>
+                        </div>
+                     </div>
+                  ) : (
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {currentTeamsList.map(teamName => {
+                           const rosterData = rostersList.find(r => r.id === teamName);
+                           const isSubmitted = rosterData?.isSubmitted || false;
+                           const hasData = !!rosterData;
+                           
+                           return (
+                              <Card key={teamName} className={`bg-[#1e2a4a] border ${isSubmitted ? 'border-emerald-500/50' : hasData ? 'border-blue-500/30' : 'border-white/5'} overflow-hidden`}>
+                                 <div className={`p-3 text-center border-b ${isSubmitted ? 'bg-emerald-600/20 border-emerald-500/30' : hasData ? 'bg-blue-600/20 border-blue-500/30' : 'bg-gray-800 border-white/5'}`}>
+                                    <h3 className="font-black text-white text-lg">{teamName}</h3>
+                                    {isSubmitted ? <Badge className="bg-emerald-500 text-white font-bold mt-1 text-[10px] px-2 py-0">معتمدة ومقفلة 🔒</Badge> : hasData ? <Badge className="bg-blue-500 text-white font-bold mt-1 text-[10px] px-2 py-0">مفتوحة للتعديل 🔓</Badge> : <Badge className="bg-gray-600 text-white font-bold mt-1 text-[10px] px-2 py-0">لم تسجل بعد ❌</Badge>}
+                                 </div>
+                                 <CardContent className="p-4 space-y-3">
+                                    <div className="text-sm">
+                                       <div className="flex justify-between text-gray-300 mb-1"><span>المسئول:</span> <span className="text-white font-bold">{rosterData?.managerName || '—'}</span></div>
+                                       <div className="flex justify-between text-gray-300 mb-1"><span>الموبايل:</span> <span className="text-white font-bold" dir="ltr">{rosterData?.managerPhone || '—'}</span></div>
+                                       <div className="flex justify-between text-gray-300"><span>الباسورد:</span> <span className="text-yellow-400 font-black tracking-widest">{rosterData?.password || '—'}</span></div>
+                                    </div>
+                                    <div className="flex gap-2 pt-3 border-t border-white/5">
+                                       <Button size="sm" onClick={() => startEditRoster(teamName)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 font-bold"><Edit className="h-4 w-4 mr-1"/> إعداد</Button>
+                                       {isSubmitted ? (
+                                          <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-black hover:bg-yellow-600" title="فتح القفل ليتمكن المدير من التعديل"><Unlock className="h-4 w-4"/></Button>
+                                       ) : hasData ? (
+                                          <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500 text-white hover:bg-emerald-600" title="قفل واعتماد القائمة يدوياً"><Lock className="h-4 w-4"/></Button>
+                                       ) : null}
+                                       {hasData && (
+                                          <Button size="sm" variant="destructive" onClick={() => deleteRoster(teamName)}><Trash2 className="h-4 w-4"/></Button>
+                                       )}
+                                    </div>
+                                 </CardContent>
+                              </Card>
+                           );
+                        })}
+                     </div>
+                  )}
+               </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="totw_admin">
             <Card className="border-emerald-500 bg-[#13213a] shadow-xl">
@@ -625,7 +791,7 @@ export default function AdminPage() {
                   {match.status === "ضربات جزاء" && (
                     <div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl mt-6">
                       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                        <h4 className="textxl font-bold text-yellow-400">ضربات الترجيح</h4>
+                        <h4 className="text-xl font-bold text-yellow-400">ضربات الترجيح</h4>
                         <Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400"><Plus className="ml-2 h-4 w-4" /> ركلة إضافية</Button>
                       </div>
                       <div className="flex flex-col md:flex-row justify-between items-center bg-[#0a1428] p-4 rounded-xl gap-6">
