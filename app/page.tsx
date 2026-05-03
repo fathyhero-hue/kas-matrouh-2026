@@ -93,11 +93,11 @@ const getWinnerData = (t1: string, t2: string, round: string, labelId: string, a
 
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
   <div className="flex-1 flex flex-col items-center gap-3">
-    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/5 border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
+    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
       {logoUrl ? (
         <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
       ) : (
-        <span className="opacity-40">🛡️</span>
+        <Shield className="h-8 w-8 text-gray-500 opacity-50" />
       )}
     </div>
     <div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div>
@@ -116,7 +116,7 @@ const renderMatchScore = (match: any) => {
 
   return (
     <div className="flex flex-col items-center" dir="ltr">
-      <span className="text-xl sm:text-3xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
+      <span className="text-xl sm:text-3xl font-black text-white">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
       {hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({hPen} - {aPen} ر.ت)</span>}
     </div>
   );
@@ -140,28 +140,46 @@ const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: 
   );
 };
 
+// ================= الكارت الاحترافي الجديد =================
 const MiniFutCard = ({ player, position }: { player: any, position: string }) => {
-  if(!player || !player.name) return <div className="w-16 h-20 md:w-24 md:h-32 bg-black/40 border-2 border-white/10 rounded-xl flex items-center justify-center text-white/30 text-sm font-bold shadow-inner backdrop-blur-sm">{position}</div>;
+  if(!player || !player.name) return (
+    <div className="w-[70px] h-[100px] md:w-[110px] md:h-[150px] bg-[#0a1428]/60 border-2 border-dashed border-emerald-500/30 rounded-2xl flex items-center justify-center text-emerald-500/50 text-xs md:text-sm font-black shadow-inner backdrop-blur-sm transition-all hover:border-emerald-500/60">
+      {position}
+    </div>
+  );
+  
   return (
-    <div className="relative w-16 h-24 md:w-24 md:h-[135px] transition-transform duration-300 hover:scale-110 cursor-pointer z-10 hover:z-50 drop-shadow-[0_10px_10px_rgba(0,0,0,0.6)]">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f8e596] via-[#dcae3a] to-[#9b7318]" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 88%, 50% 100%, 0% 88%)', borderRadius: '0.5rem 0.5rem 0 0', border: '1px solid rgba(255, 235, 150, 0.4)' }}>
-        <div className="absolute top-1 left-1.5 flex flex-col items-center z-20">
-          <span className="text-sm md:text-xl font-black text-[#3e2d14] leading-none">{player.rating || 99}</span>
-          <span className="text-[7px] md:text-[9px] font-black text-[#3e2d14] tracking-wider uppercase">{position}</span>
-        </div>
-        <div className="absolute top-3 md:top-5 w-full flex justify-center z-10 left-0">
-          <div className="w-10 h-10 md:w-[60px] md:h-[60px] rounded-full border-2 border-yellow-400 overflow-hidden bg-[#1e2a4a] shadow-inner">
-            {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.name} loading="lazy" /> : <span className="text-xl md:text-3xl opacity-40 text-white flex justify-center mt-1">👤</span>}
+    <div className="relative w-[70px] md:w-[110px] transition-transform duration-300 hover:scale-110 cursor-pointer z-10 hover:z-50 drop-shadow-[0_15px_20px_rgba(0,0,0,0.6)]">
+      <div className="w-full bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-2xl border border-yellow-400/40 overflow-hidden flex flex-col shadow-lg">
+        
+        {/* صورة اللاعب بشكل مربع/عمودي */}
+        <div className="relative w-full aspect-[4/5] bg-[#050a14] border-b border-white/5">
+          {player.imageUrl ? (
+             <img src={player.imageUrl} className="w-full h-full object-cover object-top" alt={player.name} loading="lazy" />
+          ) : (
+             <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">👤</div>
+          )}
+          
+          {/* بادج التقييم والمركز */}
+          <div className="absolute top-0 left-0 flex flex-col items-center bg-gradient-to-br from-yellow-300 to-yellow-600 px-1.5 py-0.5 rounded-br-xl shadow-md border-r border-b border-yellow-700/50">
+             <span className="text-[10px] md:text-sm font-black text-black leading-none">{player.rating || 99}</span>
+             <span className="text-[8px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
           </div>
         </div>
-        <div className="absolute bottom-2 md:bottom-3 w-full text-center z-20 px-1">
-          <div className="text-[8px] md:text-[11px] font-black text-[#3e2d14] truncate uppercase">{player.name}</div>
-          <div className="text-[6px] md:text-[8px] font-bold text-[#f8e596] bg-[#3e2d14] px-1 rounded-sm truncate mt-0.5 mx-auto max-w-[90%]">{player.team}</div>
+        
+        {/* منطقة البيانات تحت الصورة */}
+        <div className="p-1.5 md:p-2 flex flex-col items-center justify-center w-full">
+           <span className="text-[9px] md:text-[12px] font-black text-white w-full text-center truncate mb-1" title={player.name}>{player.name}</span>
+           <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded text-center w-full truncate" title={player.team}>
+             {player.team}
+           </span>
         </div>
+
       </div>
     </div>
   );
 };
+// ========================================================
 
 export default function Page() {
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
@@ -296,9 +314,14 @@ export default function Page() {
     if (existingTeam && existingTeam.players) {
         const loadedPlayers = [...existingTeam.players];
         while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
-        setRosterForm({ managerName: existingTeam.managerName || "", managerPhone: existingTeam.managerPhone || "", logoUrl: existingTeam.logoUrl || "", players: loadedPlayers.slice(0,12) });
+        setRosterForm({ 
+           managerName: existingTeam.managerName || "", 
+           managerPhone: existingTeam.managerPhone || "", 
+           logoUrl: existingTeam.logoUrl || "", 
+           players: loadedPlayers.slice(0,12) 
+        });
     } else {
-        setRosterForm({ managerName: "", managerPhone: "", logoUrl: existingTeam?.logoUrl || "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
+        setRosterForm({ managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
     }
   };
 
@@ -660,16 +683,18 @@ export default function Page() {
                             className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:border-blue-400 hover:scale-105 shadow-lg' : 'bg-[#13213a] border-white/5 opacity-60 cursor-not-allowed'}`}
                          >
                             <CardContent className="p-6 flex flex-col items-center text-center justify-center h-full gap-3">
-                               {rosterData?.logoUrl ? (
-                                  <img src={rosterData.logoUrl} className="h-14 w-14 object-contain drop-shadow-md mb-1" alt={teamName} />
+                               {isSubmitted && rosterData.logoUrl ? (
+                                  <div className="w-12 h-12 rounded-full bg-[#0a1428] border border-white/10 overflow-hidden flex items-center justify-center p-1">
+                                    <img src={rosterData.logoUrl} alt={teamName} className="w-full h-full object-contain" />
+                                  </div>
                                ) : (
-                                  <Shield className={`h-10 w-10 mb-1 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
+                                  <Shield className={`h-8 w-8 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
                                )}
-                               <span className="font-black text-white text-lg leading-tight">{teamName}</span>
+                               <span className="font-black text-white text-lg">{teamName}</span>
                                {isSubmitted ? (
-                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-1 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-2 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
                                ) : (
-                                  <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-1 font-bold px-3">لم تسجل بعد</Badge>
+                                  <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-2 font-bold px-3">لم تسجل بعد</Badge>
                                )}
                             </CardContent>
                          </Card>
@@ -685,13 +710,15 @@ export default function Page() {
                  <Card className="bg-gradient-to-b from-[#1e2a4a] to-[#13213a] border border-blue-500/50 rounded-3xl shadow-2xl overflow-hidden">
                     <CardHeader className="bg-blue-900/40 border-b border-blue-500/30 text-center py-8 relative">
                        <div className="absolute top-4 right-4"><Badge className="bg-emerald-500 text-white font-black"><CheckCircle2 className="h-4 w-4 mr-1 inline-block"/> معتمدة</Badge></div>
+                       
                        {selectedRosterToView.logoUrl ? (
-                          <div className="h-24 w-24 mx-auto mb-4 bg-white/5 rounded-full border-4 border-blue-400/50 flex items-center justify-center overflow-hidden shadow-lg p-1">
-                             <img src={selectedRosterToView.logoUrl} className="max-h-full max-w-full object-contain" alt={selectedRosterToView.teamName} />
-                          </div>
+                         <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#0a1428] border-2 border-blue-500/50 p-2 shadow-inner">
+                           <img src={selectedRosterToView.logoUrl} alt={selectedRosterToView.teamName} className="w-full h-full object-contain" />
+                         </div>
                        ) : (
-                          <Shield className="h-16 w-16 mx-auto text-blue-400 mb-4" />
+                         <Shield className="h-16 w-16 mx-auto text-blue-400 mb-4" />
                        )}
+                       
                        <CardTitle className="text-4xl font-black text-white tracking-wide">{selectedRosterToView.teamName}</CardTitle>
                        <div className="mt-4 flex flex-col sm:flex-row justify-center gap-4 text-cyan-300 font-bold">
                           <span className="flex items-center justify-center gap-2"><Users className="h-5 w-5"/> المسئول: {selectedRosterToView.managerName}</span>
@@ -752,20 +779,14 @@ export default function Page() {
                         <CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-3"><ClipboardList className="text-blue-400"/> استمارة قائمة: {unlockedRoster}</CardTitle>
                      </CardHeader>
                      <CardContent className="p-6 md:p-8 space-y-8">
-                        <div className="bg-[#0a1428] p-6 rounded-2xl border border-white/5 space-y-6">
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div>
-                                 <label className="block text-cyan-300 font-bold mb-2">اسم المدير الفني / مسئول الفريق</label>
-                                 <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
-                              </div>
-                              <div>
-                                 <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
-                                 <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
-                              </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
+                           <div>
+                              <label className="block text-cyan-300 font-bold mb-2">اسم المدير الفني / مسئول الفريق</label>
+                              <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
                            </div>
                            <div>
-                              <label className="block text-cyan-300 font-bold mb-2">رابط شعار الفريق (اختياري)</label>
-                              <Input placeholder="أدخل رابط صورة الشعار هنا..." value={rosterForm.logoUrl || ""} onChange={e => setRosterForm(p => ({...p, logoUrl: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-left" dir="ltr" />
+                              <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
+                              <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
                            </div>
                         </div>
 
@@ -856,11 +877,11 @@ export default function Page() {
                     <div className="absolute bottom-0 left-1/2 w-1/2 md:w-1/3 h-1/6 border-x-[2px] border-t-[2px] border-white/60 -translate-x-1/2"></div>
                     <div className="absolute top-0 left-1/2 w-1/2 md:w-1/3 h-1/6 border-x-[2px] border-b-[2px] border-white/60 -translate-x-1/2"></div>
                  </div>
-                 <div className="absolute inset-0 p-4 md:p-8 flex flex-col justify-between z-10">
-                    <div className="flex justify-center w-full mt-2 md:mt-4"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
-                    <div className="flex justify-between w-full px-2 md:px-16 -mt-8 md:-mt-10"><MiniFutCard player={currentFormation.players[3]} position="LM" /><div className="mt-8 md:mt-12"><MiniFutCard player={currentFormation.players[4]} position="CM" /></div><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
-                    <div className="flex justify-around w-full px-12 md:px-32 -mt-4 md:-mt-8"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
-                    <div className="flex justify-center w-full mb-2 md:mb-4"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
+                 <div className="absolute inset-0 p-2 md:p-6 flex flex-col justify-between z-10">
+                    <div className="flex justify-center w-full"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
+                    <div className="flex justify-between w-full px-2 md:px-12 -mt-4 md:-mt-6"><MiniFutCard player={currentFormation.players[3]} position="LM" /><div className="mt-6 md:mt-10"><MiniFutCard player={currentFormation.players[4]} position="CM" /></div><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
+                    <div className="flex justify-around w-full px-8 md:px-24 -mt-2 md:-mt-4"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                    <div className="flex justify-center w-full"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
                  </div>
                </div>
              </div>
@@ -885,10 +906,10 @@ export default function Page() {
                      <Card key={match.id} className="bg-[#13213a] border border-emerald-500/30 rounded-3xl overflow-hidden shadow-lg hover:border-emerald-500 transition-colors">
                        <div className="bg-[#1e2a4a] text-center py-2 text-cyan-300 text-sm font-bold border-b border-white/10">{getArabicDay(match.date)} • {match.date} • {formatTime12(match.time)}</div>
                        <CardContent className="p-6">
-                         <div className="flex items-center justify-between mb-6">
-                           <div className="flex-1 text-center font-bold text-xl text-white">{match.teamA}</div>
-                           <div className="text-yellow-400 font-black px-4 text-2xl">VS</div>
-                           <div className="flex-1 text-center font-bold text-xl text-white">{match.teamB}</div>
+                         <div className="flex items-center justify-center gap-2 sm:gap-6 mb-6">
+                           <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                           <div className="text-yellow-400 font-black px-2 text-xl sm:text-3xl shrink-0">VS</div>
+                           <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
                          </div>
                          {predictedMatches[match.id] ? (
                            <div className="bg-emerald-500/20 border border-emerald-500 text-emerald-300 p-4 rounded-xl text-center font-bold text-lg">تم تسجيل توقعك بنجاح ✔️</div>
@@ -1086,7 +1107,7 @@ export default function Page() {
                 <div>
                    <h2 className="text-2xl sm:text-3xl font-black text-yellow-300 mb-2">سجل الإنذارات</h2>
                    <div className="flex gap-2 mt-2">
-                     <Button size="sm" onClick={() => setShowArchivedCards(false)} className={`font-bold ${!showArchivedCards ? 'bg-cyan-500 text-white shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}>الإنذارات الحالية الفعالة</Button>
+                     <Button size="sm" onClick={() => setShowArchivedCards(false)} className={`font-bold ${!showArchivedCards ? 'bg-cyan-500 text-black shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}>الإنذارات الحالية الفعالة</Button>
                      <Button size="sm" onClick={() => setShowArchivedCards(true)} className={`font-bold ${showArchivedCards ? 'bg-gray-400 text-black shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}><Archive className="ml-1 h-4 w-4"/> أرشيف الإنذارات</Button>
                    </div>
                 </div>
@@ -1105,7 +1126,7 @@ export default function Page() {
                    <CardContent className="p-6">
                      <div className="flex justify-between items-start">
                        <div><h3 className="font-bold text-lg sm:text-xl text-white">{item.player}</h3><p className="text-cyan-300 text-sm font-bold">{item.team}</p></div>
-                       {!showArchivedCards && <Badge className={`${item.status === 'متاح' ? 'bg-cyan-500 text-white' : item.status === 'إيقاف' ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'} font-bold text-sm px-3`}>{item.status}</Badge>}
+                       {!showArchivedCards && <Badge className={`${item.status === 'متاح' ? 'bg-cyan-500' : item.status === 'إيقاف' ? 'bg-yellow-500' : 'bg-red-500'} text-black font-bold text-sm px-3`}>{item.status}</Badge>}
                      </div>
                      <div className="mt-4 flex gap-4">
                        <Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold text-lg">🟨 {item.yellow}</Badge>
