@@ -82,11 +82,11 @@ const pushNotification = async (title: string, body: string) => {
 
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
   <div className="flex-1 flex flex-col items-center gap-3">
-    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/5 border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
+    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
       {logoUrl ? (
         <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
       ) : (
-        <span className="opacity-40">🛡️</span>
+        <Shield className="h-8 w-8 text-gray-500 opacity-50" />
       )}
     </div>
     <div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div>
@@ -105,7 +105,7 @@ const renderMatchScore = (match: any) => {
 
   return (
     <div className="flex flex-col items-center" dir="ltr">
-      <span className="text-xl sm:text-3xl font-black">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
+      <span className="text-xl sm:text-3xl font-black text-white">{match.homeGoals || 0} - {match.awayGoals || 0}</span>
       {hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({hPen} - {aPen} ر.ت)</span>}
     </div>
   );
@@ -170,7 +170,17 @@ export default function AdminPage() {
   // Roster Admin States
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
   const [rosterFormAdmin, setRosterFormAdmin] = useState({
-    managerName: "", managerPhone: "", password: "", isSubmitted: false,
+    managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "",
+    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
+  });
+
+  const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
+  const [rosterAccessTeam, setRosterAccessTeam] = useState("");
+  const [rosterAccessPassword, setRosterAccessPassword] = useState("");
+  const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
+  const [selectedRosterToView, setSelectedRosterToView] = useState<any>(null);
+  const [rosterForm, setRosterForm] = useState({
+    managerName: "", managerPhone: "", logoUrl: "",
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
 
@@ -244,6 +254,7 @@ export default function AdminPage() {
         managerName: existing?.managerName || "",
         managerPhone: existing?.managerPhone || "",
         password: existing?.password || "",
+        logoUrl: existing?.logoUrl || "",
         isSubmitted: existing?.isSubmitted || false,
         players: loadedPlayers.slice(0,12)
     });
@@ -267,6 +278,7 @@ export default function AdminPage() {
             managerName: rosterFormAdmin.managerName,
             managerPhone: rosterFormAdmin.managerPhone,
             password: rosterFormAdmin.password,
+            logoUrl: rosterFormAdmin.logoUrl,
             isSubmitted: rosterFormAdmin.isSubmitted,
             players: rosterFormAdmin.players,
             updatedAt: new Date().toISOString()
@@ -295,6 +307,78 @@ export default function AdminPage() {
   const lockRoster = async (teamName: string) => {
     await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
     alert("تم قفل القائمة واعتمادها. 🔒");
+  };
+
+  // --- Strict Security Roster Logic ---
+  const handleRosterLogin = () => {
+    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق أولاً.");
+    if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري.");
+
+    const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
+    
+    if (!existingTeam || !existingTeam.password) {
+        return alert("❌ لم تقم إدارة البطولة بتعيين رقم سري لهذا الفريق بعد. يرجى التواصل مع اللجنة المنظمة.");
+    }
+
+    if (existingTeam.password !== rosterAccessPassword) {
+        return alert("❌ الرقم السري غير صحيح! يرجى التأكد من الرقم الممنوح لك من الإدارة.");
+    }
+
+    if (existingTeam.isSubmitted) {
+        return alert("⚠️ تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
+    }
+    
+    setUnlockedRoster(rosterAccessTeam);
+    if (existingTeam && existingTeam.players) {
+        const loadedPlayers = [...existingTeam.players];
+        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
+        setRosterForm({ 
+           managerName: existingTeam.managerName || "", 
+           managerPhone: existingTeam.managerPhone || "", 
+           logoUrl: existingTeam.logoUrl || "", 
+           players: loadedPlayers.slice(0,12) 
+        });
+    } else {
+        setRosterForm({ managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
+    }
+  };
+
+  const updateRosterPlayer = (index: number, field: string, value: string) => {
+    setRosterForm(prev => {
+        const newPlayers = [...prev.players];
+        newPlayers[index] = { ...newPlayers[index], [field]: value };
+        return { ...prev, players: newPlayers };
+    });
+  };
+
+  const submitFinalRoster = async () => {
+    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
+    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
+    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
+
+    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
+        try {
+            const suffix = activeTournament === "juniors" ? "_juniors" : "";
+            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
+                teamName: unlockedRoster,
+                managerName: rosterForm.managerName,
+                managerPhone: rosterForm.managerPhone,
+                logoUrl: rosterForm.logoUrl,
+                players: rosterForm.players,
+                password: rosterAccessPassword,
+                isSubmitted: true,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
+            setUnlockedRoster(null);
+            setRosterAccessTeam("");
+            setRosterAccessPassword("");
+            setRosterViewMode('list');
+        } catch(e) {
+            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
+        }
+    }
   };
 
   // Match & Stats Functions
@@ -560,7 +644,7 @@ export default function AdminPage() {
              <h1 className="text-3xl sm:text-4xl font-black text-yellow-300">لوحة الإدارة الاحترافية</h1>
              <p className="text-cyan-300">بطولة كأس مطروح ٢٠٢٦</p>
           </div>
-          <Button onClick={() => setIsAuth(false)} variant="outline" className="border-yellow-400 text-white hover:bg-yellow-400 hover:text-black">خروج <LogOut className="ml-2 h-4 w-4" /></Button>
+          <Button onClick={() => setIsAuth(false)} variant="outline" className="border-yellow-400 text-white hover:bg-yellow-400 hover:text-black font-bold">خروج <LogOut className="ml-2 h-4 w-4" /></Button>
         </header>
 
         <div className="flex justify-center mb-8">
@@ -589,7 +673,7 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
                <div className="space-y-2">
                  <Input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
-                 <Input value={matchForm.teamALogo} onChange={e => setMatchForm(p => ({...p, teamALogo: e.target.value}))} placeholder="رابط شعار الفريق الأول (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" />
+                 <Input value={matchForm.teamALogo} onChange={e => setMatchForm(p => ({...p, teamALogo: e.target.value}))} placeholder="رابط شعار الفريق الأول (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
                </div>
                <div className="flex flex-col items-center justify-center mt-2 md:mt-0">
                  <div className="text-3xl text-yellow-400 font-black mb-2">VS</div>
@@ -600,10 +684,10 @@ export default function AdminPage() {
                </div>
                <div className="space-y-2">
                  <Input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
-                 <Input value={matchForm.teamBLogo} onChange={e => setMatchForm(p => ({...p, teamBLogo: e.target.value}))} placeholder="رابط شعار الفريق الثاني (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" />
+                 <Input value={matchForm.teamBLogo} onChange={e => setMatchForm(p => ({...p, teamBLogo: e.target.value}))} placeholder="رابط شعار الفريق الثاني (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
                </div>
             </div>
-            <div className="grid grid-cols-2 gap-6 mt-4"><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamA || 'الأول'}</label><Input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm(p => ({...p, homeGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black" /></div><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamB || 'الثاني'}</label><Input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm(p => ({...p, awayGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black" /></div></div>
+            <div className="grid grid-cols-2 gap-6 mt-4"><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamA || 'الأول'}</label><Input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm(p => ({...p, homeGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamB || 'الثاني'}</label><Input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm(p => ({...p, awayGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div></div>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <select value={matchForm.round} onChange={e => setMatchForm(p => ({...p, round: e.target.value, matchLabel: ""}))} className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold outline-none cursor-pointer`}>{["الجولة الأولى","الجولة الثانية","الجولة الثالثة","الجولة الرابعة","الجولة الخامسة","الملحق","دور الستة عشر","دور الثمانية","نصف النهائي","النهائي"].map(r => <option key={r} value={r}>{r}</option>)}</select>
               <Input type="time" value={matchForm.time} onChange={e => setMatchForm(p => ({...p, time: e.target.value}))} className={`text-white bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 font-bold`} />
@@ -624,15 +708,15 @@ export default function AdminPage() {
             <TabsTrigger value="live" className="data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-red-400">مباشر</TabsTrigger>
             <TabsTrigger value="knockout" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">إقصائيات 🏆</TabsTrigger>
             <TabsTrigger value="motm" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">نجوم 🌟</TabsTrigger>
-            <TabsTrigger value="all" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">السابقة</TabsTrigger>
-            <TabsTrigger value="today" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">اليوم</TabsTrigger>
-            <TabsTrigger value="tomorrow" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">غداً</TabsTrigger>
+            <TabsTrigger value="all" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">السابقة</TabsTrigger>
+            <TabsTrigger value="today" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">اليوم</TabsTrigger>
+            <TabsTrigger value="tomorrow" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">غداً</TabsTrigger>
             <TabsTrigger value="predictions" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">توقعات 🎁</TabsTrigger>
-            <TabsTrigger value="goals" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
-            <TabsTrigger value="cards" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
+            <TabsTrigger value="goals" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
+            <TabsTrigger value="cards" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
             <TabsTrigger value="media" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">ميديا</TabsTrigger>
-            <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 bg-black/40 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
-            <TabsTrigger value="ticker" className="data-[state=active]:bg-black data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
+            <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
+            <TabsTrigger value="ticker" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rosters">
@@ -648,7 +732,7 @@ export default function AdminPage() {
                            <Button variant="outline" onClick={() => setEditingRosterId(null)} className="border-red-500 text-white hover:bg-red-500 font-bold">إلغاء</Button>
                         </div>
                         
-                        <div className="grid md:grid-cols-3 gap-6 mb-8 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
+                        <div className="grid md:grid-cols-4 gap-6 mb-8 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
                            <div>
                               <label className="block text-cyan-300 text-sm font-bold mb-2">اسم المسئول</label>
                               <Input placeholder="الاسم" value={rosterFormAdmin.managerName} onChange={e => setRosterFormAdmin(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold" />
@@ -658,8 +742,12 @@ export default function AdminPage() {
                               <Input dir="ltr" placeholder="01xxxxxxxxx" value={rosterFormAdmin.managerPhone} onChange={e => setRosterFormAdmin(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold text-right" />
                            </div>
                            <div>
-                              <label className="block text-yellow-400 text-sm font-bold mb-2">الباسورد السري (لإعطائه للمدير)</label>
+                              <label className="block text-yellow-400 text-sm font-bold mb-2">الباسورد السري</label>
                               <Input placeholder="كلمة المرور" value={rosterFormAdmin.password} onChange={e => setRosterFormAdmin(p => ({...p, password: e.target.value}))} className="bg-[#1e2a4a] border-yellow-500/40 text-white font-bold text-center tracking-wider" />
+                           </div>
+                           <div>
+                              <label className="block text-emerald-400 text-sm font-bold mb-2">رابط اللوجو</label>
+                              <Input dir="ltr" placeholder="Logo URL" value={rosterFormAdmin.logoUrl} onChange={e => setRosterFormAdmin(p => ({...p, logoUrl: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/40 text-white font-bold" />
                            </div>
                         </div>
 
@@ -707,12 +795,12 @@ export default function AdminPage() {
                                     <div className="flex gap-2 pt-3 border-t border-white/5">
                                        <Button size="sm" onClick={() => startEditRoster(teamName)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 font-bold"><Edit className="h-4 w-4 mr-1"/> إعداد</Button>
                                        {isSubmitted ? (
-                                          <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-black hover:bg-yellow-600" title="فتح القفل ليتمكن المدير من التعديل"><Unlock className="h-4 w-4"/></Button>
+                                          <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-white hover:bg-yellow-600 font-bold" title="فتح القفل ليتمكن المدير من التعديل"><Unlock className="h-4 w-4"/></Button>
                                        ) : hasData ? (
-                                          <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500 text-white hover:bg-emerald-600" title="قفل واعتماد القائمة يدوياً"><Lock className="h-4 w-4"/></Button>
+                                          <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500 text-white hover:bg-emerald-600 font-bold" title="قفل واعتماد القائمة يدوياً"><Lock className="h-4 w-4"/></Button>
                                        ) : null}
                                        {hasData && (
-                                          <Button size="sm" variant="destructive" onClick={() => deleteRoster(teamName)}><Trash2 className="h-4 w-4"/></Button>
+                                          <Button size="sm" variant="destructive" onClick={() => deleteRoster(teamName)} className="font-bold"><Trash2 className="h-4 w-4"/></Button>
                                        )}
                                     </div>
                                  </CardContent>
@@ -759,7 +847,7 @@ export default function AdminPage() {
                     <span className={`font-black text-lg ${match.status === 'ستبدأ بعد قليل' ? '' : 'animate-pulse'}`}>{match.status === 'ستبدأ بعد قليل' ? '🟩' : '🔴'} البث المباشر</span>
                     <select value={match.status || "الشوط الأول"} onChange={(e) => updateMatchLive(match.id, { status: e.target.value })} className="bg-black/40 border-none text-white font-bold rounded-lg px-3 py-1 text-sm outline-none cursor-pointer"><option value="ستبدأ بعد قليل">ستبدأ بعد قليل</option><option value="الشوط الأول">الشوط الأول</option><option value="استراحة">استراحة</option><option value="الشوط الثاني">الشوط الثاني</option><option value="وقت إضافي">وقت إضافي</option><option value="ضربات جزاء">ضربات جزاء</option><option value="انتهت">انتهت</option></select>
                   </div>
-                  <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20" onClick={() => updateMatchLive(match.id, { isLive: false, streamClosed: true, isTimerRunning: false })}>إغلاق البث</Button>
+                  <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20 font-bold" onClick={() => updateMatchLive(match.id, { isLive: false, streamClosed: true, isTimerRunning: false })}>إغلاق البث</Button>
                 </div>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-center gap-2 sm:gap-6 mb-8">
@@ -778,37 +866,37 @@ export default function AdminPage() {
                     <Button size="sm" onClick={() => sendQuickNotification("نهاية المباراة 🏁", `انتهت المباراة بنتيجة ${match.homeGoals} - ${match.awayGoals}`)} className="bg-gray-600 text-white font-bold">إنهاء</Button>
                   </div>
                   <div className="flex justify-center items-center gap-6 mb-8 bg-[#13213a] p-4 rounded-2xl border border-white/5 flex-wrap">
-                    <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 ${match.isTimerRunning ? 'bg-amber-500' : 'bg-emerald-500'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف</> : <><Play className="mr-2 h-5 w-5" /> تشغيل</>}</Button>
+                    <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 text-white ${match.isTimerRunning ? 'bg-amber-500' : 'bg-emerald-500'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف</> : <><Play className="mr-2 h-5 w-5" /> تشغيل</>}</Button>
                     <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={match.liveMinute || 0} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-8 items-center mb-8">
                     <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5">
                       <h3 className="text-2xl font-bold text-white mb-6">{match.teamA}</h3>
                       <div className="flex items-center justify-center gap-4 mb-6">
-                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400" onClick={() => updateMatchLive(match.id, { homeGoals: (match.homeGoals || 0) + 1 })}><Plus /></Button>
+                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { homeGoals: (match.homeGoals || 0) + 1 })}><Plus /></Button>
                         <span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span>
-                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button>
+                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button>
                       </div>
                       <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20">
                         <span className="text-red-500 font-bold">طرد:</span>
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500 font-bold" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
                         <span className="font-bold text-xl text-red-500 px-2">{match.redCardsHome || 0}</span>
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500 font-bold" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
                       </div>
                     </div>
                     <div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div>
                     <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5">
                       <h3 className="text-2xl font-bold text-white mb-6">{match.teamB}</h3>
                       <div className="flex items-center justify-center gap-4 mb-6">
-                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400" onClick={() => updateMatchLive(match.id, { awayGoals: (match.awayGoals || 0) + 1 })}><Plus /></Button>
+                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { awayGoals: (match.awayGoals || 0) + 1 })}><Plus /></Button>
                         <span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span>
-                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button>
+                        <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button>
                       </div>
                       <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20">
                         <span className="text-red-500 font-bold">طرد:</span>
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500 font-bold" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button>
                         <span className="font-bold text-xl text-red-500 px-2">{match.redCardsAway || 0}</span>
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500 font-bold" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button>
                       </div>
                     </div>
                   </div>
@@ -825,14 +913,14 @@ export default function AdminPage() {
                         </select>
                       </div>
                       <Input placeholder="تفاصيل الحدث..." value={liveEventForms[match.id]?.text || ''} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: match.liveMinute||0, type: 'info'}), text: e.target.value}}))} className="flex-1 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold" />
-                      <Button onClick={() => addLiveEvent(match.id, match.liveMinute || 0)} className="bg-cyan-500 text-black font-black w-full lg:w-auto px-8">نشر</Button>
+                      <Button onClick={() => addLiveEvent(match.id, match.liveMinute || 0)} className="bg-cyan-500 text-white font-black w-full lg:w-auto px-8">نشر</Button>
                     </div>
                     {match.liveEvents && match.liveEvents.length > 0 && (
                       <div className="mt-6 space-y-2">
                         {match.liveEvents.map((ev: any, idx: number) => (
                           <div key={idx} className="flex justify-between items-center bg-[#1e2a4a] p-3 rounded-xl border border-white/5 text-sm">
-                            <div className="flex items-center gap-3"><Badge className="bg-emerald-500 text-white font-black">الدقيقة {ev.minute}</Badge><span className="text-white">{ev.text}</span></div>
-                            <Button size="sm" variant="ghost" onClick={() => deleteLiveEvent(match.id, idx)} className="text-red-400 hover:text-red-300"><Trash2 className="h-4 w-4" /></Button>
+                            <div className="flex items-center gap-3"><Badge className="bg-emerald-500 text-white font-black">الدقيقة {ev.minute}</Badge><span className="text-white font-bold">{ev.text}</span></div>
+                            <Button size="sm" variant="ghost" onClick={() => deleteLiveEvent(match.id, idx)} className="text-red-400 hover:text-red-300 font-bold"><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         ))}
                       </div>
@@ -842,7 +930,7 @@ export default function AdminPage() {
                     <div className="bg-[#13213a] border border-yellow-400/30 p-6 rounded-3xl mt-6">
                       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <h4 className="text-xl font-bold text-yellow-400">ضربات الترجيح</h4>
-                        <Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400"><Plus className="ml-2 h-4 w-4" /> ركلة إضافية</Button>
+                        <Button size="sm" variant="outline" onClick={() => addPenaltySlot(match.id)} className="border-cyan-400 text-cyan-400 font-bold"><Plus className="ml-2 h-4 w-4" /> ركلة إضافية</Button>
                       </div>
                       <div className="flex flex-col md:flex-row justify-between items-center bg-[#0a1428] p-4 rounded-xl gap-6">
                         <div className="flex gap-2 flex-wrap justify-center">{(match.penaltiesHome || ['none','none','none','none','none']).map((p:string, i:number) => (<button key={i} onClick={() => togglePenalty(match.id, 'home', i, p)} className={`w-8 h-8 rounded-full border-2 ${p === 'scored' ? 'bg-emerald-500' : p === 'missed' ? 'bg-red-500' : 'bg-gray-600'}`}></button>))}</div>
@@ -861,7 +949,7 @@ export default function AdminPage() {
                   const roundMatches = sortMatches(matches.filter(m => m.round === roundName));
                   if (roundMatches.length === 0) return null;
                   return (
-                    <div key={roundName} className="mb-8"><div className="flex justify-center mb-4"><Badge className="bg-white/10 text-yellow-300 text-lg px-6 py-1 border border-yellow-400/30">{roundName}</Badge></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div key={roundName} className="mb-8"><div className="flex justify-center mb-4"><Badge className="bg-white/10 text-yellow-300 text-lg px-6 py-1 border border-yellow-400/30 font-bold">{roundName}</Badge></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {roundMatches.map(match => (
                           <div key={match.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col justify-between gap-4 border border-yellow-400/30 shadow-md">
                             <div>
@@ -878,9 +966,9 @@ export default function AdminPage() {
                                <div className="text-cyan-300 text-center mt-4 text-sm font-bold border-t border-white/5 pt-2">{getArabicDay(match.date)} • {match.date}</div>
                             </div>
                             <div className="flex gap-2 justify-center flex-wrap mt-2">
-                               <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1">بث</Button>
-                               <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1">تعديل</Button>
-                               <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1">حذف</Button>
+                               <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1 font-bold">بث</Button>
+                               <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1 font-bold">تعديل</Button>
+                               <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1 font-bold">حذف</Button>
                             </div>
                           </div>
                         ))}
@@ -894,13 +982,13 @@ export default function AdminPage() {
               <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-2"><Star /> كروت النجوم 🌟</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl items-center border border-yellow-400/20">
-                  <Input value={motmForm.player} onChange={e => setMotmForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" />
-                  <select value={motmForm.team} onChange={e => setMotmForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-xl p-3 text-white">
+                  <Input value={motmForm.player} onChange={e => setMotmForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                  <select value={motmForm.team} onChange={e => setMotmForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-xl p-3 text-white font-bold">
                      {currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
-                  <Input value={motmForm.imageUrl} onChange={e => setMotmForm(p => ({...p, imageUrl: e.target.value}))} placeholder="صورة اللاعب" className="bg-[#0a1428] border-yellow-400 text-white" />
+                  <Input value={motmForm.imageUrl} onChange={e => setMotmForm(p => ({...p, imageUrl: e.target.value}))} placeholder="صورة اللاعب" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
                   <div className="flex gap-2">
-                    <select value={motmForm.sponsorName} onChange={e => { const sp = SPONSORS.find(s => s.name === e.target.value); setMotmForm(p => ({...p, sponsorName: sp?.name || "", sponsorLogo: sp?.src || ""})); }} className="bg-[#0a1428] border border-yellow-400 rounded-xl px-2 text-white flex-1 text-sm">
+                    <select value={motmForm.sponsorName} onChange={e => { const sp = SPONSORS.find(s => s.name === e.target.value); setMotmForm(p => ({...p, sponsorName: sp?.name || "", sponsorLogo: sp?.src || ""})); }} className="bg-[#0a1428] border border-yellow-400 rounded-xl px-2 text-white flex-1 text-sm font-bold">
                       {SPONSORS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                     </select>
                     <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border-2 border-yellow-400 shrink-0 p-1">
@@ -909,7 +997,7 @@ export default function AdminPage() {
                   </div>
                   <div className="grid grid-cols-7 gap-2 mt-2 w-full md:col-span-4">
                      {['rating', 'pac', 'sho', 'pas', 'dri', 'def', 'phy'].map(s => (
-                        <div key={s} className="flex flex-col gap-1"><label className="text-[10px] text-cyan-300 text-center font-bold">{s.toUpperCase()}</label><Input type="number" value={(motmForm as any)[s]} onChange={e => setMotmForm(p => ({...p, [s]: Number(e.target.value)}))} className="bg-[#0a1428] border-yellow-400 text-white text-center h-10 p-1" /></div>
+                        <div key={s} className="flex flex-col gap-1"><label className="text-[10px] text-cyan-300 text-center font-bold">{s.toUpperCase()}</label><Input type="number" value={(motmForm as any)[s]} onChange={e => setMotmForm(p => ({...p, [s]: Number(e.target.value)}))} className="bg-[#0a1428] border-yellow-400 text-white font-bold text-center h-10 p-1" /></div>
                      ))}
                   </div>
                   <div className="flex gap-4 mt-4 md:col-span-4 w-full">
@@ -923,7 +1011,7 @@ export default function AdminPage() {
                             {m.imageUrl ? <img src={m.imageUrl} className="h-10 w-10 rounded-full object-cover border-2 border-yellow-400" /> : <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">👤</div>}
                             <div className="font-bold text-white text-lg">{m.player} <span className="text-yellow-400 ml-1 text-sm">({m.rating})</span></div>
                         </div>
-                        <div className="flex gap-2"><Button size="sm" onClick={() => startEditMotm(m)} className="bg-yellow-400 text-black"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteMotm(m.id)}><Trash2 className="h-4 w-4" /></Button></div>
+                        <div className="flex gap-2"><Button size="sm" onClick={() => startEditMotm(m)} className="bg-yellow-400 text-black font-bold"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteMotm(m.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   ))}
                 </div>
@@ -935,11 +1023,11 @@ export default function AdminPage() {
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader className="flex flex-col sm:flex-row justify-between gap-4">
                 <CardTitle className="text-yellow-300">السابقة</CardTitle>
-                <Input placeholder="بحث..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm border-yellow-400 bg-[#1e2a4a]" />
+                <Input placeholder="بحث..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm border-yellow-400 bg-[#1e2a4a] font-bold text-white" />
               </CardHeader>
               <CardContent className="space-y-4">
                 {matches.filter(m => !liveMatchIds.has(m.id) && (String(m.teamA || "").includes(searchTerm) || String(m.teamB || "").includes(searchTerm))).map(m => (
-                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col justify-between gap-4 border border-yellow-400/30">
+                  <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col sm:flex-row justify-between gap-4 border border-yellow-400/30">
                     <div className="flex items-center justify-center gap-2 sm:gap-6 pt-2">
                        <TeamMatchDisplay teamName={m.teamA} logoUrl={m.teamALogo} />
                        <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/10 text-yellow-400 shrink-0">
@@ -947,13 +1035,13 @@ export default function AdminPage() {
                        </div>
                        <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
                     </div>
-                    <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2">{m.date} • {m.status || m.time}</div>
+                    <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.date} • {m.status || m.time}</div>
                     
                     <div className="flex gap-2 justify-center mt-2">
-                      <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white">شير</Button>
-                      <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white">بث</Button>
-                      <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black">تعديل</Button>
-                      <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive">حذف</Button>
+                      <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">شير</Button>
+                      <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
+                      <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black font-bold">تعديل</Button>
+                      <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
                     </div>
                   </div>
                 ))}
@@ -971,7 +1059,11 @@ export default function AdminPage() {
                        <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
                      </div>
                      <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
-                     <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); }} className="bg-emerald-600 w-full font-bold">بدء المباراة الآن</Button>
+                     <div className="flex gap-2 mt-2">
+                        <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-emerald-600 text-white flex-1 font-bold">بدء الآن</Button>
+                        <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black font-bold">تعديل</Button>
+                        <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
+                     </div>
                   </div>
                 ))}
              </div>
@@ -987,6 +1079,10 @@ export default function AdminPage() {
                        <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
                      </div>
                      <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
+                     <div className="flex gap-2 mt-2">
+                        <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black flex-1 font-bold">تعديل</Button>
+                        <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="flex-1 font-bold">حذف</Button>
+                     </div>
                   </div>
                 ))}
              </div>
@@ -1003,7 +1099,7 @@ export default function AdminPage() {
                     <thead className="bg-[#1e2a4a]"><tr><th className="p-4 text-cyan-300">المباراة</th><th className="p-4 text-cyan-300">الاسم</th><th className="p-4 text-cyan-300">الهاتف</th><th className="p-4 text-cyan-300 text-center">التوقع</th><th className="p-4"></th></tr></thead>
                     <tbody>
                       {predictions.map(p => (
-                        <tr key={p.id} className="border-b border-white/5"><td className="p-4 font-bold">{p.matchName}</td><td className="p-4">{p.name}</td><td className="p-4 text-yellow-400">{p.phone}</td><td className="p-4 text-center"><Badge className="bg-emerald-500 text-white">{p.homeScore} - {p.awayScore}</Badge></td><td className="p-4"><Button size="sm" variant="ghost" onClick={() => deletePrediction(p.id)}><Trash2 className="h-4 w-4"/></Button></td></tr>
+                        <tr key={p.id} className="border-b border-white/5"><td className="p-4 font-bold">{p.matchName}</td><td className="p-4">{p.name}</td><td className="p-4 text-yellow-400 font-bold">{p.phone}</td><td className="p-4 text-center"><Badge className="bg-emerald-500 text-white font-bold">{p.homeScore} - {p.awayScore}</Badge></td><td className="p-4"><Button size="sm" variant="ghost" onClick={() => deletePrediction(p.id)} className="font-bold"><Trash2 className="h-4 w-4"/></Button></td></tr>
                       ))}
                     </tbody>
                   </table>
@@ -1019,20 +1115,20 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent className="space-y-6 p-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl">
-                  <Input value={cardForm.player} onChange={e => setCardForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400" />
-                  <select value={cardForm.team} onChange={e => setCardForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                  <select value={cardForm.type} onChange={e => setCardForm(p => ({...p, type: e.target.value as any}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white"><option value="yellow">إنذار أصفر</option><option value="red">طرد</option></select>
-                  <Button onClick={addCard} className={`font-black ${activeTournament === 'juniors' ? 'bg-cyan-500' : 'bg-yellow-400 text-black'}`}>تسجيل</Button>
+                  <Input value={cardForm.player} onChange={e => setCardForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                  <select value={cardForm.team} onChange={e => setCardForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white font-bold">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                  <select value={cardForm.type} onChange={e => setCardForm(p => ({...p, type: e.target.value as any}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white font-bold"><option value="yellow">إنذار أصفر</option><option value="red">طرد</option></select>
+                  <Button onClick={addCard} className={`font-black ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white' : 'bg-yellow-400 text-black'}`}>تسجيل</Button>
                 </div>
-                <Input value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} placeholder="بحث..." className="max-w-xs border-yellow-400 bg-[#1e2a4a]" />
+                <Input value={cardSearchTerm} onChange={(e) => setCardSearchTerm(e.target.value)} placeholder="بحث..." className="max-w-xs border-yellow-400 bg-[#1e2a4a] text-white font-bold" />
                 <div className="space-y-3">{filteredCards.map(item => (
                   <Card key={item.id} className="bg-[#1e2a4a] border border-white/10">
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <div><h3 className="font-bold text-white">{item.player}</h3><p className="text-cyan-300 text-sm">{item.team}</p></div>
+                      <div><h3 className="font-bold text-white">{item.player}</h3><p className="text-cyan-300 text-sm font-bold">{item.team}</p></div>
                       <div className="flex gap-4">
-                        <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, Math.max(0, item.yellow - 1), item.red)}><Minus /></Button><span className="text-yellow-300">🟨 {item.yellow}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow + 1, item.red)}><Plus /></Button></div>
-                        <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, item.yellow, Math.max(0, item.red - 1))}><Minus /></Button><span className="text-red-500">🟥 {item.red}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow, item.red + 1)}><Plus /></Button></div>
-                        <Button size="sm" variant="destructive" onClick={() => deleteCard(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                        <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, Math.max(0, item.yellow - 1), item.red)} className="font-bold"><Minus /></Button><span className="text-yellow-300 font-bold">🟨 {item.yellow}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow + 1, item.red)} className="font-bold"><Plus /></Button></div>
+                        <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, item.yellow, Math.max(0, item.red - 1))} className="font-bold"><Minus /></Button><span className="text-red-500 font-bold">🟥 {item.red}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow, item.red + 1)} className="font-bold"><Plus /></Button></div>
+                        <Button size="sm" variant="destructive" onClick={() => deleteCard(item.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -1043,16 +1139,16 @@ export default function AdminPage() {
 
           <TabsContent value="goals">
             <Card className="border-yellow-400 bg-[#13213a]">
-              <CardHeader><CardTitle className="text-yellow-300">الهدافين وكروت الفيفا</CardTitle><Input placeholder="بحث..." value={goalSearchTerm} onChange={(e) => setGoalSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a]" /></CardHeader>
+              <CardHeader><CardTitle className="text-yellow-300">الهدافين وكروت الفيفا</CardTitle><Input placeholder="بحث..." value={goalSearchTerm} onChange={(e) => setGoalSearchTerm(e.target.value)} className="mt-4 max-w-md border-yellow-400 bg-[#1e2a4a] text-white font-bold" /></CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-[#1e2a4a] rounded-2xl">
-                  <Input value={goalForm.player} onChange={e => setGoalForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400" />
-                  <select value={goalForm.team} onChange={e => setGoalForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                  <Input type="number" value={goalForm.goalsCount} onChange={e => setGoalForm(p => ({...p, goalsCount: Number(e.target.value)}))} placeholder="الأهداف" className="bg-[#0a1428] border-yellow-400" />
-                  <Input value={goalForm.imageUrl} onChange={e => setGoalForm(p => ({...p, imageUrl: e.target.value}))} placeholder="رابط الصورة" className="bg-[#0a1428] border-yellow-400" />
+                  <Input value={goalForm.player} onChange={e => setGoalForm(p => ({...p, player: e.target.value}))} placeholder="اسم اللاعب" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                  <select value={goalForm.team} onChange={e => setGoalForm(p => ({...p, team: e.target.value}))} className="bg-[#0a1428] border border-yellow-400 rounded-2xl p-3 text-white font-bold">{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                  <Input type="number" value={goalForm.goalsCount} onChange={e => setGoalForm(p => ({...p, goalsCount: Number(e.target.value)}))} placeholder="الأهداف" className="bg-[#0a1428] border-yellow-400 text-white font-bold text-center" />
+                  <Input value={goalForm.imageUrl} onChange={e => setGoalForm(p => ({...p, imageUrl: e.target.value}))} placeholder="رابط الصورة" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
                   <div className="flex gap-4 mt-4 md:col-span-4 w-full"><Button onClick={addOrUpdateGoal} className="flex-1 bg-yellow-400 text-black font-black h-12">حفظ</Button></div>
                 </div>
-                <div className="space-y-3">{filteredGoals.map(goal => (<Card key={goal.id} className="bg-[#1e2a4a] border-white/10"><CardContent className="p-4 flex justify-between items-center"><div className="flex items-center gap-4">{goal.imageUrl ? <img src={goal.imageUrl} className="h-10 w-10 rounded-full object-cover" /> : <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">👤</div>}<div><div className="font-bold text-white">{goal.player}</div><div className="text-cyan-300 text-sm">{goal.team} — {goal.goals} هدف</div></div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEditGoal(goal)} className="bg-yellow-400 text-black"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(goal.id)}><Trash2 className="h-4 w-4" /></Button></div></CardContent></Card>))}</div>
+                <div className="space-y-3">{filteredGoals.map(goal => (<Card key={goal.id} className="bg-[#1e2a4a] border-white/10"><CardContent className="p-4 flex justify-between items-center"><div className="flex items-center gap-4">{goal.imageUrl ? <img src={goal.imageUrl} className="h-10 w-10 rounded-full object-cover" /> : <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">👤</div>}<div><div className="font-bold text-white">{goal.player}</div><div className="text-cyan-300 text-sm font-bold">{goal.team} — {goal.goals} هدف</div></div></div><div className="flex gap-2"><Button size="sm" onClick={() => startEditGoal(goal)} className="bg-yellow-400 text-black font-bold"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(goal.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div></CardContent></Card>))}</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1061,8 +1157,8 @@ export default function AdminPage() {
             <Card className="border-emerald-500 bg-[#13213a]">
               <CardHeader><CardTitle className="text-emerald-400 flex items-center gap-2"><Video /> ميديا</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-[#1e2a4a] rounded-2xl"><Input value={mediaForm.title} onChange={e => setMediaForm(p => ({...p, title: e.target.value}))} placeholder="العنوان" className="bg-[#0a1428] border-emerald-500" /><Input value={mediaForm.url} onChange={e => setMediaForm(p => ({...p, url: e.target.value}))} placeholder="الرابط" className="bg-[#0a1428] border-emerald-500" /><Button onClick={addMedia} className="bg-emerald-500 text-white font-bold h-full">إضافة</Button></div>
-                <div className="space-y-3">{mediaItems.map(item => (<div key={item.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-emerald-500/30"><div className="font-bold text-white">{item.title}</div><Button size="sm" variant="destructive" onClick={() => deleteMedia(item.id)}><Trash2 className="h-4 w-4" /></Button></div>))}</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-[#1e2a4a] rounded-2xl"><Input value={mediaForm.title} onChange={e => setMediaForm(p => ({...p, title: e.target.value}))} placeholder="العنوان" className="bg-[#0a1428] border-emerald-500 text-white font-bold" /><Input value={mediaForm.url} onChange={e => setMediaForm(p => ({...p, url: e.target.value}))} placeholder="الرابط" className="bg-[#0a1428] border-emerald-500 text-white font-bold" /><Button onClick={addMedia} className="bg-emerald-500 text-white font-bold h-full">إضافة</Button></div>
+                <div className="space-y-3">{mediaItems.map(item => (<div key={item.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-emerald-500/30"><div className="font-bold text-white">{item.title}</div><Button size="sm" variant="destructive" onClick={() => deleteMedia(item.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>))}</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1072,7 +1168,7 @@ export default function AdminPage() {
               <CardHeader className="text-center pb-2"><BellRing className="mx-auto h-12 w-12 text-yellow-400 mb-4 animate-bounce" /><CardTitle className="text-3xl font-black text-yellow-300">إرسال إشعار عاجل 🚀</CardTitle></CardHeader>
               <CardContent className="p-6 md:p-10 space-y-6 max-w-3xl mx-auto">
                 <Input value={notifyTitle} onChange={e => setNotifyTitle(e.target.value)} placeholder="عنوان الإشعار" className="text-xl bg-[#0a1428] border-yellow-400 text-white p-6 font-bold" />
-                <Input value={notifyBody} onChange={e => setNotifyBody(e.target.value)} placeholder="التفاصيل" className="text-lg bg-[#0a1428] border-yellow-400 text-white p-6" />
+                <Input value={notifyBody} onChange={e => setNotifyBody(e.target.value)} placeholder="التفاصيل" className="text-lg bg-[#0a1428] border-yellow-400 text-white p-6 font-bold" />
                 <Button onClick={sendNotification} disabled={isSending} className="w-full bg-yellow-400 text-black py-8 font-black text-2xl shadow-lg mt-8">{isSending ? "جاري الإرسال..." : "إرسال الآن 🚀"}</Button>
               </CardContent>
             </Card>
@@ -1081,7 +1177,7 @@ export default function AdminPage() {
           <TabsContent value="ticker">
             <Card className="border-yellow-400 bg-[#13213a]">
                <CardHeader><CardTitle className="text-yellow-300">شريط الأخبار</CardTitle></CardHeader>
-               <CardContent className="p-6 space-y-6"><Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white" /><Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ</Button></CardContent>
+               <CardContent className="p-6 space-y-6"><Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white font-bold" /><Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ</Button></CardContent>
             </Card>
           </TabsContent>
         </Tabs>

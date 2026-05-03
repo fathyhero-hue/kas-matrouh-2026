@@ -198,7 +198,7 @@ export default function Page() {
   const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
   const [selectedRosterToView, setSelectedRosterToView] = useState<any>(null);
   const [rosterForm, setRosterForm] = useState({
-    managerName: "", managerPhone: "",
+    managerName: "", managerPhone: "", logoUrl: "",
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
 
@@ -274,36 +274,31 @@ export default function Page() {
     } catch(e) { alert("حدث خطأ، حاول مرة أخرى."); }
   };
 
-  // --- Strict Security Roster Logic ---
   const handleRosterLogin = () => {
     if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق أولاً.");
     if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري.");
 
     const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
     
-    // Security check 1: Admin must have created the roster and set a password
     if (!existingTeam || !existingTeam.password) {
         return alert("❌ لم تقم إدارة البطولة بتعيين رقم سري لهذا الفريق بعد. يرجى التواصل مع اللجنة المنظمة.");
     }
 
-    // Security check 2: Strict password matching
     if (existingTeam.password !== rosterAccessPassword) {
         return alert("❌ الرقم السري غير صحيح! يرجى التأكد من الرقم الممنوح لك من الإدارة.");
     }
 
-    // Security check 3: Prevent editing if already submitted
     if (existingTeam.isSubmitted) {
         return alert("⚠️ تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
     }
     
-    // Passed all checks, allow entry
     setUnlockedRoster(rosterAccessTeam);
     if (existingTeam && existingTeam.players) {
         const loadedPlayers = [...existingTeam.players];
         while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
-        setRosterForm({ managerName: existingTeam.managerName || "", managerPhone: existingTeam.managerPhone || "", players: loadedPlayers.slice(0,12) });
+        setRosterForm({ managerName: existingTeam.managerName || "", managerPhone: existingTeam.managerPhone || "", logoUrl: existingTeam.logoUrl || "", players: loadedPlayers.slice(0,12) });
     } else {
-        setRosterForm({ managerName: "", managerPhone: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
+        setRosterForm({ managerName: "", managerPhone: "", logoUrl: existingTeam?.logoUrl || "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
     }
   };
 
@@ -327,6 +322,7 @@ export default function Page() {
                 teamName: unlockedRoster,
                 managerName: rosterForm.managerName,
                 managerPhone: rosterForm.managerPhone,
+                logoUrl: rosterForm.logoUrl,
                 players: rosterForm.players,
                 password: rosterAccessPassword,
                 isSubmitted: true,
@@ -343,7 +339,6 @@ export default function Page() {
         }
     }
   };
-  // --------------------
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
@@ -665,12 +660,16 @@ export default function Page() {
                             className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:border-blue-400 hover:scale-105 shadow-lg' : 'bg-[#13213a] border-white/5 opacity-60 cursor-not-allowed'}`}
                          >
                             <CardContent className="p-6 flex flex-col items-center text-center justify-center h-full gap-3">
-                               <Shield className={`h-8 w-8 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
-                               <span className="font-black text-white text-lg">{teamName}</span>
-                               {isSubmitted ? (
-                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-2 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
+                               {rosterData?.logoUrl ? (
+                                  <img src={rosterData.logoUrl} className="h-14 w-14 object-contain drop-shadow-md mb-1" alt={teamName} />
                                ) : (
-                                  <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-2 font-bold px-3">لم تسجل بعد</Badge>
+                                  <Shield className={`h-10 w-10 mb-1 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
+                               )}
+                               <span className="font-black text-white text-lg leading-tight">{teamName}</span>
+                               {isSubmitted ? (
+                                  <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-1 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
+                               ) : (
+                                  <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-1 font-bold px-3">لم تسجل بعد</Badge>
                                )}
                             </CardContent>
                          </Card>
@@ -686,7 +685,13 @@ export default function Page() {
                  <Card className="bg-gradient-to-b from-[#1e2a4a] to-[#13213a] border border-blue-500/50 rounded-3xl shadow-2xl overflow-hidden">
                     <CardHeader className="bg-blue-900/40 border-b border-blue-500/30 text-center py-8 relative">
                        <div className="absolute top-4 right-4"><Badge className="bg-emerald-500 text-white font-black"><CheckCircle2 className="h-4 w-4 mr-1 inline-block"/> معتمدة</Badge></div>
-                       <Shield className="h-16 w-16 mx-auto text-blue-400 mb-4" />
+                       {selectedRosterToView.logoUrl ? (
+                          <div className="h-24 w-24 mx-auto mb-4 bg-white/5 rounded-full border-4 border-blue-400/50 flex items-center justify-center overflow-hidden shadow-lg p-1">
+                             <img src={selectedRosterToView.logoUrl} className="max-h-full max-w-full object-contain" alt={selectedRosterToView.teamName} />
+                          </div>
+                       ) : (
+                          <Shield className="h-16 w-16 mx-auto text-blue-400 mb-4" />
+                       )}
                        <CardTitle className="text-4xl font-black text-white tracking-wide">{selectedRosterToView.teamName}</CardTitle>
                        <div className="mt-4 flex flex-col sm:flex-row justify-center gap-4 text-cyan-300 font-bold">
                           <span className="flex items-center justify-center gap-2"><Users className="h-5 w-5"/> المسئول: {selectedRosterToView.managerName}</span>
@@ -747,14 +752,20 @@ export default function Page() {
                         <CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-3"><ClipboardList className="text-blue-400"/> استمارة قائمة: {unlockedRoster}</CardTitle>
                      </CardHeader>
                      <CardContent className="p-6 md:p-8 space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
-                           <div>
-                              <label className="block text-cyan-300 font-bold mb-2">اسم المدير الفني / مسئول الفريق</label>
-                              <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
+                        <div className="bg-[#0a1428] p-6 rounded-2xl border border-white/5 space-y-6">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div>
+                                 <label className="block text-cyan-300 font-bold mb-2">اسم المدير الفني / مسئول الفريق</label>
+                                 <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
+                              </div>
+                              <div>
+                                 <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
+                                 <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
+                              </div>
                            </div>
                            <div>
-                              <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
-                              <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
+                              <label className="block text-cyan-300 font-bold mb-2">رابط شعار الفريق (اختياري)</label>
+                              <Input placeholder="أدخل رابط صورة الشعار هنا..." value={rosterForm.logoUrl || ""} onChange={e => setRosterForm(p => ({...p, logoUrl: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-left" dir="ltr" />
                            </div>
                         </div>
 
@@ -1075,7 +1086,7 @@ export default function Page() {
                 <div>
                    <h2 className="text-2xl sm:text-3xl font-black text-yellow-300 mb-2">سجل الإنذارات</h2>
                    <div className="flex gap-2 mt-2">
-                     <Button size="sm" onClick={() => setShowArchivedCards(false)} className={`font-bold ${!showArchivedCards ? 'bg-cyan-500 text-black shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}>الإنذارات الحالية الفعالة</Button>
+                     <Button size="sm" onClick={() => setShowArchivedCards(false)} className={`font-bold ${!showArchivedCards ? 'bg-cyan-500 text-white shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}>الإنذارات الحالية الفعالة</Button>
                      <Button size="sm" onClick={() => setShowArchivedCards(true)} className={`font-bold ${showArchivedCards ? 'bg-gray-400 text-black shadow-md' : 'bg-[#1e2a4a] text-gray-400 hover:text-white'}`}><Archive className="ml-1 h-4 w-4"/> أرشيف الإنذارات</Button>
                    </div>
                 </div>
@@ -1094,7 +1105,7 @@ export default function Page() {
                    <CardContent className="p-6">
                      <div className="flex justify-between items-start">
                        <div><h3 className="font-bold text-lg sm:text-xl text-white">{item.player}</h3><p className="text-cyan-300 text-sm font-bold">{item.team}</p></div>
-                       {!showArchivedCards && <Badge className={`${item.status === 'متاح' ? 'bg-cyan-500' : item.status === 'إيقاف' ? 'bg-yellow-500' : 'bg-red-500'} text-black font-bold text-sm px-3`}>{item.status}</Badge>}
+                       {!showArchivedCards && <Badge className={`${item.status === 'متاح' ? 'bg-cyan-500 text-white' : item.status === 'إيقاف' ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'} font-bold text-sm px-3`}>{item.status}</Badge>}
                      </div>
                      <div className="mt-4 flex gap-4">
                        <Badge className="bg-yellow-400/20 text-yellow-300 px-4 py-2 font-bold text-lg">🟨 {item.yellow}</Badge>
