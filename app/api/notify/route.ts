@@ -15,7 +15,8 @@ export async function POST(req: Request) {
       cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${REST_API_KEY}`,
+        // التعديل الجذري هنا: غيرنا Basic لـ Key عشان يقبل المفتاح الجديد
+        'Authorization': `Key ${REST_API_KEY}`,
       },
       body: JSON.stringify({
         app_id: APP_ID,
