@@ -1,26 +1,30 @@
 import { NextResponse } from 'next/server';
 
-// السطر ده بيجبر السيرفر إنه مايحتفظش بكاش ويقرا الكود الجديد دايماً
-export const dynamic = 'force-dynamic'; 
+// الأوامر دي بتدمر أي كاش على سيرفر Vercel وتخليه فريش دايماً
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req: Request) {
   try {
     const { title, body } = await req.json();
 
-    const APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c"; 
-    const REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittzhvop5bjyemdubmfaamssu2362tmqporlevdmcjrk7thzs7txtxbzqkks5bwgoydxu3n7jdfh3cwq"; 
-
-    // السطر ده عشان نراقب بيه السيرفر من جوه Vercel لو حبينا
-    console.log("Using API Key:", REST_API_KEY.substring(0, 15) + "...");
+    const APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c".trim(); 
+    
+    // المفتاح الجديد مع كود سحري (.replace) بيمسح أي مسافة أو سطر مخفي بالغلط
+    const rawApiKey = "os_v2_app_2466rn4urzeu5bhsnq2t57xittzhvop5bjyemdubmfaamssu2362tmqporlevdmcjrk7thzs7txtxbzqkks5bwgoydxu3n7jdfh3cwq";
+    const REST_API_KEY = rawApiKey.replace(/\s+/g, ''); 
 
     const response = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
+      cache: 'no-store', // منع كاش المتصفح للطلب
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Authorization': `Basic ${REST_API_KEY}`,
       },
       body: JSON.stringify({
         app_id: APP_ID,
+        target_channel: "push",
         included_segments: ['Total Subscriptions', 'Active Users', 'Subscribed Users'], 
         headings: { en: title, ar: title },
         contents: { en: body, ar: body },
@@ -32,9 +36,10 @@ export async function POST(req: Request) {
     } else {
       const errorData = await response.json();
       console.error('OneSignal Error Details:', errorData);
-      return NextResponse.json({ success: false, error: errorData }, { status: 500 });
+      return NextResponse.json({ success: false, error: errorData }, { status: response.status });
     }
   } catch (error) {
+    console.error('Server Catch Error:', error);
     return NextResponse.json({ success: false, error: 'Server Error' }, { status: 500 });
   }
 }
