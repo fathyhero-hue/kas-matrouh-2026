@@ -10,7 +10,7 @@ import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
-import html2canvas from "html2canvas";
+import { toJpeg } from 'html-to-image';
 
 const ADMIN_PASSWORD = "hero123";
 
@@ -79,6 +79,13 @@ const pushNotification = async (title: string, body: string) => {
      console.error(e); 
      return false; 
   }
+};
+
+// دالة الكوبري (Proxy) لتخطي حماية المتصفحات للصور الخارجية
+const proxiedUrl = (url: string) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  return url;
 };
 
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
@@ -315,6 +322,78 @@ export default function AdminPage() {
     alert("تم قفل القائمة واعتمادها. 🔒");
   };
 
+  // --- Strict Security Roster Logic ---
+  const handleRosterLogin = () => {
+    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق أولاً.");
+    if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري.");
+
+    const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
+    
+    if (!existingTeam || !existingTeam.password) {
+        return alert("❌ لم تقم إدارة البطولة بتعيين رقم سري لهذا الفريق بعد. يرجى التواصل مع اللجنة المنظمة.");
+    }
+
+    if (existingTeam.password !== rosterAccessPassword) {
+        return alert("❌ الرقم السري غير صحيح! يرجى التأكد من الرقم الممنوح لك من الإدارة.");
+    }
+
+    if (existingTeam.isSubmitted) {
+        return alert("⚠️ تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
+    }
+    
+    setUnlockedRoster(rosterAccessTeam);
+    if (existingTeam && existingTeam.players) {
+        const loadedPlayers = [...existingTeam.players];
+        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
+        setRosterForm({ 
+           managerName: existingTeam.managerName || "", 
+           managerPhone: existingTeam.managerPhone || "", 
+           logoUrl: existingTeam.logoUrl || "", 
+           players: loadedPlayers.slice(0,12) 
+        });
+    } else {
+        setRosterForm({ managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
+    }
+  };
+
+  const updateRosterPlayer = (index: number, field: string, value: string) => {
+    setRosterForm(prev => {
+        const newPlayers = [...prev.players];
+        newPlayers[index] = { ...newPlayers[index], [field]: value };
+        return { ...prev, players: newPlayers };
+    });
+  };
+
+  const submitFinalRoster = async () => {
+    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
+    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
+    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
+
+    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
+        try {
+            const suffix = activeTournament === "juniors" ? "_juniors" : "";
+            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
+                teamName: unlockedRoster,
+                managerName: rosterForm.managerName,
+                managerPhone: rosterForm.managerPhone,
+                logoUrl: rosterForm.logoUrl,
+                players: rosterForm.players,
+                password: rosterAccessPassword,
+                isSubmitted: true,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
+            setUnlockedRoster(null);
+            setRosterAccessTeam("");
+            setRosterAccessPassword("");
+            setRosterViewMode('list');
+        } catch(e) {
+            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
+        }
+    }
+  };
+
   // دالة تحميل البوستر
   const downloadPoster = async () => {
     const element = document.getElementById("poster-canvas-node");
@@ -322,22 +401,26 @@ export default function AdminPage() {
     setIsGeneratingPoster(true);
     
     try {
-      const canvas = await html2canvas(element, {
-        scale: 2, 
-        useCORS: true, 
-        allowTaint: true,
-        backgroundColor: "#0a1428"
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const dataUrl = await toJpeg(element, { 
+         quality: 0.95,
+         backgroundColor: '#050a14',
+         pixelRatio: 2,
+         fetchRequest: {
+            cache: 'no-cache'
+         }
       });
-      const data = canvas.toDataURL("image/jpeg", 0.9);
+      
       const link = document.createElement("a");
-      link.href = data;
+      link.href = dataUrl;
       link.download = `Match_Result_${posterMatch.teamA}_vs_${posterMatch.teamB}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
       console.error("خطأ في توليد البوستر:", err);
-      alert("حدث خطأ أثناء تحميل البوستر.");
+      alert("حدث خطأ أثناء تحميل البوستر. (تأكد أن روابط اللوجوهات تعمل بشكل صحيح)");
     }
     setIsGeneratingPoster(false);
   };
@@ -615,7 +698,7 @@ export default function AdminPage() {
              
              {/* الرأس (الهيدر) */}
              <div className="mt-8 z-10 flex flex-col items-center">
-                <img src="/logo.png" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
+                <img src="/logo.png" crossOrigin="anonymous" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
                 <h1 className="text-3xl font-black text-yellow-400 mt-2 tracking-wide">كأس مطروح</h1>
                 <p className="text-cyan-300 font-bold text-sm tracking-widest">النسخة الثالثة 2026</p>
                 <Badge className="mt-4 bg-yellow-400 text-black font-black px-6 py-1.5 text-sm">{posterMatch.round}</Badge>
@@ -625,7 +708,7 @@ export default function AdminPage() {
              <div className="w-full mt-12 flex justify-between items-center px-6 z-10">
                 <div className="flex flex-col items-center gap-3 w-1/3">
                    <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
-                     {posterMatch.teamALogo ? <img src={posterMatch.teamALogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                     {posterMatch.teamALogo ? <img src={proxiedUrl(posterMatch.teamALogo)} crossOrigin="anonymous" className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
                    </div>
                    <div className="text-center font-black text-white text-lg">{posterMatch.teamA}</div>
                 </div>
@@ -639,7 +722,7 @@ export default function AdminPage() {
 
                 <div className="flex flex-col items-center gap-3 w-1/3">
                    <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
-                     {posterMatch.teamBLogo ? <img src={posterMatch.teamBLogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                     {posterMatch.teamBLogo ? <img src={proxiedUrl(posterMatch.teamBLogo)} crossOrigin="anonymous" className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
                    </div>
                    <div className="text-center font-black text-white text-lg">{posterMatch.teamB}</div>
                 </div>
