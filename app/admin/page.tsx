@@ -68,7 +68,7 @@ const generatePostContent = (match: any) => {
 
 const pushNotification = async (title: string, body: string) => {
   try {
-  const res = await fetch("/api/push-service", { // غيرنا الاسم هنا للمسار الجديد
+  const res = await fetch("/api/push-service", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -148,6 +148,10 @@ export default function AdminPage() {
   const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
   const [isPreparingPoster, setIsPreparingPoster] = useState(false);
 
+  // إعدادات نافذة نجم المباراة السريعة
+  const [motmPopupMatch, setMotmPopupMatch] = useState<any | null>(null);
+  const [quickMotmForm, setQuickMotmForm] = useState({ player: "", team: "", rating: 99 });
+
   const [time, setTime] = useState<Date | null>(null);
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
@@ -162,7 +166,7 @@ export default function AdminPage() {
   
   const defaultStats = { rating: 99, pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99 };
   const [goalForm, setGoalForm] = useState({ player: "", team: currentTeamsList[0] || "", goalsCount: 1, imageUrl: "", ...defaultStats });
-  const [motmForm, setMotmForm] = useState({ player: "", team: currentTeamsList[0] || "", imageUrl: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats });
+  const [motmForm, setMotmForm] = useState({ player: "", team: currentTeamsList[0] || "", imageUrl: "", matchName: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats });
   
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
@@ -203,7 +207,7 @@ export default function AdminPage() {
     setMatchForm(p => ({...p, teamA: "", teamALogo: "", teamB: "", teamBLogo: "", matchLabel: ""}));
     setGoalForm(p => ({...p, team: currentTeamsList[0] || "", player: "", goalsCount: 1, imageUrl: ""}));
     setCardForm(p => ({...p, team: currentTeamsList[0] || "", player: ""}));
-    setMotmForm(p => ({...p, team: currentTeamsList[0] || "", player: "", imageUrl: ""}));
+    setMotmForm(p => ({...p, team: currentTeamsList[0] || "", player: "", imageUrl: "", matchName: ""}));
     setEditingId(null); setEditingGoalId(null); setEditingMotmId(null); setEditingRosterId(null);
   }, [activeTournament, currentTeamsList]);
 
@@ -391,7 +395,33 @@ export default function AdminPage() {
     }
   };
 
-  // دالة ذكية لسحب الصور كـ Base64 لتخطي الـ CORS تماماً
+  // دوال نافذة نجم المباراة السريعة
+  const openMotmPopup = (match: any) => {
+    setMotmPopupMatch(match);
+    setQuickMotmForm({ player: "", team: match.teamA, rating: 99 });
+  };
+
+  const saveQuickMotm = async () => {
+    if (!quickMotmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
+    try {
+      const matchName = `${motmPopupMatch.teamA} vs ${motmPopupMatch.teamB}`;
+      await addDoc(collection(db, getColl("motm")), {
+        player: quickMotmForm.player.trim(),
+        team: quickMotmForm.team,
+        matchName: matchName,
+        imageUrl: "", 
+        sponsorName: SPONSORS[0].name,
+        sponsorLogo: SPONSORS[0].src,
+        rating: Number(quickMotmForm.rating),
+        pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99
+      });
+      alert("✅ تم تسجيل نجم المباراة بنجاح! يمكنكم إضافة صورته لاحقاً من تبويب النجوم.");
+      setMotmPopupMatch(null);
+    } catch (e) {
+      alert("حدث خطأ أثناء حفظ نجم المباراة.");
+    }
+  };
+
   const openPoster = async (match: any) => {
     setPosterMatch(match);
     setIsPreparingPoster(true);
@@ -400,7 +430,6 @@ export default function AdminPage() {
     const fetchBase64 = async (url: string) => {
       if (!url) return "";
       try {
-        // نستخدم wsrv.nl لتخطي الكاش والحماية وجلب الصورة نقية
         const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`);
         const blob = await res.blob();
         return await new Promise<string>((resolve) => {
@@ -409,7 +438,7 @@ export default function AdminPage() {
           reader.readAsDataURL(blob);
         });
       } catch (e) {
-        return url; // لو فشلت نرجع الرابط الأصلي
+        return url; 
       }
     };
 
@@ -420,7 +449,6 @@ export default function AdminPage() {
     setIsPreparingPoster(false);
   };
 
-  // دالة تحميل البوستر بعد ما الصور اتحولت لـ Base64
   const downloadPoster = async () => {
     const element = document.getElementById("poster-canvas-node");
     if (!element) return;
@@ -624,13 +652,13 @@ export default function AdminPage() {
       await addDoc(collection(db, getColl("motm")), data);
       alert("✅ تم إضافة النجم بنجاح");
     }
-    setMotmForm({ player: "", team: currentTeamsList[0] || "", imageUrl: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats }); 
+    setMotmForm({ player: "", team: currentTeamsList[0] || "", imageUrl: "", matchName: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats }); 
   };
 
   const startEditMotm = (m: any) => {
     setEditingMotmId(m.id);
     setMotmForm({
-      player: m.player || "", team: m.team || currentTeamsList[0], imageUrl: m.imageUrl || "", sponsorName: m.sponsorName || SPONSORS[0].name, sponsorLogo: m.sponsorLogo || SPONSORS[0].src,
+      player: m.player || "", team: m.team || currentTeamsList[0], imageUrl: m.imageUrl || "", matchName: m.matchName || "", sponsorName: m.sponsorName || SPONSORS[0].name, sponsorLogo: m.sponsorLogo || SPONSORS[0].src,
       rating: m.rating || 99, pac: m.pac || 99, sho: m.sho || 99, pas: m.pas || 99, dri: m.dri || 99, def: m.def || 99, phy: m.phy || 99
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -677,20 +705,24 @@ export default function AdminPage() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
+  // ========== المنطق الجديد للمباريات المباشرة ==========
   const liveMatchesList = matches.filter(m => {
-    if (m.isLive === true) return true;
+    if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
+
     if (m.date === todayStr && m.time) {
       const now = time || new Date();
       const [hours, minutes] = m.time.split(':').map(Number);
       const matchTime = new Date();
       matchTime.setHours(hours, minutes, 0, 0);
-      const diffMins = (matchTime.getTime() - now.getTime()) / 60000;
-      if (diffMins <= 30 && !m.streamClosed) {
+      const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
+      
+      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") {
         return true;
       }
     }
     return false;
   });
+  
   const liveMatches = sortMatches(liveMatchesList);
   const liveMatchIds = new Set(liveMatchesList.map(m => m.id));
 
@@ -707,9 +739,42 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white pb-20 font-sans">
       <datalist id="teams-list">{currentTeamsList.map(t => <option key={t} value={t} />)}</datalist>
       
+      {/* ===================== نافذة تسجيل نجم المباراة السريعة ===================== */}
+      {motmPopupMatch && (
+        <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-md bg-[#13213a] border-yellow-400 shadow-2xl">
+            <CardHeader className="border-b border-white/10 pb-4">
+              <CardTitle className="text-yellow-300 text-center text-2xl flex items-center justify-center gap-2"><Star/> تسجيل نجم المباراة</CardTitle>
+              <p className="text-cyan-300 text-center font-bold text-sm mt-2">{motmPopupMatch.teamA} <span className="text-white">VS</span> {motmPopupMatch.teamB}</p>
+            </CardHeader>
+            <CardContent className="space-y-4 p-6">
+              <div>
+                <label className="text-cyan-300 font-bold mb-2 block">اسم اللاعب</label>
+                <Input value={quickMotmForm.player} onChange={e => setQuickMotmForm(p => ({...p, player: e.target.value}))} placeholder="اكتب اسم نجم المباراة" className="bg-[#1e2a4a] border-yellow-400 text-white font-bold h-12" />
+              </div>
+              <div>
+                <label className="text-cyan-300 font-bold mb-2 block">فريق اللاعب</label>
+                <select value={quickMotmForm.team} onChange={e => setQuickMotmForm(p => ({...p, team: e.target.value}))} className="bg-[#1e2a4a] border border-yellow-400 w-full rounded-xl p-3 text-white font-bold outline-none cursor-pointer h-12">
+                  <option value={motmPopupMatch.teamA}>{motmPopupMatch.teamA}</option>
+                  <option value={motmPopupMatch.teamB}>{motmPopupMatch.teamB}</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-cyan-300 font-bold mb-2 block">التقييم الأولي (Rating)</label>
+                <Input type="number" value={quickMotmForm.rating} onChange={e => setQuickMotmForm(p => ({...p, rating: Number(e.target.value)}))} className="bg-[#1e2a4a] border-yellow-400 text-white font-bold text-center h-12" />
+              </div>
+              <div className="flex gap-4 mt-6">
+                <Button onClick={saveQuickMotm} className="flex-1 bg-yellow-400 text-black font-black text-lg hover:bg-yellow-500 shadow-lg py-6">حفظ واعتماد ✔️</Button>
+                <Button onClick={() => setMotmPopupMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6 px-8">إلغاء</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* ===================== شاشة البوستر (Popup) ===================== */}
       {posterMatch && (
-        <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/95 z-[9998] flex flex-col items-center justify-center p-4 overflow-y-auto">
           
           {/* الكونتينر اللي هيتحول لبوستر - مقاس طولي 9:16 تقريباً */}
           <div 
@@ -993,6 +1058,7 @@ export default function AdminPage() {
                     <Button size="sm" onClick={() => sendQuickNotification("هدف مبكر! ⚽", `هدف لصالح فريق ${match.teamB}`)} className="bg-emerald-600 text-white font-bold">هدف ({match.teamB})</Button>
                     <Button size="sm" onClick={() => sendQuickNotification("طرد! 🟥", `حالة طرد في مباراة ${match.teamA} و ${match.teamB}`)} className="bg-red-600 text-white font-bold">طرد</Button>
                     <Button size="sm" onClick={() => sendQuickNotification("نهاية المباراة 🏁", `انتهت المباراة بنتيجة ${match.homeGoals} - ${match.awayGoals}`)} className="bg-gray-600 text-white font-bold">إنهاء</Button>
+                    <Button size="sm" onClick={() => openMotmPopup(match)} className="bg-yellow-500 text-black font-bold border-2 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]">نجم المباراة 🌟</Button>
                   </div>
                   <div className="flex justify-center items-center gap-6 mb-8 bg-[#13213a] p-4 rounded-2xl border border-white/5 flex-wrap">
                     <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 text-white ${match.isTimerRunning ? 'bg-amber-500' : 'bg-emerald-500'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف</> : <><Play className="mr-2 h-5 w-5" /> تشغيل</>}</Button>
@@ -1097,6 +1163,7 @@ export default function AdminPage() {
                             <div className="flex gap-2 justify-center flex-wrap mt-2">
                                <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1 font-bold">بث</Button>
                                <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1 font-bold">تعديل</Button>
+                               <Button size="sm" onClick={() => openMotmPopup(match)} className="bg-yellow-500 text-black flex-1 font-bold">نجم 🌟</Button>
                                <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1 font-bold">حذف</Button>
                             </div>
                           </div>
@@ -1116,7 +1183,8 @@ export default function AdminPage() {
                      {currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <Input value={motmForm.imageUrl} onChange={e => setMotmForm(p => ({...p, imageUrl: e.target.value}))} placeholder="صورة اللاعب" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
-                  <div className="flex gap-2">
+                  <Input value={motmForm.matchName} onChange={e => setMotmForm(p => ({...p, matchName: e.target.value}))} placeholder="اسم المباراة (مثال: السلوم vs الفهود)" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                  <div className="flex gap-2 md:col-span-4 mt-2">
                     <select value={motmForm.sponsorName} onChange={e => { const sp = SPONSORS.find(s => s.name === e.target.value); setMotmForm(p => ({...p, sponsorName: sp?.name || "", sponsorLogo: sp?.src || ""})); }} className="bg-[#0a1428] border border-yellow-400 rounded-xl px-2 text-white flex-1 text-sm font-bold">
                       {SPONSORS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                     </select>
@@ -1135,12 +1203,18 @@ export default function AdminPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {motmList.map(m => (
-                    <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-white/10">
+                    <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col gap-3 border border-white/10">
                         <div className="flex items-center gap-4">
                             {m.imageUrl ? <img src={m.imageUrl} className="h-10 w-10 rounded-full object-cover border-2 border-yellow-400" /> : <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">👤</div>}
-                            <div className="font-bold text-white text-lg">{m.player} <span className="text-yellow-400 ml-1 text-sm">({m.rating})</span></div>
+                            <div>
+                                <div className="font-bold text-white text-lg">{m.player} <span className="text-yellow-400 ml-1 text-sm">({m.rating})</span></div>
+                                <div className="text-xs text-cyan-300 font-bold">{m.matchName || "بدون مباراة"}</div>
+                            </div>
                         </div>
-                        <div className="flex gap-2"><Button size="sm" onClick={() => startEditMotm(m)} className="bg-yellow-400 text-black font-bold"><Edit className="h-4 w-4" /></Button><Button size="sm" variant="destructive" onClick={() => deleteMotm(m.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>
+                        <div className="flex gap-2 justify-end border-t border-white/5 pt-2">
+                            <Button size="sm" onClick={() => startEditMotm(m)} className="bg-yellow-400 text-black font-bold flex-1"><Edit className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="destructive" onClick={() => deleteMotm(m.id)} className="font-bold flex-1"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
                     </div>
                   ))}
                 </div>
@@ -1171,6 +1245,7 @@ export default function AdminPage() {
                       <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">نص 📋</Button>
                       <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
                       <Button size="sm" onClick={() => startEdit(m)} className="bg-transparent border-yellow-400 text-yellow-400 font-bold border">تعديل</Button>
+                      <Button size="sm" onClick={() => openMotmPopup(m)} className="bg-yellow-500 text-black font-bold">نجم 🌟</Button>
                       <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
                     </div>
                   </div>
@@ -1189,8 +1264,9 @@ export default function AdminPage() {
                        <TeamMatchDisplay teamName={m.teamB} logoUrl={m.teamBLogo} />
                      </div>
                      <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
-                     <div className="flex gap-2 mt-2">
+                     <div className="flex gap-2 mt-2 flex-wrap">
                         <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-emerald-600 text-white flex-1 font-bold">بدء الآن</Button>
+                        <Button size="sm" onClick={() => openMotmPopup(m)} className="bg-yellow-500 text-black font-bold">نجم 🌟</Button>
                         <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black font-bold">تعديل</Button>
                         <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
                      </div>

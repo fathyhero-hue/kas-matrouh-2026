@@ -237,7 +237,6 @@ export default function Page() {
         hiddenTime = Date.now();
       } else if (document.visibilityState === 'visible' && hiddenTime) {
         const timeAway = Date.now() - hiddenTime;
-        // لو التطبيق فضل في الخلفية أكتر من 10 دقايق، نعمله ريفريش صامت
         if (timeAway > 600000) {
           forceAppUpdate();
         }
@@ -395,20 +394,24 @@ export default function Page() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
+  // ========== المنطق الجديد للمباريات المباشرة ==========
   const liveMatchesList = matches.filter(m => {
-    if (m.isLive === true) return true;
+    if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
+
     if (m.date === todayStr && m.time) {
       const now = time || new Date();
       const [hours, minutes] = m.time.split(':').map(Number);
       const matchTime = new Date();
       matchTime.setHours(hours, minutes, 0, 0);
-      const diffMins = (matchTime.getTime() - now.getTime()) / 60000;
-      if (diffMins <= 30 && !m.streamClosed) {
+      const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
+      
+      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") {
         return true;
       }
     }
     return false;
   });
+  
   const liveMatches = sortMatchesAsc(liveMatchesList);
   const liveMatchIds = new Set(liveMatchesList.map(m => m.id));
 
@@ -676,7 +679,7 @@ export default function Page() {
             { key: "scorers", label: "الهدافين", icon: "🥇", extraClass: "" }, 
             { key: "cards", label: "الكروت", icon: "🟨", extraClass: "" }, 
             { key: "stats", label: "إحصائيات", icon: "📈", extraClass: "" }, 
-            { key: "motm_tab", label: "نجوم الماتش", icon: "🌟", extraClass: "" }, 
+            { key: "motm_tab", label: "نجوم المباريات", icon: "🌟", extraClass: "" }, 
             { key: "media", label: "ميديا", icon: "🎥", extraClass: "" },
             { key: "settings", label: "الإعدادات", icon: "⚙️", extraClass: "bg-gray-800 text-white shadow-lg border-gray-600" }
           ].map(tab => (
@@ -884,7 +887,6 @@ export default function Page() {
               </CardContent>
             </Card>
 
-            {/* كارت التحديث الإجباري الجديد */}
             <Card className="bg-[#13213a] border-blue-500/30 rounded-3xl overflow-hidden shadow-2xl">
               <CardHeader className="border-b border-white/5 bg-[#1e2a4a] py-6">
                 <CardTitle className="text-2xl text-white flex items-center gap-3">
@@ -1030,6 +1032,24 @@ export default function Page() {
               </>
             )}
           </div>
+        )}
+
+        {activeTab === "live" && (
+           <div className="grid gap-6 animate-in fade-in">
+             {liveMatches.length > 0 ? liveMatches.map(match => (
+               <Card key={match.id} className="bg-[#13213a] border-red-500/50 rounded-3xl overflow-hidden shadow-2xl">
+                 <div className="bg-red-600 text-white text-center py-2 font-black animate-pulse">مباشر الآن 🔴</div>
+                 <CardContent className="p-6">
+                   <div className="flex items-center justify-center gap-6">
+                     <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                     <div className="bg-[#0a1428] rounded-2xl py-4 px-6 border-2 border-red-500 text-yellow-400 font-black text-4xl shadow-inner">{renderMatchScore(match)}</div>
+                     <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                   </div>
+                   <div className="text-center mt-6 text-cyan-300 font-bold tracking-wide uppercase text-xs">{match.round}</div>
+                 </CardContent>
+               </Card>
+             )) : <div className="text-center py-20 bg-[#13213a] rounded-3xl border border-white/5"><p className="text-xl font-bold text-gray-500">لا توجد مباريات مباشرة حالياً</p></div>}
+           </div>
         )}
 
         {activeTab === "standings" && (
@@ -1214,43 +1234,48 @@ export default function Page() {
         )}
 
         {activeTab === "motm_tab" && (
-          <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-3 justify-items-center animate-in fade-in duration-500 pt-6">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 justify-items-center animate-in fade-in duration-500 pt-6">
             {motmList.length > 0 ? motmList.map((m, i) => (
-              <div key={i} className="relative w-[280px] h-[400px] group transition-transform duration-300 hover:scale-105 cursor-pointer mx-auto">
-                <div className="absolute inset-0 bg-yellow-500/20 rounded-t-[2rem] blur-2xl group-hover:bg-yellow-400/40 transition-all"></div>
-                <div className="absolute inset-0 bg-gradient-to-br from-[#f8e596] via-[#dcae3a] to-[#9b7318] overflow-hidden" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 88%, 50% 100%, 0% 88%)', borderRadius: '1.5rem 1.5rem 0 0', border: '1px solid rgba(255, 235, 150, 0.4)' }}>
-                  <div className="absolute inset-0 opacity-[0.25] mix-blend-overlay">
-                     <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><path d="M-50,150 L140,-50 L330,150 L140,350 Z" stroke="#ffffff" strokeWidth="2" fill="none" /><path d="M-50,200 L140,0 L330,200 L140,400 Z" stroke="#ffffff" strokeWidth="1" fill="none" /><path d="M40,50 L240,250 M240,50 L40,250" stroke="#000000" strokeWidth="0.5" fill="none" /><path d="M140,-50 L140,400" stroke="#ffffff" strokeWidth="2" fill="none" /></svg>
-                  </div>
-                  <div className="relative w-full h-full p-4 flex flex-col text-[#3e2d14]">
-                    <div className="absolute top-6 left-5 flex flex-col items-center z-20">
-                      <span className="text-5xl font-black leading-none drop-shadow-sm tracking-tighter">{m.rating || 99}</span>
-                      <span className="text-sm font-black mt-0.5 tracking-wider uppercase">نجم</span>
-                    </div>
-                    <div className="absolute top-10 w-full flex justify-center z-10 left-0">
-                       <div className="w-[140px] h-[140px] rounded-full border-4 border-yellow-400 overflow-hidden bg-[#1e2a4a] shadow-[0_5px_15px_rgba(0,0,0,0.5)] flex items-center justify-center">
-                         {m.imageUrl ? ( <img src={m.imageUrl} className="w-full h-full object-cover" alt={m.player} loading="lazy" /> ) : ( <span className="text-7xl opacity-40 text-white">👤</span> )}
+              <div key={i} className="relative w-[300px] group transition-transform duration-300 hover:scale-105 mx-auto">
+                <div className="bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-[2.5rem] border-2 border-yellow-400/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
+                  <div className="relative w-full aspect-[2/3] bg-[#050a14]">
+                     {m.imageUrl ? (
+                        <img src={m.imageUrl} className="w-full h-full object-cover object-top" alt={m.player} loading="lazy" />
+                     ) : (
+                        <div className="w-full h-full flex items-center justify-center text-8xl opacity-10">👤</div>
+                     )}
+                     <div className="absolute top-6 right-6 bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-2xl shadow-lg border-2 border-black/20">
+                       {m.rating || 99}
+                     </div>
+                     {m.sponsorLogo && (
+                       <div className="absolute bottom-4 left-4 bg-white/10 backdrop-blur-md p-2 rounded-xl border border-white/20 shadow-lg">
+                         <img src={m.sponsorLogo} alt="Sponsor" className="h-10 w-auto object-contain" />
                        </div>
-                    </div>
-                    <div className="absolute top-[210px] left-0 w-full flex flex-col items-center z-20">
-                      <div className="text-3xl font-black tracking-tighter truncate w-[90%] text-center drop-shadow-sm">{m.player}</div>
-                      <div className="w-[85%] h-[1px] bg-[#3e2d14] opacity-20 my-2"></div>
-                      <div className="flex justify-between w-[85%] mx-auto text-center text-[#3e2d14]">
-                        {[ { label: "السرعة", val: m.pac }, { label: "الشوط", val: m.sho }, { label: "التمرير", val: m.pas }, { label: "المراوغة", val: m.dri }, { label: "الدفاع", val: m.def }, { label: "البدني", val: m.phy } ].map(stat => (
-                          <div key={stat.label} className="flex flex-col items-center"><span className="text-[10px] font-bold">{stat.label}</span><span className="text-xl font-black leading-none mt-1">{stat.val || 99}</span></div>
-                        ))}
-                      </div>
-                      <div className="w-[85%] h-[1px] bg-[#3e2d14] opacity-20 my-2"></div>
-                      <div className="flex justify-center items-center gap-6 mt-1">
-                        {m.sponsorLogo ? <img src={m.sponsorLogo} alt="Sponsor" className="w-8 h-6 object-contain drop-shadow-sm" loading="lazy" /> : <Star className="w-6 h-6 opacity-60" />}
-                        <img src="/logo.png" className="w-6 h-7 object-contain opacity-90 drop-shadow-sm" alt="Matrouh Cup" />
-                        <div className="text-[10px] font-black uppercase tracking-wider bg-[#3e2d14] text-[#f8e596] px-2 py-1 rounded-sm truncate max-w-[80px] shadow-sm">{m.team}</div>
-                      </div>
-                    </div>
+                     )}
+                  </div>
+                  <div className="p-6 text-center space-y-3 bg-[#13213a]">
+                     <div className="text-3xl font-black text-yellow-300 tracking-tighter drop-shadow-md">{m.player}</div>
+                     <div className="flex items-center justify-center gap-2">
+                       <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">{m.team}</Badge>
+                     </div>
+                     <div className="mt-4 pt-4 border-t border-white/5">
+                        <div className="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-widest">مباراة</div>
+                        <div className="text-xs font-black text-white bg-[#0a1428] py-2 px-3 rounded-xl border border-white/5 italic">
+                          {m.matchName || "مباراة رسمية"}
+                        </div>
+                     </div>
+                     <div className="flex justify-center items-center gap-2 mt-4">
+                        <img src="/logo.png" className="h-6 w-auto opacity-80" alt="Matrouh Cup" />
+                        <span className="text-[10px] font-black text-yellow-400 opacity-50 uppercase tracking-widest">MAN OF THE MATCH</span>
+                     </div>
                   </div>
                 </div>
               </div>
-            )) : <div className="text-center col-span-full py-20 bg-[#1e2a4a] w-full rounded-3xl border border-yellow-400/30"><p className="text-white font-black text-2xl mb-2">انتظروا جوائز النجوم 🌟</p><p className="text-cyan-300">سيتم تفعيل كروت الفيفا لأفضل لاعب بعد كل مباراة!</p></div>}
+            )) : (
+              <div className="text-center col-span-full py-20 bg-[#1e2a4a] w-full rounded-3xl border border-yellow-400/30">
+                <p className="text-white font-black text-2xl mb-2">انتظروا نجوم المباريات 🌟</p>
+              </div>
+            )}
           </div>
         )}
 
