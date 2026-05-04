@@ -10,7 +10,6 @@ import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
-import { toJpeg } from 'html-to-image';
 
 const ADMIN_PASSWORD = "hero123";
 
@@ -81,13 +80,6 @@ const pushNotification = async (title: string, body: string) => {
   }
 };
 
-// دالة الكوبري (Proxy) لتخطي حماية المتصفحات للصور الخارجية عبر الـ API الداخلي
-const proxiedUrl = (url: string) => {
-  if (!url) return "";
-  if (url.startsWith("http")) return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-  return url;
-};
-
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
   <div className="flex-1 flex flex-col items-center gap-3">
     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
@@ -147,9 +139,11 @@ export default function AdminPage() {
 
   const [shareMatch, setShareMatch] = useState<any | null>(null);
   
-  // البوستر
+  // البوستر والإعدادات
   const [posterMatch, setPosterMatch] = useState<any | null>(null);
+  const [posterLogos, setPosterLogos] = useState({ a: "", b: "" });
   const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
+  const [isPreparingPoster, setIsPreparingPoster] = useState(false);
 
   const [time, setTime] = useState<Date | null>(null);
 
@@ -394,22 +388,49 @@ export default function AdminPage() {
     }
   };
 
-  // دالة تحميل البوستر
+  // دالة ذكية لسحب الصور كـ Base64 لتخطي الـ CORS تماماً
+  const openPoster = async (match: any) => {
+    setPosterMatch(match);
+    setIsPreparingPoster(true);
+    setPosterLogos({ a: "", b: "" });
+
+    const fetchBase64 = async (url: string) => {
+      if (!url) return "";
+      try {
+        // نستخدم wsrv.nl لتخطي الكاش والحماية وجلب الصورة نقية
+        const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`);
+        const blob = await res.blob();
+        return await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        return url; // لو فشلت نرجع الرابط الأصلي
+      }
+    };
+
+    const logoA = await fetchBase64(match.teamALogo);
+    const logoB = await fetchBase64(match.teamBLogo);
+    
+    setPosterLogos({ a: logoA, b: logoB });
+    setIsPreparingPoster(false);
+  };
+
+  // دالة تحميل البوستر بعد ما الصور اتحولت لـ Base64
   const downloadPoster = async () => {
     const element = document.getElementById("poster-canvas-node");
     if (!element) return;
     setIsGeneratingPoster(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      const dataUrl = await toJpeg(element, { 
+      const htmlToImage = await import('html-to-image');
+      const dataUrl = await htmlToImage.toJpeg(element, { 
          quality: 0.95,
          backgroundColor: '#050a14',
-         pixelRatio: 2,
-         fetchRequestInit: { // الكلمة اللي اتصلحت
-            cache: 'no-cache'
-         }
+         pixelRatio: 2
       });
       
       const link = document.createElement("a");
@@ -420,7 +441,7 @@ export default function AdminPage() {
       document.body.removeChild(link);
     } catch (err) {
       console.error("خطأ في توليد البوستر:", err);
-      alert("حدث خطأ أثناء تحميل البوستر. (تأكد أن روابط اللوجوهات تعمل بشكل صحيح)");
+      alert("حدث خطأ أثناء تحميل البوستر.");
     }
     setIsGeneratingPoster(false);
   };
@@ -698,7 +719,8 @@ export default function AdminPage() {
              
              {/* الرأس (الهيدر) */}
              <div className="mt-8 z-10 flex flex-col items-center">
-                <img src="/logo.png" crossOrigin="anonymous" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
+                {/* إزالة الـ crossOrigin من الصورة اللوكال */}
+                <img src="/logo.png" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
                 <h1 className="text-3xl font-black text-yellow-400 mt-2 tracking-wide">كأس مطروح</h1>
                 <p className="text-cyan-300 font-bold text-sm tracking-widest">النسخة الثالثة 2026</p>
                 <Badge className="mt-4 bg-yellow-400 text-black font-black px-6 py-1.5 text-sm">{posterMatch.round}</Badge>
@@ -708,7 +730,8 @@ export default function AdminPage() {
              <div className="w-full mt-12 flex justify-between items-center px-6 z-10">
                 <div className="flex flex-col items-center gap-3 w-1/3">
                    <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
-                     {posterMatch.teamALogo ? <img src={proxiedUrl(posterMatch.teamALogo)} crossOrigin="anonymous" className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                     {/* بنستخدم الصورة الـ Base64 اللي جاهزة */}
+                     {posterLogos.a || posterMatch.teamALogo ? <img src={posterLogos.a || posterMatch.teamALogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
                    </div>
                    <div className="text-center font-black text-white text-lg">{posterMatch.teamA}</div>
                 </div>
@@ -722,7 +745,8 @@ export default function AdminPage() {
 
                 <div className="flex flex-col items-center gap-3 w-1/3">
                    <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
-                     {posterMatch.teamBLogo ? <img src={proxiedUrl(posterMatch.teamBLogo)} crossOrigin="anonymous" className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                     {/* بنستخدم الصورة الـ Base64 اللي جاهزة */}
+                     {posterLogos.b || posterMatch.teamBLogo ? <img src={posterLogos.b || posterMatch.teamBLogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
                    </div>
                    <div className="text-center font-black text-white text-lg">{posterMatch.teamB}</div>
                 </div>
@@ -743,8 +767,8 @@ export default function AdminPage() {
           </div>
 
           <div className="flex gap-4 mt-6">
-             <Button onClick={downloadPoster} disabled={isGeneratingPoster} className="bg-yellow-400 text-black hover:bg-yellow-500 font-black py-6 px-8 text-xl shadow-[0_0_15px_rgba(250,204,21,0.5)]">
-               {isGeneratingPoster ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : <Camera className="h-6 w-6 mr-2" />} 
+             <Button onClick={downloadPoster} disabled={isGeneratingPoster || isPreparingPoster} className="bg-yellow-400 text-black hover:bg-yellow-500 font-black py-6 px-8 text-xl shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+               {isGeneratingPoster || isPreparingPoster ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : <Camera className="h-6 w-6 mr-2" />} 
                تحميل البوستر ⬇️
              </Button>
              <Button onClick={() => setPosterMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-6 px-8 font-bold text-lg">إغلاق</Button>
@@ -1140,7 +1164,7 @@ export default function AdminPage() {
                     <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.date} • {m.status || m.time}</div>
                     
                     <div className="flex gap-2 justify-center mt-2 flex-wrap">
-                      <Button size="sm" onClick={() => setPosterMatch(m)} className="bg-yellow-400 text-black font-bold border-2 border-yellow-400 shadow-md">بوستر 📸</Button>
+                      <Button size="sm" onClick={() => openPoster(m)} className="bg-yellow-400 text-black font-bold border-2 border-yellow-400 shadow-md">بوستر 📸</Button>
                       <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">نص 📋</Button>
                       <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
                       <Button size="sm" onClick={() => startEdit(m)} className="bg-transparent border-yellow-400 text-yellow-400 font-bold border">تعديل</Button>
