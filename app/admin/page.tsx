@@ -81,10 +81,10 @@ const pushNotification = async (title: string, body: string) => {
   }
 };
 
-// دالة الكوبري (Proxy) لتخطي حماية المتصفحات للصور الخارجية
+// دالة الكوبري (Proxy) لتخطي حماية المتصفحات للصور الخارجية عبر الـ API الداخلي
 const proxiedUrl = (url: string) => {
   if (!url) return "";
-  if (url.startsWith("http")) return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  if (url.startsWith("http")) return `/api/image-proxy?url=${encodeURIComponent(url)}`;
   return url;
 };
 
@@ -407,7 +407,7 @@ export default function AdminPage() {
          quality: 0.95,
          backgroundColor: '#050a14',
          pixelRatio: 2,
-         fetchRequest: {
+         fetchRequestInit: { // الكلمة اللي اتصلحت
             cache: 'no-cache'
          }
       });
