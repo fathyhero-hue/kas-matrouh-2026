@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Clock, Trophy, Target, Shield, 
-  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, Settings, CheckCircle2, BellOff, ClipboardList, Lock, Unlock, Phone 
+  ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, Settings, CheckCircle2, BellOff, ClipboardList, Lock, Unlock, Phone, RefreshCw
 } from "lucide-react";
 import { TEAM_NAMES } from "@/data/tournament";
 import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
@@ -151,30 +151,23 @@ const MiniFutCard = ({ player, position }: { player: any, position: string }) =>
   return (
     <div className="relative w-[70px] md:w-[110px] transition-transform duration-300 hover:scale-110 cursor-pointer z-10 hover:z-50 drop-shadow-[0_15px_20px_rgba(0,0,0,0.6)]">
       <div className="w-full bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-2xl border border-yellow-400/40 overflow-hidden flex flex-col shadow-lg">
-        
-        {/* صورة اللاعب بشكل مربع/عمودي */}
         <div className="relative w-full aspect-[4/5] bg-[#050a14] border-b border-white/5">
           {player.imageUrl ? (
              <img src={player.imageUrl} className="w-full h-full object-cover object-top" alt={player.name} loading="lazy" />
           ) : (
              <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">👤</div>
           )}
-          
-          {/* بادج التقييم والمركز */}
           <div className="absolute top-0 left-0 flex flex-col items-center bg-gradient-to-br from-yellow-300 to-yellow-600 px-1.5 py-0.5 rounded-br-xl shadow-md border-r border-b border-yellow-700/50">
              <span className="text-[10px] md:text-sm font-black text-black leading-none">{player.rating || 99}</span>
              <span className="text-[8px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
           </div>
         </div>
-        
-        {/* منطقة البيانات تحت الصورة */}
         <div className="p-1.5 md:p-2 flex flex-col items-center justify-center w-full">
            <span className="text-[9px] md:text-[12px] font-black text-white w-full text-center truncate mb-1" title={player.name}>{player.name}</span>
            <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded text-center w-full truncate" title={player.team}>
              {player.team}
            </span>
         </div>
-
       </div>
     </div>
   );
@@ -219,6 +212,42 @@ export default function Page() {
     managerName: "", managerPhone: "", logoUrl: "",
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
+
+  // ========== نظام التحديث الإجباري والذكي للكاش ==========
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const forceAppUpdate = async () => {
+    setIsRefreshing(true);
+    try {
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+        }
+    } catch (e) {
+        console.error("خطأ في مسح الكاش", e);
+    }
+    window.location.reload();
+  };
+
+  useEffect(() => {
+    let hiddenTime: number | null = null;
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenTime = Date.now();
+      } else if (document.visibilityState === 'visible' && hiddenTime) {
+        const timeAway = Date.now() - hiddenTime;
+        // لو التطبيق فضل في الخلفية أكتر من 10 دقايق، نعمله ريفريش صامت
+        if (timeAway > 600000) {
+          forceAppUpdate();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+  // =======================================================
 
   useEffect(() => {
     setLoading(true);
@@ -854,6 +883,32 @@ export default function Page() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* كارت التحديث الإجباري الجديد */}
+            <Card className="bg-[#13213a] border-blue-500/30 rounded-3xl overflow-hidden shadow-2xl">
+              <CardHeader className="border-b border-white/5 bg-[#1e2a4a] py-6">
+                <CardTitle className="text-2xl text-white flex items-center gap-3">
+                  <RefreshCw className={`h-6 w-6 text-blue-400 ${isRefreshing ? 'animate-spin' : ''}`} /> تحديث واجهة التطبيق
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex-1 text-center md:text-right">
+                    <h3 className="text-xl font-bold text-white mb-2">جلب أحدث التعديلات والتصميمات</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed">
+                      إذا قام المبرمج بإضافة تبويبات جديدة أو تغيير شكل التطبيق ولم تظهر عندك بسبب "الذاكرة المؤقتة"، اضغط هنا لمسح الكاش وجلب أحدث نسخة فوراً.
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    <Button onClick={forceAppUpdate} disabled={isRefreshing} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-6 rounded-2xl text-lg shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-transform hover:scale-105">
+                      {isRefreshing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <RefreshCw className="mr-2 h-5 w-5" />}
+                      {isRefreshing ? "جاري التحديث..." : "تحديث الآن 🔄"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
           </div>
         )}
 
