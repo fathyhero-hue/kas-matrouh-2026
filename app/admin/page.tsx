@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert, ClipboardList, Lock, Unlock, Phone, CheckCircle2, Shield } from "lucide-react";
+import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert, ClipboardList, Lock, Unlock, Phone, CheckCircle2, Shield, Camera, Loader2 } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
+import html2canvas from "html2canvas";
 
 const ADMIN_PASSWORD = "hero123";
 
@@ -138,6 +139,11 @@ export default function AdminPage() {
   const [isSending, setIsSending] = useState(false);
 
   const [shareMatch, setShareMatch] = useState<any | null>(null);
+  
+  // البوستر
+  const [posterMatch, setPosterMatch] = useState<any | null>(null);
+  const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
+
   const [time, setTime] = useState<Date | null>(null);
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
@@ -309,76 +315,31 @@ export default function AdminPage() {
     alert("تم قفل القائمة واعتمادها. 🔒");
   };
 
-  // --- Strict Security Roster Logic ---
-  const handleRosterLogin = () => {
-    if(!rosterAccessTeam) return alert("الرجاء اختيار الفريق أولاً.");
-    if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري.");
-
-    const existingTeam = rostersList.find(r => r.id === rosterAccessTeam);
+  // دالة تحميل البوستر
+  const downloadPoster = async () => {
+    const element = document.getElementById("poster-canvas-node");
+    if (!element) return;
+    setIsGeneratingPoster(true);
     
-    if (!existingTeam || !existingTeam.password) {
-        return alert("❌ لم تقم إدارة البطولة بتعيين رقم سري لهذا الفريق بعد. يرجى التواصل مع اللجنة المنظمة.");
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2, 
+        useCORS: true, 
+        allowTaint: true,
+        backgroundColor: "#0a1428"
+      });
+      const data = canvas.toDataURL("image/jpeg", 0.9);
+      const link = document.createElement("a");
+      link.href = data;
+      link.download = `Match_Result_${posterMatch.teamA}_vs_${posterMatch.teamB}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("خطأ في توليد البوستر:", err);
+      alert("حدث خطأ أثناء تحميل البوستر.");
     }
-
-    if (existingTeam.password !== rosterAccessPassword) {
-        return alert("❌ الرقم السري غير صحيح! يرجى التأكد من الرقم الممنوح لك من الإدارة.");
-    }
-
-    if (existingTeam.isSubmitted) {
-        return alert("⚠️ تم حفظ واعتماد قائمة هذا الفريق مسبقاً. لا يمكن التعديل عليها إلا من خلال إدارة البطولة.");
-    }
-    
-    setUnlockedRoster(rosterAccessTeam);
-    if (existingTeam && existingTeam.players) {
-        const loadedPlayers = [...existingTeam.players];
-        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
-        setRosterForm({ 
-           managerName: existingTeam.managerName || "", 
-           managerPhone: existingTeam.managerPhone || "", 
-           logoUrl: existingTeam.logoUrl || "", 
-           players: loadedPlayers.slice(0,12) 
-        });
-    } else {
-        setRosterForm({ managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
-    }
-  };
-
-  const updateRosterPlayer = (index: number, field: string, value: string) => {
-    setRosterForm(prev => {
-        const newPlayers = [...prev.players];
-        newPlayers[index] = { ...newPlayers[index], [field]: value };
-        return { ...prev, players: newPlayers };
-    });
-  };
-
-  const submitFinalRoster = async () => {
-    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
-    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
-    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
-
-    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
-        try {
-            const suffix = activeTournament === "juniors" ? "_juniors" : "";
-            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
-                teamName: unlockedRoster,
-                managerName: rosterForm.managerName,
-                managerPhone: rosterForm.managerPhone,
-                logoUrl: rosterForm.logoUrl,
-                players: rosterForm.players,
-                password: rosterAccessPassword,
-                isSubmitted: true,
-                updatedAt: new Date().toISOString()
-            }, { merge: true });
-            
-            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
-            setUnlockedRoster(null);
-            setRosterAccessTeam("");
-            setRosterAccessPassword("");
-            setRosterViewMode('list');
-        } catch(e) {
-            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
-        }
-    }
+    setIsGeneratingPoster(false);
   };
 
   // Match & Stats Functions
@@ -638,6 +599,77 @@ export default function AdminPage() {
   return (
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white pb-20 font-sans">
       <datalist id="teams-list">{currentTeamsList.map(t => <option key={t} value={t} />)}</datalist>
+      
+      {/* ===================== شاشة البوستر (Popup) ===================== */}
+      {posterMatch && (
+        <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4 overflow-y-auto">
+          
+          {/* الكونتينر اللي هيتحول لبوستر - مقاس طولي 9:16 تقريباً */}
+          <div 
+             id="poster-canvas-node" 
+             className="relative w-[400px] h-[711px] bg-gradient-to-b from-[#050a14] via-[#13213a] to-[#050a14] flex flex-col items-center overflow-hidden border border-yellow-400/20"
+             dir="rtl"
+          >
+             {/* خامة الخلفية */}
+             <div className="absolute inset-0 opacity-10 bg-[url('/pattern.png')] bg-repeat"></div>
+             
+             {/* الرأس (الهيدر) */}
+             <div className="mt-8 z-10 flex flex-col items-center">
+                <img src="/logo.png" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
+                <h1 className="text-3xl font-black text-yellow-400 mt-2 tracking-wide">كأس مطروح</h1>
+                <p className="text-cyan-300 font-bold text-sm tracking-widest">النسخة الثالثة 2026</p>
+                <Badge className="mt-4 bg-yellow-400 text-black font-black px-6 py-1.5 text-sm">{posterMatch.round}</Badge>
+             </div>
+
+             {/* منطقة النتيجة والفرق */}
+             <div className="w-full mt-12 flex justify-between items-center px-6 z-10">
+                <div className="flex flex-col items-center gap-3 w-1/3">
+                   <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
+                     {posterMatch.teamALogo ? <img src={posterMatch.teamALogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                   </div>
+                   <div className="text-center font-black text-white text-lg">{posterMatch.teamA}</div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center w-1/3">
+                   <div className="text-5xl font-black text-white tracking-tighter" dir="ltr">
+                     {posterMatch.homeGoals} - {posterMatch.awayGoals}
+                   </div>
+                   <div className="text-cyan-400 font-bold mt-2 text-sm bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30">نتيجة نهائية</div>
+                </div>
+
+                <div className="flex flex-col items-center gap-3 w-1/3">
+                   <div className="w-24 h-24 rounded-full bg-[#0a1428] border-2 border-yellow-400/50 flex items-center justify-center shadow-lg overflow-hidden p-2">
+                     {posterMatch.teamBLogo ? <img src={posterMatch.teamBLogo} className="w-full h-full object-contain" /> : <Shield className="w-12 h-12 text-gray-500" />}
+                   </div>
+                   <div className="text-center font-black text-white text-lg">{posterMatch.teamB}</div>
+                </div>
+             </div>
+
+             {/* التذييل (الفوتر) */}
+             <div className="absolute bottom-0 w-full flex flex-col items-center z-10 pb-6">
+                <div className="bg-[#1e2a4a] text-cyan-300 w-full text-center py-2 font-bold border-y border-white/5 text-sm mb-4">
+                   {getArabicDay(posterMatch.date)} • {posterMatch.date}
+                </div>
+                
+                <div className="flex items-center gap-4 text-white/50 text-xs font-bold">
+                   <Star className="w-4 h-4 text-yellow-400/50" />
+                   <span>إدارة البطولة: فتحي هيرو 🦅</span>
+                   <Star className="w-4 h-4 text-yellow-400/50" />
+                </div>
+             </div>
+          </div>
+
+          <div className="flex gap-4 mt-6">
+             <Button onClick={downloadPoster} disabled={isGeneratingPoster} className="bg-yellow-400 text-black hover:bg-yellow-500 font-black py-6 px-8 text-xl shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+               {isGeneratingPoster ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : <Camera className="h-6 w-6 mr-2" />} 
+               تحميل البوستر ⬇️
+             </Button>
+             <Button onClick={() => setPosterMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-6 px-8 font-bold text-lg">إغلاق</Button>
+          </div>
+        </div>
+      )}
+      {/* ================================================================ */}
+
       <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         <header className="mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-center sm:text-right">
@@ -653,19 +685,6 @@ export default function AdminPage() {
             <button onClick={() => setActiveTournament('juniors')} className={`flex-1 py-3 rounded-lg text-lg sm:text-xl font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>إدارة الناشئين 🏅</button>
           </div>
         </div>
-
-        {shareMatch && (
-          <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-gradient-to-br from-[#1e2a4a] to-[#13213a] border-2 border-emerald-500 p-6 rounded-3xl max-w-lg w-full shadow-[0_0_30px_rgba(16,185,129,0.4)]">
-               <h3 className="text-2xl font-black text-emerald-400 mb-4 flex items-center gap-2"><Share2 /> جاهز للنشر السريع</h3>
-               <textarea readOnly value={generatePostContent(shareMatch)} className="w-full h-48 bg-[#0a1428] text-white p-4 rounded-xl border border-emerald-500/50 resize-none font-bold mb-4 focus:outline-none" />
-               <div className="flex gap-4">
-                 <Button onClick={() => { navigator.clipboard.writeText(generatePostContent(shareMatch)); alert("تم نسخ النص! 📋"); }} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black h-12 text-lg"><Copy className="ml-2 h-5 w-5"/> نسخ النص</Button>
-                 <Button onClick={() => setShareMatch(null)} variant="outline" className="border-red-500 text-white hover:bg-red-500 h-12 font-bold px-8">إغلاق</Button>
-               </div>
-            </div>
-          </div>
-        )}
 
         <Card className={`border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} bg-[#13213a] mb-8 mt-4 shadow-2xl transition-colors`}>
           <CardHeader><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>{editingId ? "تعديل مباراة" : `إضافة مباراة (${activeTournament === 'youth' ? 'شباب' : 'ناشئين'})`}</CardTitle></CardHeader>
@@ -795,7 +814,7 @@ export default function AdminPage() {
                                     <div className="flex gap-2 pt-3 border-t border-white/5">
                                        <Button size="sm" onClick={() => startEditRoster(teamName)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 font-bold"><Edit className="h-4 w-4 mr-1"/> إعداد</Button>
                                        {isSubmitted ? (
-                                          <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-white hover:bg-yellow-600 font-bold" title="فتح القفل ليتمكن المدير من التعديل"><Unlock className="h-4 w-4"/></Button>
+                                          <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-black hover:bg-yellow-600 font-bold" title="فتح القفل ليتمكن المدير من التعديل"><Unlock className="h-4 w-4"/></Button>
                                        ) : hasData ? (
                                           <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500 text-white hover:bg-emerald-600 font-bold" title="قفل واعتماد القائمة يدوياً"><Lock className="h-4 w-4"/></Button>
                                        ) : null}
@@ -1037,10 +1056,11 @@ export default function AdminPage() {
                     </div>
                     <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.date} • {m.status || m.time}</div>
                     
-                    <div className="flex gap-2 justify-center mt-2">
-                      <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">شير</Button>
+                    <div className="flex gap-2 justify-center mt-2 flex-wrap">
+                      <Button size="sm" onClick={() => setPosterMatch(m)} className="bg-yellow-400 text-black font-bold border-2 border-yellow-400 shadow-md">بوستر 📸</Button>
+                      <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">نص 📋</Button>
                       <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
-                      <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black font-bold">تعديل</Button>
+                      <Button size="sm" onClick={() => startEdit(m)} className="bg-transparent border-yellow-400 text-yellow-400 font-bold border">تعديل</Button>
                       <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
                     </div>
                   </div>
@@ -1124,7 +1144,7 @@ export default function AdminPage() {
                 <div className="space-y-3">{filteredCards.map(item => (
                   <Card key={item.id} className="bg-[#1e2a4a] border border-white/10">
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <div><h3 className="font-bold text-white">{item.player}</h3><p className="text-cyan-300 text-sm font-bold">{item.team}</p></div>
+                      <div><h3 className="font-bold text-white">{item.player}</h3><p className="text-cyan-300 text-sm">{item.team}</p></div>
                       <div className="flex gap-4">
                         <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, Math.max(0, item.yellow - 1), item.red)} className="font-bold"><Minus /></Button><span className="text-yellow-300 font-bold">🟨 {item.yellow}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow + 1, item.red)} className="font-bold"><Plus /></Button></div>
                         <div className="flex items-center gap-2"><Button size="sm" onClick={() => updateCard(item.id, item.yellow, Math.max(0, item.red - 1))} className="font-bold"><Minus /></Button><span className="text-red-500 font-bold">🟥 {item.red}</span><Button size="sm" onClick={() => updateCard(item.id, item.yellow, item.red + 1)} className="font-bold"><Plus /></Button></div>
