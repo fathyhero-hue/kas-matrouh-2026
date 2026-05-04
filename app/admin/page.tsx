@@ -68,9 +68,12 @@ const generatePostContent = (match: any) => {
 
 const pushNotification = async (title: string, body: string) => {
   try {
-     const res = await fetch("/api/notify", {
+  const res = await fetch("/api/push-service", { // غيرنا الاسم هنا للمسار الجديد
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json" 
+        },
         body: JSON.stringify({ title, body })
      });
      return res.ok;
