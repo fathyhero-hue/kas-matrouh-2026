@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     // الـ App ID بتاعك
     const APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c"; 
     
-    // ⚠️ حط مفتاح الـ REST API Key بتاعك هنا بين علامتين التنصيص ""
+    // المفتاح السري الجديد (REST API KEY) اللي إنت لسه مولده
     const REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittzhvop5bjyemdubmfaamssu2362tmqporlevdmcjrk7thzs7txtxbzqkks5bwgoydxu3n7jdfh3cwq"; 
 
     const response = await fetch('https://onesignal.com/api/v1/notifications', {
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         app_id: APP_ID,
-        // حطينا كل أسماء الشرائح عشان نتفادى خطأ التحديث الجديد لـ OneSignal
+        // الشرائح دي عشان تضمن إن الإشعار يوصل لكل الموبايلات بلا استثناء
         included_segments: ['Total Subscriptions', 'Active Users', 'Subscribed Users'], 
         headings: { en: title, ar: title },
         contents: { en: body, ar: body },
