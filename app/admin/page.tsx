@@ -1,5 +1,13 @@
 "use client";
 
+// ================== LIVE IMPROVEMENTS ==================
+const calculateLiveMinute = (startTime:any) => {
+  if (!startTime) return 0;
+  const now = new Date().getTime();
+  const started = new Date(startTime).getTime();
+  return Math.max(0, Math.floor((now - started) / 60000));
+};
+// =======================================================
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,6 +122,23 @@ const renderMatchScore = (match: any) => {
   );
 };
 
+
+const getAccurateLiveMinute = (match: any) => {
+  const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0;
+  const startedAt = Number(match?.timerStartedAt || 0);
+  const pausedTotal = Number(match?.timerPausedTotal || 0) || 0;
+  if (!match?.isTimerRunning || !startedAt) return Number(match?.liveMinute ?? baseMinute) || 0;
+  const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal);
+  return baseMinute + Math.floor(elapsed / 60000);
+};
+
+const getPenaltyScore = (match: any) => ({
+  home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length,
+  away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length
+});
+
+const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
+
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
@@ -171,12 +196,14 @@ export default function AdminPage() {
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
   const [cardForm, setCardForm] = useState({ player: "", team: currentTeamsList[0] || "", type: "yellow" as "yellow" | "red" });
-  const [mediaForm, setMediaForm] = useState({ title: "", url: "" });
+  const [mediaForm, setMediaForm] = useState({ type: "news", title: "", url: "", imageUrl: "", body: "" });
 
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
+  const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
   const [formationForm, setFormationForm] = useState({
     round: "دور المجموعات",
-    players: Array(7).fill({...defaultPlayer})
+    players: Array(7).fill({...defaultPlayer}),
+    coach: {...defaultCoach}
   });
 
   const [liveEventForms, setLiveEventForms] = useState<Record<string, { minute?: number, type: string, text: string }>>({});
@@ -216,9 +243,9 @@ export default function AdminPage() {
     if(existing) {
         const playersArr = Array.isArray(existing.players) ? [...existing.players] : Array(7).fill({...defaultPlayer});
         while(playersArr.length < 7) playersArr.push({...defaultPlayer});
-        setFormationForm({ round: existing.round, players: playersArr });
+        setFormationForm({ round: existing.round, players: playersArr, coach: existing.coach || {...defaultCoach} });
     } else {
-        setFormationForm(p => ({ ...p, players: Array(7).fill({...defaultPlayer}) }));
+        setFormationForm(p => ({ ...p, players: Array(7).fill({...defaultPlayer}), coach: {...defaultCoach} }));
     }
   }, [formationForm.round, formationsList]);
 
@@ -242,10 +269,13 @@ export default function AdminPage() {
     const timerInterval = setInterval(() => {
       matchesRef.current.forEach(m => {
         if (m.isTimerRunning && m.status !== "انتهت" && m.status !== "استراحة" && m.status !== "ضربات جزاء" && m.status !== "ستبدأ بعد قليل") {
-          updateDoc(doc(db, collName, m.id), { liveMinute: (m.liveMinute || 0) + 1 });
+          const accurateMinute = getAccurateLiveMinute(m);
+          if (accurateMinute !== Number(m.liveMinute || 0)) {
+            updateDoc(doc(db, collName, m.id), { liveMinute: accurateMinute });
+          }
         }
       });
-    }, 60000); 
+    }, 5000); 
 
     return () => { 
         unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); 
@@ -505,7 +535,31 @@ export default function AdminPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
-  const updateMatchLive = async (id: string, updates: any) => await updateDoc(doc(db, getColl("matches"), id), updates);
+  const updateMatchLive = async (id: string, updates: any) => {
+    const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id);
+    const nextUpdates = { ...updates };
+    if (Object.prototype.hasOwnProperty.call(nextUpdates, 'isTimerRunning')) {
+      if (nextUpdates.isTimerRunning) {
+        const baseMinute = getAccurateLiveMinute(currentMatch);
+        nextUpdates.liveMinute = baseMinute;
+        nextUpdates.liveMinuteBase = baseMinute;
+        nextUpdates.timerStartedAt = Date.now();
+        nextUpdates.timerPausedTotal = 0;
+      } else if (currentMatch) {
+        const pausedMinute = getAccurateLiveMinute(currentMatch);
+        nextUpdates.liveMinute = pausedMinute;
+        nextUpdates.liveMinuteBase = pausedMinute;
+        nextUpdates.timerStartedAt = null;
+        nextUpdates.timerPausedTotal = 0;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(nextUpdates, 'liveMinute') && currentMatch?.isTimerRunning && !Object.prototype.hasOwnProperty.call(updates, 'isTimerRunning')) {
+      nextUpdates.liveMinuteBase = Number(nextUpdates.liveMinute) || 0;
+      nextUpdates.timerStartedAt = Date.now();
+      nextUpdates.timerPausedTotal = 0;
+    }
+    await updateDoc(doc(db, getColl("matches"), id), nextUpdates);
+  };
 
   const togglePenalty = async (matchId: string, team: 'home' | 'away', index: number, current: string) => {
     const field = team === 'home' ? 'penaltiesHome' : 'penaltiesAway';
@@ -528,7 +582,7 @@ export default function AdminPage() {
     const minute = form.minute !== undefined ? form.minute : currentLiveMinute;
     const currentMatch = matches.find(m => m.id === matchId);
     if(!currentMatch) return;
-    const newEvent = { minute, type: form.type || 'info', text: form.text.trim() };
+    const newEvent = { minute, type: form.type || 'info', text: form.text.trim(), createdAt: new Date().toISOString() };
     const updatedEvents = [...(currentMatch.liveEvents || []), newEvent];
     await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
     setLiveEventForms(p => ({ ...p, [matchId]: { minute: currentLiveMinute, type: 'info', text: '' } }));
@@ -634,12 +688,14 @@ export default function AdminPage() {
   };
 
   const addMedia = async () => {
-    if (!mediaForm.title || !mediaForm.url) return alert("اكتب عنوان ورابط الفيديو");
+    if (!mediaForm.title.trim()) return alert("اكتب عنوان الخبر أو الفيديو");
+    if ((mediaForm.type === "video" || mediaForm.type === "goal") && !mediaForm.url.trim()) return alert("اكتب رابط الفيديو أو الهدف");
+    if (mediaForm.type === "news" && !mediaForm.body.trim() && !mediaForm.url.trim()) return alert("اكتب تفاصيل الخبر أو رابط الخبر");
     await addDoc(collection(db, getColl("media")), mediaForm);
-    setMediaForm({ title: "", url: "" }); 
-    alert("✅ تم إضافة الفيديو بنجاح");
+    setMediaForm({ type: "news", title: "", url: "", imageUrl: "", body: "" }); 
+    alert(mediaForm.type === "news" ? "✅ تم إضافة الخبر بنجاح" : "✅ تم إضافة الفيديو/الهدف بنجاح");
   };
-  const deleteMedia = async (id: string) => confirm("حذف هذا الفيديو؟") && await deleteDoc(doc(db, getColl("media"), id));
+  const deleteMedia = async (id: string) => confirm("حذف هذا العنصر؟") && await deleteDoc(doc(db, getColl("media"), id));
 
   const addMotm = async () => {
     if (!motmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
@@ -668,10 +724,10 @@ export default function AdminPage() {
   const saveFormation = async () => {
     const existing = formationsList.find(f => f.round === formationForm.round);
     if(existing) {
-       await updateDoc(doc(db, getColl("formations"), existing.id), { players: formationForm.players });
+       await updateDoc(doc(db, getColl("formations"), existing.id), { players: formationForm.players, coach: formationForm.coach || {...defaultCoach} });
        alert("✅ تم التحديث بنجاح");
     } else {
-       await addDoc(collection(db, getColl("formations")), { round: formationForm.round, players: formationForm.players });
+       await addDoc(collection(db, getColl("formations")), { round: formationForm.round, players: formationForm.players, coach: formationForm.coach || {...defaultCoach} });
        alert("✅ تم الحفظ بنجاح");
     }
   };
@@ -682,6 +738,10 @@ export default function AdminPage() {
       newPlayers[index] = { ...newPlayers[index], [field]: value };
       return { ...prev, players: newPlayers };
     });
+  };
+
+  const updateFormationCoach = (field: string, value: any) => {
+    setFormationForm(prev => ({ ...prev, coach: { ...(prev.coach || {...defaultCoach}), [field]: value } }));
   };
 
   const deletePrediction = async (id: string) => confirm("حذف التوقع؟") && await deleteDoc(doc(db, getColl("predictions"), id));
@@ -908,7 +968,7 @@ export default function AdminPage() {
             <TabsTrigger value="predictions" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">توقعات 🎁</TabsTrigger>
             <TabsTrigger value="goals" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
             <TabsTrigger value="cards" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
-            <TabsTrigger value="media" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">ميديا</TabsTrigger>
+            <TabsTrigger value="media" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">أخبار البطولة</TabsTrigger>
             <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
             <TabsTrigger value="ticker" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
@@ -1026,6 +1086,13 @@ export default function AdminPage() {
                        <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-emerald-300 font-bold">التقييم</label><Input type="number" value={formationForm.players[item.idx]?.rating || 99} onChange={e => updateFormationPlayer(item.idx, 'rating', Number(e.target.value))} className="bg-[#0a1428] border-emerald-500 text-white w-16 text-center font-black" /></div>
                      </div>
                    ))}
+                   <div className="bg-gradient-to-r from-emerald-900/50 to-[#1e2a4a] p-4 rounded-2xl border border-yellow-400/30 flex flex-col lg:flex-row gap-4 items-center shadow-lg">
+                     <Badge className="bg-yellow-400 text-black w-full lg:w-32 justify-center py-2 shrink-0 font-black">أفضل مدير فني</Badge>
+                     <Input placeholder="اسم المدير الفني" value={formationForm.coach?.name || ""} onChange={e => updateFormationCoach('name', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white font-bold" />
+                     <select value={formationForm.coach?.team || ""} onChange={e => updateFormationCoach('team', e.target.value)} className="bg-[#0a1428] border border-yellow-400/30 rounded-xl p-2 text-white outline-none w-full lg:w-48"><option value="">-- اختر الفريق --</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                     <Input placeholder="رابط صورة المدير الفني" value={formationForm.coach?.imageUrl || ""} onChange={e => updateFormationCoach('imageUrl', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white" />
+                     <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-yellow-300 font-bold">التقييم</label><Input type="number" value={formationForm.coach?.rating || 99} onChange={e => updateFormationCoach('rating', Number(e.target.value))} className="bg-[#0a1428] border-yellow-400 text-white w-16 text-center font-black" /></div>
+                   </div>
                    <Button onClick={saveFormation} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl mt-4 shadow-lg">حفظ تشكيلة "{formationForm.round}" 🚀</Button>
                  </div>
               </CardContent>
@@ -1041,7 +1108,7 @@ export default function AdminPage() {
                     <span className={`font-black text-lg ${match.status === 'ستبدأ بعد قليل' ? '' : 'animate-pulse'}`}>{match.status === 'ستبدأ بعد قليل' ? '🟩' : '🔴'} البث المباشر</span>
                     <select value={match.status || "الشوط الأول"} onChange={(e) => updateMatchLive(match.id, { status: e.target.value })} className="bg-black/40 border-none text-white font-bold rounded-lg px-3 py-1 text-sm outline-none cursor-pointer"><option value="ستبدأ بعد قليل">ستبدأ بعد قليل</option><option value="الشوط الأول">الشوط الأول</option><option value="استراحة">استراحة</option><option value="الشوط الثاني">الشوط الثاني</option><option value="وقت إضافي">وقت إضافي</option><option value="ضربات جزاء">ضربات جزاء</option><option value="انتهت">انتهت</option></select>
                   </div>
-                  <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20 font-bold" onClick={() => updateMatchLive(match.id, { isLive: false, streamClosed: true, isTimerRunning: false })}>إغلاق البث</Button>
+                  <Button size="sm" variant="outline" className="bg-white/10 text-white border-white/20 font-bold" onClick={() => updateMatchLive(match.id, { isLive: false, streamClosed: true, isTimerRunning: false, timerStartedAt: null, timerPausedTotal: 0 })}>إغلاق البث</Button>
                 </div>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-center gap-2 sm:gap-6 mb-8">
@@ -1062,7 +1129,7 @@ export default function AdminPage() {
                   </div>
                   <div className="flex justify-center items-center gap-6 mb-8 bg-[#13213a] p-4 rounded-2xl border border-white/5 flex-wrap">
                     <Button onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} className={`font-bold h-12 px-6 text-white ${match.isTimerRunning ? 'bg-amber-500' : 'bg-emerald-500'}`}>{match.isTimerRunning ? <><Pause className="mr-2 h-5 w-5" /> إيقاف</> : <><Play className="mr-2 h-5 w-5" /> تشغيل</>}</Button>
-                    <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={match.liveMinute || 0} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
+                    <div className="flex items-center gap-3"><label className="text-gray-400 font-bold">الدقيقة:</label><Input type="number" value={getAccurateLiveMinute(match)} onChange={(e) => updateMatchLive(match.id, { liveMinute: Number(e.target.value) })} className="w-24 text-center text-2xl font-black bg-black border-yellow-400 text-yellow-400" /></div>
                   </div>
                   <div className="grid md:grid-cols-3 gap-8 items-center mb-8">
                     <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5">
@@ -1099,16 +1166,16 @@ export default function AdminPage() {
                     <h4 className="text-cyan-400 font-black mb-4 flex items-center gap-2"><Activity /> إضافة حدث للتايم لاين</h4>
                     <div className="flex flex-col lg:flex-row gap-4">
                       <div className="flex gap-2">
-                        <Input type="number" placeholder="الدقيقة" value={liveEventForms[match.id]?.minute ?? match.liveMinute ?? 0} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {type: 'info', text: ''}), minute: Number(e.target.value)}}))} className="w-24 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold text-center" />
-                        <select value={liveEventForms[match.id]?.type || 'info'} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: match.liveMinute||0, text: ''}), type: e.target.value}}))} className="bg-[#1e2a4a] border-cyan-500/50 rounded-xl px-4 text-white outline-none cursor-pointer font-bold">
+                        <Input type="number" placeholder="الدقيقة" value={liveEventForms[match.id]?.minute ?? getAccurateLiveMinute(match)} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {type: 'info', text: ''}), minute: Number(e.target.value)}}))} className="w-24 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold text-center" />
+                        <select value={liveEventForms[match.id]?.type || 'info'} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: getAccurateLiveMinute(match), text: ''}), type: e.target.value}}))} className="bg-[#1e2a4a] border-cyan-500/50 rounded-xl px-4 text-white outline-none cursor-pointer font-bold">
                           <option value="goal">هدف ⚽</option>
                           <option value="yellow">إنذار 🟨</option>
                           <option value="red">طرد 🟥</option>
                           <option value="info">تحديث 🎙️</option>
                         </select>
                       </div>
-                      <Input placeholder="تفاصيل الحدث..." value={liveEventForms[match.id]?.text || ''} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: match.liveMinute||0, type: 'info'}), text: e.target.value}}))} className="flex-1 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold" />
-                      <Button onClick={() => addLiveEvent(match.id, match.liveMinute || 0)} className="bg-cyan-500 text-white font-black w-full lg:w-auto px-8">نشر</Button>
+                      <Input placeholder="تفاصيل الحدث..." value={liveEventForms[match.id]?.text || ''} onChange={e => setLiveEventForms(p => ({...p, [match.id]: {...(p[match.id] || {minute: getAccurateLiveMinute(match), type: 'info'}), text: e.target.value}}))} className="flex-1 bg-[#1e2a4a] border-cyan-500/50 text-white font-bold" />
+                      <Button onClick={() => addLiveEvent(match.id, getAccurateLiveMinute(match))} className="bg-cyan-500 text-white font-black w-full lg:w-auto px-8">نشر</Button>
                     </div>
                     {match.liveEvents && match.liveEvents.length > 0 && (
                       <div className="mt-6 space-y-2">
@@ -1161,7 +1228,7 @@ export default function AdminPage() {
                                <div className="text-cyan-300 text-center mt-4 text-sm font-bold border-t border-white/5 pt-2">{getArabicDay(match.date)} • {match.date}</div>
                             </div>
                             <div className="flex gap-2 justify-center flex-wrap mt-2">
-                               <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1 font-bold">بث</Button>
+                               <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0, liveMinuteBase: 0, timerStartedAt: null, timerPausedTotal: 0, isTimerRunning: false }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white flex-1 font-bold">بث</Button>
                                <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1 font-bold">تعديل</Button>
                                <Button size="sm" onClick={() => openMotmPopup(match)} className="bg-yellow-500 text-black flex-1 font-bold">نجم 🌟</Button>
                                <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1 font-bold">حذف</Button>
@@ -1243,7 +1310,7 @@ export default function AdminPage() {
                     <div className="flex gap-2 justify-center mt-2 flex-wrap">
                       <Button size="sm" onClick={() => openPoster(m)} className="bg-yellow-400 text-black font-bold border-2 border-yellow-400 shadow-md">بوستر 📸</Button>
                       <Button size="sm" onClick={() => setShareMatch(m)} className="bg-emerald-500 text-white font-bold">نص 📋</Button>
-                      <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
+                      <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0, liveMinuteBase: 0, timerStartedAt: null, timerPausedTotal: 0, isTimerRunning: false }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-red-600 text-white font-bold">بث</Button>
                       <Button size="sm" onClick={() => startEdit(m)} className="bg-transparent border-yellow-400 text-yellow-400 font-bold border">تعديل</Button>
                       <Button size="sm" onClick={() => openMotmPopup(m)} className="bg-yellow-500 text-black font-bold">نجم 🌟</Button>
                       <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
@@ -1265,7 +1332,7 @@ export default function AdminPage() {
                      </div>
                      <div className="text-cyan-300 text-sm text-center border-t border-white/5 pt-2 font-bold">{m.time}</div>
                      <div className="flex gap-2 mt-2 flex-wrap">
-                        <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0 }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-emerald-600 text-white flex-1 font-bold">بدء الآن</Button>
+                        <Button size="sm" onClick={() => { updateMatchLive(m.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل", liveMinute: 0, liveMinuteBase: 0, timerStartedAt: null, timerPausedTotal: 0, isTimerRunning: false }); setActiveTab("live"); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="bg-emerald-600 text-white flex-1 font-bold">بدء الآن</Button>
                         <Button size="sm" onClick={() => openMotmPopup(m)} className="bg-yellow-500 text-black font-bold">نجم 🌟</Button>
                         <Button size="sm" onClick={() => startEdit(m)} className="bg-yellow-400 text-black font-bold">تعديل</Button>
                         <Button size="sm" onClick={() => deleteMatch(m.id)} variant="destructive" className="font-bold">حذف</Button>
@@ -1361,10 +1428,31 @@ export default function AdminPage() {
 
           <TabsContent value="media">
             <Card className="border-emerald-500 bg-[#13213a]">
-              <CardHeader><CardTitle className="text-emerald-400 flex items-center gap-2"><Video /> ميديا</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-emerald-400 flex items-center gap-2"><Video /> أخبار البطولة والفيديوهات</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-[#1e2a4a] rounded-2xl"><Input value={mediaForm.title} onChange={e => setMediaForm(p => ({...p, title: e.target.value}))} placeholder="العنوان" className="bg-[#0a1428] border-emerald-500 text-white font-bold" /><Input value={mediaForm.url} onChange={e => setMediaForm(p => ({...p, url: e.target.value}))} placeholder="الرابط" className="bg-[#0a1428] border-emerald-500 text-white font-bold" /><Button onClick={addMedia} className="bg-emerald-500 text-white font-bold h-full">إضافة</Button></div>
-                <div className="space-y-3">{mediaItems.map(item => (<div key={item.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-emerald-500/30"><div className="font-bold text-white">{item.title}</div><Button size="sm" variant="destructive" onClick={() => deleteMedia(item.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>))}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-[#1e2a4a] rounded-2xl">
+                  <select value={mediaForm.type} onChange={e => setMediaForm(p => ({...p, type: e.target.value}))} className="bg-[#0a1428] border border-emerald-500 rounded-md px-3 py-2 text-white font-bold outline-none">
+                    <option value="news">خبر البطولة 📰</option>
+                    <option value="video">فيديو 🎥</option>
+                    <option value="goal">هدف ⚽</option>
+                  </select>
+                  <Input value={mediaForm.title} onChange={e => setMediaForm(p => ({...p, title: e.target.value}))} placeholder={mediaForm.type === "news" ? "عنوان الخبر" : "عنوان الفيديو / الهدف"} className="bg-[#0a1428] border-emerald-500 text-white font-bold" />
+                  <Input value={mediaForm.url} onChange={e => setMediaForm(p => ({...p, url: e.target.value}))} placeholder={mediaForm.type === "news" ? "رابط الخبر اختياري" : "رابط يوتيوب"} className="bg-[#0a1428] border-emerald-500 text-white font-bold" />
+                  <Input value={mediaForm.imageUrl} onChange={e => setMediaForm(p => ({...p, imageUrl: e.target.value}))} placeholder="رابط صورة الخبر اختياري" className="bg-[#0a1428] border-emerald-500 text-white font-bold" />
+                  <Button onClick={addMedia} className="bg-emerald-500 text-white font-bold h-full">إضافة</Button>
+                  <textarea value={mediaForm.body} onChange={e => setMediaForm(p => ({...p, body: e.target.value}))} placeholder="تفاصيل الخبر" className="md:col-span-2 lg:col-span-5 min-h-[120px] bg-[#0a1428] border border-emerald-500 rounded-md p-4 text-white font-bold outline-none resize-none" />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="text-yellow-400 font-black text-xl">📰 أخبار البطولة</h3>
+                    {mediaItems.filter(item => (item.type || "news") === "news").map(item => (<div key={item.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-yellow-400/30"><div><div className="font-bold text-white">{item.title}</div><div className="text-gray-400 text-xs font-bold mt-1 line-clamp-1">{item.body || item.url}</div></div><Button size="sm" variant="destructive" onClick={() => deleteMedia(item.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>))}
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-cyan-400 font-black text-xl">🎥 الفيديوهات والأهداف</h3>
+                    {mediaItems.filter(item => (item.type || "video") === "video" || item.type === "goal").map(item => (<div key={item.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex justify-between items-center border border-cyan-500/30"><div><Badge className="bg-cyan-500 text-white mb-1">{item.type === "goal" ? "هدف" : "فيديو"}</Badge><div className="font-bold text-white">{item.title}</div></div><Button size="sm" variant="destructive" onClick={() => deleteMedia(item.id)} className="font-bold"><Trash2 className="h-4 w-4" /></Button></div>))}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
