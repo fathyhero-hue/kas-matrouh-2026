@@ -160,29 +160,32 @@ const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: 
 
 // ================= الكارت الاحترافي الجديد =================
 const MiniFutCard = ({ player, position }: { player: any, position: string }) => {
+  const baseSize = "w-[74px] sm:w-[88px] md:w-[104px] lg:w-[118px]";
   if(!player || !player.name) return (
-    <div className="w-[70px] h-[100px] md:w-[110px] md:h-[150px] bg-[#0a1428]/60 border-2 border-dashed border-emerald-500/30 rounded-2xl flex items-center justify-center text-emerald-500/50 text-xs md:text-sm font-black shadow-inner backdrop-blur-sm transition-all hover:border-emerald-500/60">
+    <div className={`${baseSize} h-[112px] sm:h-[132px] md:h-[154px] lg:h-[172px] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/40 rounded-[1.4rem] flex flex-col items-center justify-center text-emerald-300/70 text-xs md:text-sm font-black shadow-inner backdrop-blur-sm transition-all hover:border-emerald-400/80`}>
+      <span className="text-2xl mb-1 opacity-60">＋</span>
       {position}
     </div>
   );
-  
+
   return (
-    <div className="relative w-[70px] md:w-[110px] transition-transform duration-300 hover:scale-110 cursor-pointer z-10 hover:z-50 drop-shadow-[0_15px_20px_rgba(0,0,0,0.6)]">
-      <div className="w-full bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-2xl border border-yellow-400/40 overflow-hidden flex flex-col shadow-lg">
-        <div className="relative w-full aspect-[4/5] bg-[#050a14] border-b border-white/5">
+    <div className={`relative ${baseSize} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_12px_22px_rgba(0,0,0,0.65)]`}>
+      <div className="relative w-full rounded-[1.4rem] overflow-hidden border border-yellow-400/50 bg-gradient-to-b from-yellow-300/20 via-[#1e2a4a] to-[#07101f] shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
+        <div className="absolute inset-x-2 top-2 h-10 bg-gradient-to-r from-yellow-400/0 via-yellow-300/20 to-yellow-400/0 rounded-full blur-md"></div>
+        <div className="relative w-full aspect-[4/4.9] bg-gradient-to-b from-[#101b32] to-[#050a14] border-b border-white/10">
           {player.imageUrl ? (
-             <img src={player.imageUrl} className="w-full h-full object-cover object-top" alt={player.name} loading="lazy" />
+             <img src={player.imageUrl} className="w-full h-full object-contain object-center p-1.5 bg-[#050a14]" alt={player.name} loading="lazy" />
           ) : (
              <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">👤</div>
           )}
-          <div className="absolute top-0 left-0 flex flex-col items-center bg-gradient-to-br from-yellow-300 to-yellow-600 px-1.5 py-0.5 rounded-br-xl shadow-md border-r border-b border-yellow-700/50">
+          <div className="absolute top-1 left-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-300 to-yellow-600 min-w-[28px] md:min-w-[34px] px-1.5 py-1 rounded-xl shadow-md border border-yellow-700/50">
              <span className="text-[10px] md:text-sm font-black text-black leading-none">{player.rating || 99}</span>
-             <span className="text-[8px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
+             <span className="text-[7px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
           </div>
         </div>
-        <div className="p-1.5 md:p-2 flex flex-col items-center justify-center w-full">
-           <span className="text-[9px] md:text-[12px] font-black text-white w-full text-center truncate mb-1" title={player.name}>{player.name}</span>
-           <span className="bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded text-center w-full truncate" title={player.team}>
+        <div className="relative p-1.5 md:p-2 flex flex-col items-center justify-center w-full bg-gradient-to-b from-[#101b32] to-[#07101f]">
+           <span className="text-[9px] sm:text-[10px] md:text-[12px] font-black text-white w-full text-center truncate mb-1 leading-tight" title={player.name}>{player.name}</span>
+           <span className="bg-yellow-400/10 border border-yellow-400/25 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-lg text-center w-full truncate" title={player.team}>
              {player.team}
            </span>
         </div>
@@ -963,19 +966,38 @@ export default function Page() {
                    </div>
                  </div>
                )}
-               <div className="relative w-full aspect-[3/4] md:aspect-square bg-gradient-to-t from-green-800 via-green-600 to-green-800 border-4 border-white/80 rounded-lg overflow-hidden shadow-2xl">
+               <div className="relative w-full min-h-[720px] sm:min-h-[760px] md:min-h-[820px] lg:min-h-[880px] bg-gradient-to-t from-[#0d5f2e] via-[#16813b] to-[#0d5f2e] border-4 border-white/80 rounded-[2rem] overflow-hidden shadow-2xl">
                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/2 left-0 w-full h-[2px] bg-white/60 -translate-y-1/2"></div>
-                    <div className="absolute top-1/2 left-1/2 w-24 h-24 md:w-32 md:h-32 border-[2px] border-white/60 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-                    <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-white/60 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-                    <div className="absolute bottom-0 left-1/2 w-1/2 md:w-1/3 h-1/6 border-x-[2px] border-t-[2px] border-white/60 -translate-x-1/2"></div>
-                    <div className="absolute top-0 left-1/2 w-1/2 md:w-1/3 h-1/6 border-x-[2px] border-b-[2px] border-white/60 -translate-x-1/2"></div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.14),transparent_45%)]"></div>
+                    <div className="absolute inset-0 opacity-20" style={{backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 2px, transparent 2px, transparent 80px)"}}></div>
+                    <div className="absolute top-1/2 left-0 w-full h-[2px] bg-white/70 -translate-y-1/2"></div>
+                    <div className="absolute top-1/2 left-1/2 w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 border-[2px] border-white/70 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+                    <div className="absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-white/80 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
+                    <div className="absolute bottom-0 left-1/2 w-[58%] md:w-[42%] h-[16%] border-x-[2px] border-t-[2px] border-white/70 -translate-x-1/2 rounded-t-2xl"></div>
+                    <div className="absolute bottom-0 left-1/2 w-[30%] md:w-[22%] h-[7%] border-x-[2px] border-t-[2px] border-white/70 -translate-x-1/2 rounded-t-xl"></div>
+                    <div className="absolute top-0 left-1/2 w-[58%] md:w-[42%] h-[16%] border-x-[2px] border-b-[2px] border-white/70 -translate-x-1/2 rounded-b-2xl"></div>
+                    <div className="absolute top-0 left-1/2 w-[30%] md:w-[22%] h-[7%] border-x-[2px] border-b-[2px] border-white/70 -translate-x-1/2 rounded-b-xl"></div>
                  </div>
-                 <div className="absolute inset-0 p-2 md:p-6 flex flex-col justify-between z-10">
-                    <div className="flex justify-center w-full"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
-                    <div className="flex justify-between w-full px-2 md:px-12 -mt-4 md:-mt-6"><MiniFutCard player={currentFormation.players[3]} position="LM" /><div className="mt-6 md:mt-10"><MiniFutCard player={currentFormation.players[4]} position="CM" /></div><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
-                    <div className="flex justify-around w-full px-8 md:px-24 -mt-2 md:-mt-4"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
-                    <div className="flex justify-center w-full"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
+
+                 <div className="absolute inset-0 z-10 px-3 py-5 sm:px-5 sm:py-7 md:px-8 md:py-10 grid grid-rows-[1fr_1.15fr_1.05fr_1fr] items-center">
+                    <div className="flex justify-center items-center">
+                      <MiniFutCard player={currentFormation.players[6]} position="ST" />
+                    </div>
+
+                    <div className="grid grid-cols-3 items-center gap-2 sm:gap-4 md:gap-8">
+                      <div className="flex justify-center"><MiniFutCard player={currentFormation.players[3]} position="LM" /></div>
+                      <div className="flex justify-center translate-y-8 sm:translate-y-10 md:translate-y-12"><MiniFutCard player={currentFormation.players[4]} position="CM" /></div>
+                      <div className="flex justify-center"><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 items-center gap-8 sm:gap-14 md:gap-24 px-8 sm:px-16 md:px-28">
+                      <div className="flex justify-center"><MiniFutCard player={currentFormation.players[1]} position="CB" /></div>
+                      <div className="flex justify-center"><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                    </div>
+
+                    <div className="flex justify-center items-end">
+                      <MiniFutCard player={currentFormation.players[0]} position="GK" />
+                    </div>
                  </div>
                </div>
              </div>
