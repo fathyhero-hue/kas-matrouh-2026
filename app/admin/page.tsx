@@ -154,7 +154,9 @@ export default function AdminPage() {
   const [predictions, setPredictions] = useState<any[]>([]);
   const [motmList, setMotmList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
-  const [rostersList, setRostersList] = useState<any[]>([]); 
+  const [rostersList, setRostersList] = useState<any[]>([]);
+  const [productsList, setProductsList] = useState<any[]>([]);
+  const [ordersList, setOrdersList] = useState<any[]>([]); 
 
   const [tickerText, setTickerText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -198,6 +200,8 @@ export default function AdminPage() {
   const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
   const [cardForm, setCardForm] = useState({ player: "", team: currentTeamsList[0] || "", type: "yellow" as "yellow" | "red" });
   const [mediaForm, setMediaForm] = useState({ type: "news", title: "", url: "", imageUrl: "", body: "" });
+  const [productForm, setProductForm] = useState({ title: "", price: "", imageUrl: "", description: "", stock: "", isActive: true });
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
   const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
@@ -265,6 +269,8 @@ export default function AdminPage() {
     const unsubMotm = onSnapshot(collection(db, getColl("motm")), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubForms = onSnapshot(collection(db, getColl("formations")), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, getColl("team_rosters")), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProducts = onSnapshot(collection(db, "products"), (snap) => setProductsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubOrders = onSnapshot(collection(db, "orders"), (snap) => setOrdersList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any,b:any)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
 
     const timerInterval = setInterval(() => {
@@ -280,7 +286,7 @@ export default function AdminPage() {
 
     return () => { 
         unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); 
-        unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubTicker(); 
+        unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubProducts(); unsubOrders(); unsubTicker(); 
         clearInterval(timerInterval); 
     };
   }, [isAuth, activeTournament]);
@@ -688,7 +694,39 @@ export default function AdminPage() {
     } catch (e) { alert("حدث خطأ أثناء الأرشفة."); }
   };
 
-  const addMedia = async () => {
+  
+  const saveProduct = async () => {
+    if (!productForm.title.trim()) return alert("اكتب اسم المنتج");
+    if (!productForm.price || Number(productForm.price) <= 0) return alert("اكتب سعر صحيح");
+    const data = { ...productForm, price: Number(productForm.price), stock: productForm.stock === "" ? "" : Number(productForm.stock), updatedAt: new Date().toISOString() };
+    if (editingProductId) {
+      await updateDoc(doc(db, "products", editingProductId), data);
+      setEditingProductId(null);
+      alert("✅ تم تعديل المنتج");
+    } else {
+      await addDoc(collection(db, "products"), data);
+      alert("✅ تم إضافة المنتج");
+    }
+    setProductForm({ title: "", price: "", imageUrl: "", description: "", stock: "", isActive: true });
+  };
+
+  const startEditProduct = (product: any) => {
+    setEditingProductId(product.id);
+    setProductForm({
+      title: product.title || "",
+      price: String(product.price || ""),
+      imageUrl: product.imageUrl || "",
+      description: product.description || "",
+      stock: product.stock === undefined ? "" : String(product.stock),
+      isActive: product.isActive !== false
+    });
+  };
+
+  const deleteProduct = async (id: string) => confirm("حذف هذا المنتج؟") && await deleteDoc(doc(db, "products", id));
+  const updateOrderStatus = async (id: string, status: string) => await updateDoc(doc(db, "orders", id), { status });
+  const updateOrderPaymentStatus = async (id: string, paymentStatus: string) => await updateDoc(doc(db, "orders", id), { paymentStatus });
+
+const addMedia = async () => {
     if (!mediaForm.title.trim()) return alert("اكتب عنوان الخبر أو الفيديو");
     if ((mediaForm.type === "video" || mediaForm.type === "goal") && !mediaForm.url.trim()) return alert("اكتب رابط الفيديو أو الهدف");
     if (mediaForm.type === "news" && !mediaForm.body.trim() && !mediaForm.url.trim()) return alert("اكتب تفاصيل الخبر أو رابط الخبر");
@@ -970,6 +1008,7 @@ export default function AdminPage() {
             <TabsTrigger value="goals" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
             <TabsTrigger value="cards" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
             <TabsTrigger value="media" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">أخبار البطولة</TabsTrigger>
+            <TabsTrigger value="shop_admin" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">المتجر 🛒</TabsTrigger>
             <TabsTrigger value="notify" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
             <TabsTrigger value="ticker" className="data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
@@ -1474,7 +1513,106 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="notify">
+          
+          <TabsContent value="shop_admin">
+            <div className="space-y-8">
+              <Card className="border-yellow-400 bg-[#13213a]">
+                <CardHeader><CardTitle className="text-yellow-300 flex items-center gap-2">🛒 إدارة المتجر</CardTitle></CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 p-4 bg-[#1e2a4a] rounded-2xl border border-yellow-400/20">
+                    <Input value={productForm.title} onChange={e => setProductForm(p => ({...p, title: e.target.value}))} placeholder="اسم المنتج" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                    <Input value={productForm.price} onChange={e => setProductForm(p => ({...p, price: e.target.value}))} placeholder="السعر" type="number" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                    <Input value={productForm.stock} onChange={e => setProductForm(p => ({...p, stock: e.target.value}))} placeholder="الكمية" type="number" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                    <Input value={productForm.imageUrl} onChange={e => setProductForm(p => ({...p, imageUrl: e.target.value}))} placeholder="رابط الصورة" className="bg-[#0a1428] border-yellow-400 text-white font-bold" />
+                    <select value={productForm.isActive ? "active" : "hidden"} onChange={e => setProductForm(p => ({...p, isActive: e.target.value === "active"}))} className="bg-[#0a1428] border border-yellow-400 rounded-md px-3 py-2 text-white font-bold outline-none">
+                      <option value="active">ظاهر في المتجر</option>
+                      <option value="hidden">مخفي</option>
+                    </select>
+                    <Button onClick={saveProduct} className="bg-yellow-400 text-black font-black">{editingProductId ? "تعديل المنتج" : "إضافة منتج"}</Button>
+                    <textarea value={productForm.description} onChange={e => setProductForm(p => ({...p, description: e.target.value}))} placeholder="وصف المنتج" className="md:col-span-2 lg:col-span-6 min-h-[100px] bg-[#0a1428] border border-yellow-400 rounded-md p-4 text-white font-bold outline-none resize-none" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {productsList.map(product => (
+                      <div key={product.id} className="bg-[#1e2a4a] p-4 rounded-2xl border border-yellow-400/20 flex flex-col gap-3">
+                        <div className="flex items-center gap-4">
+                          {product.imageUrl ? <img src={product.imageUrl} className="w-16 h-16 rounded-xl object-cover" /> : <div className="w-16 h-16 rounded-xl bg-[#0a1428] flex items-center justify-center text-2xl">🛍️</div>}
+                          <div className="flex-1">
+                            <div className="text-white font-black">{product.title}</div>
+                            <div className="text-yellow-400 font-black">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</div>
+                            <Badge className={product.isActive !== false ? "bg-emerald-500 text-white" : "bg-gray-600 text-white"}>{product.isActive !== false ? "ظاهر" : "مخفي"}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => startEditProduct(product)} className="bg-yellow-400 text-black font-bold flex-1"><Edit className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteProduct(product.id)} className="font-bold flex-1"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-cyan-500 bg-[#13213a]">
+                <CardHeader><CardTitle className="text-cyan-300 flex items-center gap-2">📦 طلبات المتجر</CardTitle></CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  {ordersList.length > 0 ? ordersList.map(order => (
+                    <div key={order.id} className="bg-[#1e2a4a] border border-cyan-500/20 rounded-2xl p-5 space-y-4">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div>
+                          <h3 className="text-xl font-black text-white">{order.customer?.name}</h3>
+                          <div className="text-cyan-300 font-bold">{order.customer?.phone}</div>
+                          <div className="text-gray-300 font-bold">{order.customer?.address}</div>
+                          <div className="text-yellow-400 font-black mt-2">الإجمالي: {Number(order.total || 0).toLocaleString("ar-EG")} ج.م</div>
+                        </div>
+                        <div className="flex flex-col gap-2 min-w-[220px]">
+                          <select value={order.status || "طلب جديد"} onChange={e => updateOrderStatus(order.id, e.target.value)} className="bg-[#0a1428] border border-cyan-500 rounded-md p-2 text-white font-bold outline-none">
+                            <option>طلب جديد</option>
+                            <option>قيد التجهيز</option>
+                            <option>تم الشحن</option>
+                            <option>تم التسليم</option>
+                            <option>ملغي</option>
+                          </select>
+                          <select value={order.paymentStatus || "في انتظار التأكيد"} onChange={e => updateOrderPaymentStatus(order.id, e.target.value)} className="bg-[#0a1428] border border-yellow-400 rounded-md p-2 text-white font-bold outline-none">
+                            <option>الدفع عند الاستلام</option>
+                            <option>في انتظار التأكيد</option>
+                            <option>تم تأكيد الدفع</option>
+                            <option>فشل الدفع</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {(order.items || []).map((item:any, i:number) => (
+                          <div key={i} className="bg-[#0a1428] rounded-xl p-3 flex justify-between text-white font-bold">
+                            <span>{item.title} × {item.qty}</span>
+                            <span className="text-yellow-400">{Number((item.price || 0) * (item.qty || 1)).toLocaleString("ar-EG")} ج.م</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="bg-[#0a1428] rounded-xl p-3 text-sm font-bold text-gray-300">
+                        <div>طريقة الدفع: <span className="text-cyan-300">{order.paymentMethod}</span></div>
+                        {order.customer?.transactionRef && <div>رقم العملية: <span className="text-yellow-300">{order.customer.transactionRef}</span></div>}
+                        {order.customer?.receiptImage && (
+                          <div className="mt-3">
+                            <div className="text-yellow-300 mb-2">صورة الإيصال:</div>
+                            <a href={order.customer.receiptImage} target="_blank" rel="noopener noreferrer">
+                              <img src={order.customer.receiptImage} alt="صورة الإيصال" className="max-w-xs max-h-56 object-contain rounded-xl border border-yellow-400/30 bg-[#050a14] p-2" />
+                            </a>
+                          </div>
+                        )}
+                        {order.customer?.receiptUrl && !order.customer?.receiptImage && <div>الإيصال القديم: <a href={order.customer.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">فتح الإيصال</a></div>}
+                        {order.customer?.notes && <div>ملاحظات: {order.customer.notes}</div>}
+                      </div>
+                    </div>
+                  )) : <div className="text-center text-white font-black py-12">لا توجد طلبات حالياً</div>}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+<TabsContent value="notify">
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader className="text-center pb-2"><BellRing className="mx-auto h-12 w-12 text-yellow-400 mb-4 animate-bounce" /><CardTitle className="text-3xl font-black text-yellow-300">إرسال إشعار عاجل 🚀</CardTitle></CardHeader>
               <CardContent className="p-6 md:p-10 space-y-6 max-w-3xl mx-auto">

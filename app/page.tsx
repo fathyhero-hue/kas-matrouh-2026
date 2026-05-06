@@ -208,7 +208,10 @@ export default function Page() {
   const [motmList, setMotmList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
-  const [rostersList, setRostersList] = useState<any[]>([]); 
+  const [rostersList, setRostersList] = useState<any[]>([]);
+  const [productsList, setProductsList] = useState<any[]>([]);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [checkoutForm, setCheckoutForm] = useState({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImage: "", receiptFileName: "", notes: "" }); 
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   
   const [search, setSearch] = useState("");
@@ -309,13 +312,14 @@ export default function Page() {
     const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, `team_rosters${suffix}`), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubProducts = onSnapshot(collection(db, "products"), (snap) => setProductsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((p:any) => p.isActive !== false).sort((a:any,b:any)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
 
     return () => { 
         unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); 
-        unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters();
+        unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts();
         unsubTicker(); clearInterval(clockTimer); 
     };
   }, [activeTournament]);
@@ -622,7 +626,51 @@ export default function Page() {
     return { ...form, players: playersArr, coach: form.coach || { name: "", team: "", imageUrl: "", rating: 99 } };
   }, [formationsList, activeTotwRound]);
 
-  if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
+  
+  const cartTotal = useMemo(() => cartItems.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0), [cartItems]);
+
+  const addToCart = (product: any) => {
+    setCartItems(prev => {
+      const found = prev.find(item => item.id === product.id);
+      if (found) return prev.map(item => item.id === product.id ? { ...item, qty: (Number(item.qty) || 1) + 1 } : item);
+      return [...prev, { ...product, qty: 1 }];
+    });
+  };
+
+  const updateCartQty = (productId: string, qty: number) => {
+    if (qty <= 0) return setCartItems(prev => prev.filter(item => item.id !== productId));
+    setCartItems(prev => prev.map(item => item.id === productId ? { ...item, qty } : item));
+  };
+
+  const handleReceiptImageUpload = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return alert("يرجى اختيار صورة فقط");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCheckoutForm(p => ({ ...p, receiptImage: reader.result as string, receiptFileName: file.name }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitOrder = async () => {
+    if (cartItems.length === 0) return alert("السلة فارغة");
+    if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إدخال الاسم ورقم الهاتف والعنوان");
+    if (checkoutForm.paymentMethod !== "cash" && !checkoutForm.transactionRef.trim() && !checkoutForm.receiptImage) return alert("يرجى إدخال رقم العملية أو إرفاق صورة الإيصال");
+    await addDoc(collection(db, "orders"), {
+      customer: checkoutForm,
+      items: cartItems.map(item => ({ id: item.id, title: item.title, price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })),
+      total: cartTotal,
+      paymentMethod: checkoutForm.paymentMethod,
+      paymentStatus: checkoutForm.paymentMethod === "cash" ? "الدفع عند الاستلام" : "في انتظار التأكيد",
+      status: "طلب جديد",
+      createdAt: new Date().toISOString()
+    });
+    alert("✅ تم إرسال الطلب بنجاح وسيتم التواصل معك للتأكيد");
+    setCartItems([]);
+    setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImage: "", receiptFileName: "", notes: "" });
+  };
+
+if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
 
   const formattedTime = time ? time.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : "";
   const formattedDate = time ? time.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "";
@@ -706,6 +754,7 @@ export default function Page() {
             { key: "stats", label: "إحصائيات", icon: "📈", extraClass: "" }, 
             { key: "motm_tab", label: "نجوم المباريات", icon: "🌟", extraClass: "" }, 
             { key: "media", label: "أخبار البطولة", icon: "📰", extraClass: "" },
+            { key: "shop", label: "تسوق الآن", icon: "🛒", extraClass: "bg-gradient-to-r from-yellow-500 to-orange-600 text-black border-none shadow-[0_0_15px_rgba(245,158,11,0.5)]" },
             { key: "settings", label: "الإعدادات", icon: "⚙️", extraClass: "bg-gray-800 text-white shadow-lg border-gray-600" }
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`flex-1 sm:flex-none px-5 py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all border ${activeTab === tab.key ? (tab.extraClass || "bg-yellow-400 text-black border-yellow-400 shadow-lg scale-105") : "bg-[#1e2a4a] text-white border-yellow-400/30 hover:bg-[#25345a]"}`}>
@@ -1422,7 +1471,99 @@ export default function Page() {
           </div>
         )}
 
-        {activeTab === "media" && (
+        
+        {activeTab === "shop" && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 shadow-xl">
+              <h2 className="text-3xl font-black text-yellow-400 mb-2">🛒 تسوق الآن</h2>
+              <p className="text-cyan-300 font-bold">منتجات كأس مطروح — اختر المنتج وأضفه للسلة ثم أرسل الطلب.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {productsList.length > 0 ? productsList.map(product => (
+                  <Card key={product.id} className="bg-[#13213a] border-yellow-400/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-400 transition-colors">
+                    <div className="aspect-square bg-[#0a1428] overflow-hidden">
+                      {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">🛍️</div>}
+                    </div>
+                    <CardContent className="p-5 space-y-3">
+                      <h3 className="text-xl font-black text-white leading-tight">{product.title}</h3>
+                      {product.description && <p className="text-gray-300 text-sm font-bold leading-6 line-clamp-3">{product.description}</p>}
+                      <div className="flex items-center justify-between gap-3">
+                        <Badge className="bg-yellow-400 text-black font-black text-lg px-3 py-1">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</Badge>
+                        {product.stock !== "" && product.stock !== undefined && <span className="text-xs text-cyan-300 font-bold">المتاح: {product.stock}</span>}
+                      </div>
+                      <Button onClick={() => addToCart(product)} className="w-full bg-yellow-400 text-black font-black rounded-2xl py-6">إضافة للسلة 🛒</Button>
+                    </CardContent>
+                  </Card>
+                )) : (
+                  <div className="col-span-full text-center py-20 bg-[#13213a] border border-yellow-400/20 rounded-3xl text-white font-black text-2xl">لا توجد منتجات حالياً</div>
+                )}
+              </div>
+
+              <div className="lg:sticky lg:top-4 h-fit bg-[#13213a] border border-cyan-500/30 rounded-3xl p-5 shadow-2xl space-y-5">
+                <h3 className="text-2xl font-black text-cyan-300">سلة الشراء</h3>
+                {cartItems.length > 0 ? (
+                  <div className="space-y-3">
+                    {cartItems.map(item => (
+                      <div key={item.id} className="bg-[#1e2a4a] border border-white/5 rounded-2xl p-3 flex items-center gap-3">
+                        {item.imageUrl && <img src={item.imageUrl} className="w-14 h-14 rounded-xl object-cover" alt={item.title} />}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white font-bold truncate">{item.title}</div>
+                          <div className="text-yellow-400 font-black text-sm">{Number(item.price || 0).toLocaleString("ar-EG")} ج.م</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => updateCartQty(item.id, (Number(item.qty) || 1) - 1)} className="w-7 h-7 rounded-full bg-red-500 text-white font-black">-</button>
+                          <span className="text-white font-black w-6 text-center">{item.qty}</span>
+                          <button onClick={() => updateCartQty(item.id, (Number(item.qty) || 1) + 1)} className="w-7 h-7 rounded-full bg-emerald-500 text-white font-black">+</button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t border-white/10 pt-4">
+                      <span className="text-white font-black">الإجمالي</span>
+                      <span className="text-yellow-400 text-2xl font-black">{cartTotal.toLocaleString("ar-EG")} ج.م</span>
+                    </div>
+                  </div>
+                ) : <p className="text-center text-gray-300 font-bold py-8">السلة فارغة</p>}
+
+                <div className="space-y-3">
+                  <Input value={checkoutForm.name} onChange={e => setCheckoutForm(p => ({...p, name: e.target.value}))} placeholder="الاسم بالكامل" className="bg-[#0a1428] border-cyan-500/50 text-white font-bold" />
+                  <Input value={checkoutForm.phone} onChange={e => setCheckoutForm(p => ({...p, phone: e.target.value}))} placeholder="رقم الهاتف" className="bg-[#0a1428] border-cyan-500/50 text-white font-bold" />
+                  <Input value={checkoutForm.address} onChange={e => setCheckoutForm(p => ({...p, address: e.target.value}))} placeholder="العنوان" className="bg-[#0a1428] border-cyan-500/50 text-white font-bold" />
+                  <select value={checkoutForm.paymentMethod} onChange={e => setCheckoutForm(p => ({...p, paymentMethod: e.target.value}))} className="w-full bg-[#0a1428] border border-cyan-500/50 rounded-md p-3 text-white font-bold outline-none">
+                    <option value="cash">كاش عند الاستلام</option>
+                    <option value="vodafone_cash">فودافون كاش</option>
+                    <option value="orange_cash">أورانج كاش</option>
+                    <option value="instapay">إنستا باي</option>
+                    <option value="fawry">فوري</option>
+                  </select>
+
+                  {checkoutForm.paymentMethod !== "cash" && (
+                    <div className="bg-[#0a1428] border border-yellow-400/30 rounded-2xl p-3 space-y-3">
+                      <p className="text-yellow-300 text-sm font-bold leading-6">
+                        بعد التحويل اكتب رقم العملية أو أرفق صورة الإيصال. يتم تأكيد الطلب يدوياً من الإدارة.
+                      </p>
+                      <Input value={checkoutForm.transactionRef} onChange={e => setCheckoutForm(p => ({...p, transactionRef: e.target.value}))} placeholder="رقم العملية" className="bg-[#1e2a4a] border-yellow-400/50 text-white font-bold" />
+                      <div className="space-y-3">
+                        <label className="block w-full cursor-pointer bg-[#1e2a4a] border border-yellow-400/50 text-white font-bold rounded-md p-3 text-center hover:bg-[#25345a] transition-colors">
+                          📎 إرفاق صورة الإيصال
+                          <input type="file" accept="image/*" onChange={e => handleReceiptImageUpload(e.target.files?.[0])} className="hidden" />
+                        </label>
+                        {checkoutForm.receiptFileName && <div className="text-emerald-300 text-xs font-bold text-center">تم اختيار: {checkoutForm.receiptFileName}</div>}
+                        {checkoutForm.receiptImage && <img src={checkoutForm.receiptImage} alt="صورة الإيصال" className="w-full max-h-48 object-contain rounded-xl border border-yellow-400/30 bg-[#0a1428] p-2" />}
+                      </div>
+                    </div>
+                  )}
+
+                  <Input value={checkoutForm.notes} onChange={e => setCheckoutForm(p => ({...p, notes: e.target.value}))} placeholder="ملاحظات اختيارية" className="bg-[#0a1428] border-cyan-500/50 text-white font-bold" />
+                  <Button onClick={submitOrder} className="w-full bg-emerald-500 text-white font-black rounded-2xl py-6" disabled={cartItems.length === 0}>تأكيد الطلب ✅</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+{activeTab === "media" && (
           <div className="space-y-8 animate-in fade-in duration-500">
                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                  <h2 className="text-3xl font-black text-yellow-400 flex items-center gap-2"><Play /> أخبار البطولة</h2>
