@@ -160,6 +160,7 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [goalSearchTerm, setGoalSearchTerm] = useState("");
   const [cardSearchTerm, setCardSearchTerm] = useState("");
+  const [motmSearchTerm, setMotmSearchTerm] = useState("");
 
   const [notifyTitle, setNotifyTitle] = useState("");
   const [notifyBody, setNotifyBody] = useState("");
@@ -1268,8 +1269,15 @@ export default function AdminPage() {
                     <Button onClick={addMotm} className={`flex-1 font-black h-12 ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white' : 'bg-yellow-400 text-black'}`}>{editingMotmId ? "تعديل" : "إضافة"}</Button>
                   </div>
                 </div>
+                <div className="bg-[#1e2a4a] border border-yellow-400/20 rounded-2xl p-4">
+                  <Input value={motmSearchTerm} onChange={e => setMotmSearchTerm(e.target.value)} placeholder="ابحث باسم اللاعب أو الفريق أو المباراة..." className="bg-[#0a1428] border-yellow-400 text-white font-bold text-center h-12 rounded-xl" />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {motmList.map(m => (
+                  {motmList.filter(m => {
+                    const q = motmSearchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return `${m.player || ""} ${m.team || ""} ${m.matchName || ""} ${m.sponsorName || ""}`.toLowerCase().includes(q);
+                  }).map(m => (
                     <div key={m.id} className="bg-[#1e2a4a] p-4 rounded-2xl flex flex-col gap-3 border border-white/10">
                         <div className="flex items-center gap-4">
                             {m.imageUrl ? <img src={m.imageUrl} className="h-10 w-10 rounded-full object-cover border-2 border-yellow-400" /> : <div className="h-10 w-10 rounded-full bg-gray-600 flex items-center justify-center">👤</div>}
@@ -1284,6 +1292,15 @@ export default function AdminPage() {
                         </div>
                     </div>
                   ))}
+                  {motmList.filter(m => {
+                    const q = motmSearchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return `${m.player || ""} ${m.team || ""} ${m.matchName || ""} ${m.sponsorName || ""}`.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="col-span-full text-center py-12 bg-[#1e2a4a] rounded-2xl border border-yellow-400/20 text-white font-black">
+                      لا توجد نتائج مطابقة للبحث
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

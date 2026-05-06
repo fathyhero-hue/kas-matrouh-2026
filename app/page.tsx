@@ -214,6 +214,7 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [searchScorers, setSearchScorers] = useState("");
   const [searchCards, setSearchCards] = useState("");
+  const [searchMotm, setSearchMotm] = useState("");
   const [loading, setLoading] = useState(true);
   
   const [predForms, setPredForms] = useState<Record<string, any>>({});
@@ -1351,48 +1352,73 @@ export default function Page() {
         )}
 
         {activeTab === "motm_tab" && (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 justify-items-center animate-in fade-in duration-500 pt-6">
-            {motmList.length > 0 ? motmList.map((m, i) => (
-              <div key={i} className="relative w-[300px] group transition-transform duration-300 hover:scale-105 mx-auto">
-                <div className="bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-[2.5rem] border-2 border-yellow-400/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
-                  <div className="relative w-full aspect-[2/3] bg-[#050a14]">
-                     {m.imageUrl ? (
-                        <img src={m.imageUrl} className="w-full h-full object-cover object-top" alt={m.player} loading="lazy" />
-                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-8xl opacity-10">👤</div>
-                     )}
-                     <div className="absolute top-6 right-6 bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-2xl shadow-lg border-2 border-black/20">
-                       {m.rating || 99}
-                     </div>
-                     {m.sponsorLogo && (
-                       <div className="absolute bottom-4 left-4 bg-white/10 backdrop-blur-md p-2 rounded-xl border border-white/20 shadow-lg">
-                         <img src={m.sponsorLogo} alt="Sponsor" className="h-10 w-auto object-contain" />
-                       </div>
-                     )}
+          <div className="space-y-6 animate-in fade-in duration-500 pt-6">
+            <div className="max-w-2xl mx-auto bg-[#13213a] border border-yellow-400/30 rounded-3xl p-4 shadow-xl">
+              <Input
+                value={searchMotm}
+                onChange={e => setSearchMotm(e.target.value)}
+                placeholder="ابحث في نجوم المباريات باسم اللاعب أو الفريق أو المباراة..."
+                className="bg-[#0a1428] border-yellow-400/50 text-white font-bold text-center h-12 rounded-2xl"
+              />
+            </div>
+
+            {(() => {
+              const filteredMotmList = motmList.filter(m => {
+                const q = searchMotm.trim().toLowerCase();
+                if (!q) return true;
+                return `${m.player || ""} ${m.team || ""} ${m.matchName || ""} ${m.sponsorName || ""}`.toLowerCase().includes(q);
+              });
+
+              if (filteredMotmList.length === 0) {
+                return (
+                  <div className="text-center py-20 bg-[#1e2a4a] w-full rounded-3xl border border-yellow-400/30">
+                    <p className="text-white font-black text-2xl mb-2">{searchMotm.trim() ? "لا توجد نتائج مطابقة للبحث" : "انتظروا نجوم المباريات 🌟"}</p>
                   </div>
-                  <div className="p-6 text-center space-y-3 bg-[#13213a]">
-                     <div className="text-3xl font-black text-yellow-300 tracking-tighter drop-shadow-md">{m.player}</div>
-                     <div className="flex items-center justify-center gap-2">
-                       <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">{m.team}</Badge>
-                     </div>
-                     <div className="mt-4 pt-4 border-t border-white/5">
-                        <div className="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-widest">مباراة</div>
-                        <div className="text-xs font-black text-white bg-[#0a1428] py-2 px-3 rounded-xl border border-white/5 italic">
-                          {m.matchName || "مباراة رسمية"}
+                );
+              }
+
+              return (
+                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 justify-items-center">
+                  {filteredMotmList.map((m, i) => (
+                    <div key={i} className="relative w-[300px] group transition-transform duration-300 hover:scale-105 mx-auto">
+                      <div className="bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-[2.5rem] border-2 border-yellow-400/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
+                        <div className="relative w-full aspect-[2/3] bg-[#050a14]">
+                           {m.imageUrl ? (
+                              <img src={m.imageUrl} className="w-full h-full object-cover object-top" alt={m.player} loading="lazy" />
+                           ) : (
+                              <div className="w-full h-full flex items-center justify-center text-8xl opacity-10">👤</div>
+                           )}
+                           <div className="absolute top-6 right-6 bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-2xl shadow-lg border-2 border-black/20">
+                             {m.rating || 99}
+                           </div>
+                           {m.sponsorLogo && (
+                             <div className="absolute bottom-4 left-4 bg-white/10 backdrop-blur-md p-2 rounded-xl border border-white/20 shadow-lg">
+                               <img src={m.sponsorLogo} alt="Sponsor" className="h-10 w-auto object-contain" />
+                             </div>
+                           )}
                         </div>
-                     </div>
-                     <div className="flex justify-center items-center gap-2 mt-4">
-                        <img src="/logo.png" className="h-6 w-auto opacity-80" alt="Matrouh Cup" />
-                        <span className="text-[10px] font-black text-yellow-400 opacity-50 uppercase tracking-widest">MAN OF THE MATCH</span>
-                     </div>
-                  </div>
+                        <div className="p-6 text-center relative">
+                          <h3 className="text-2xl font-black text-white mb-1 truncate">{m.player}</h3>
+                          <div className="flex items-center justify-center gap-2">
+                            <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">{m.team}</Badge>
+                          </div>
+                          <div className="mt-4 pt-4 border-t border-white/5">
+                             <div className="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-widest">مباراة</div>
+                             <div className="text-xs font-black text-white bg-[#0a1428] py-2 px-3 rounded-xl border border-white/5 italic">
+                               {m.matchName || "مباراة رسمية"}
+                             </div>
+                          </div>
+                          <div className="flex justify-center items-center gap-2 mt-4">
+                             <img src="/logo.png" className="h-6 w-auto opacity-80" alt="Matrouh Cup" />
+                             <span className="text-[10px] font-black text-yellow-400 opacity-50 uppercase tracking-widest">MAN OF THE MATCH</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )) : (
-              <div className="text-center col-span-full py-20 bg-[#1e2a4a] w-full rounded-3xl border border-yellow-400/30">
-                <p className="text-white font-black text-2xl mb-2">انتظروا نجوم المباريات 🌟</p>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
