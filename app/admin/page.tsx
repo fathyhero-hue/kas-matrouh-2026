@@ -203,8 +203,8 @@ export default function AdminPage() {
   const [productForm, setProductForm] = useState({ title: "", price: "", imageUrl: "", description: "", stock: "", isActive: true });
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-  const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 10 };
-  const defaultCoach = { name: "", team: "", imageUrl: "", rating: 10 };
+  const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
+  const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
   const [formationForm, setFormationForm] = useState({
     round: "دور المجموعات",
     players: Array(7).fill({...defaultPlayer}),
@@ -810,28 +810,26 @@ const addMedia = async () => {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
-  // ========== المنطق الجديد والمُحسّن للمباريات المباشرة ==========
-  const liveMatchesList = useMemo(() => {
-    return matches.filter(m => {
-      if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
+  // ========== المنطق الجديد للمباريات المباشرة ==========
+  const liveMatchesList = matches.filter(m => {
+    if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
 
-      if (m.date === todayStr && m.time) {
-        const now = new Date(); // استخدام Date داخلي لعدم ربط التحديث بالثواني
-        const [hours, minutes] = m.time.split(':').map(Number);
-        const matchTime = new Date();
-        matchTime.setHours(hours, minutes, 0, 0);
-        const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
-        
-        if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") {
-          return true;
-        }
+    if (m.date === todayStr && m.time) {
+      const now = time || new Date();
+      const [hours, minutes] = m.time.split(':').map(Number);
+      const matchTime = new Date();
+      matchTime.setHours(hours, minutes, 0, 0);
+      const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
+      
+      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") {
+        return true;
       }
-      return false;
-    });
-  }, [matches, todayStr]);
+    }
+    return false;
+  });
   
-  const liveMatches = useMemo(() => sortMatches(liveMatchesList), [liveMatchesList]);
-  const liveMatchIds = useMemo(() => new Set(liveMatchesList.map(m => m.id)), [liveMatchesList]);
+  const liveMatches = sortMatches(liveMatchesList);
+  const liveMatchIds = new Set(liveMatchesList.map(m => m.id));
 
   if (!isAuth) return (
     <div dir="rtl" className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
@@ -952,38 +950,24 @@ const addMedia = async () => {
           </div>
         </div>
 
-        {/* تصميم التبويبات الفرعية الاحترافي */}
+        {/* نظام التبويبات الفرعية أسفل الرئيسية مباشرة */}
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-          <TabsList className="flex flex-wrap justify-center bg-[#0a1428] border border-white/5 p-2 rounded-[2rem] mb-8 gap-2 md:gap-3 h-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-            <TabsTrigger value="rosters" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-800 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(37,99,235,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-blue-400/50">📋 القوائم</TabsTrigger>
-            
-            <TabsTrigger value="totw_admin" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(16,185,129,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-emerald-400/50">🏟️ التشكيلة</TabsTrigger>
-            
-            <TabsTrigger value="live" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-red-800 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(220,38,38,0.5)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-red-400/50">🔴 مباشر</TabsTrigger>
-            
-            <TabsTrigger value="knockout" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-yellow-600 data-[state=active]:text-black data-[state=active]:shadow-[0_0_20px_rgba(250,204,21,0.4)] data-[state=active]:scale-105 transition-all font-black py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-yellow-300">🏆 إقصائيات</TabsTrigger>
-            
-            <TabsTrigger value="motm" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-400 data-[state=active]:to-orange-500 data-[state=active]:text-black data-[state=active]:shadow-[0_0_20px_rgba(245,158,11,0.4)] data-[state=active]:scale-105 transition-all font-black py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-orange-300">🌟 نجوم</TabsTrigger>
-            
-            <TabsTrigger value="all" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-gray-700 data-[state=active]:to-gray-900 data-[state=active]:text-yellow-300 data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-gray-500">⚽ سابقة</TabsTrigger>
-            
-            <TabsTrigger value="today" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(99,102,241,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-indigo-400/50">📅 اليوم</TabsTrigger>
-            
-            <TabsTrigger value="tomorrow" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(6,182,212,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-cyan-400/50">📆 غداً</TabsTrigger>
-            
-            <TabsTrigger value="predictions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-teal-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(20,184,166,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-teal-400/50">🎁 توقعات</TabsTrigger>
-            
-            <TabsTrigger value="goals" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(168,85,247,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-purple-400/50">🥇 أهداف</TabsTrigger>
-            
-            <TabsTrigger value="cards" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-rose-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(244,63,94,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-rose-400/50">🟨 كروت</TabsTrigger>
-            
-            <TabsTrigger value="media" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-sky-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(14,165,233,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-sky-400/50">📰 ميديا</TabsTrigger>
-            
-            <TabsTrigger value="shop_admin" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-600 data-[state=active]:text-black data-[state=active]:shadow-[0_0_20px_rgba(245,158,11,0.4)] data-[state=active]:scale-105 transition-all font-black py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-amber-300">🛒 المتجر</TabsTrigger>
-            
-            <TabsTrigger value="notify" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-fuchsia-700 data-[state=active]:text-white data-[state=active]:shadow-[0_0_20px_rgba(217,70,239,0.4)] data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-fuchsia-400/50">🔔 تنبيهات</TabsTrigger>
-            
-            <TabsTrigger value="ticker" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-zinc-600 data-[state=active]:to-zinc-800 data-[state=active]:text-yellow-300 data-[state=active]:shadow-lg data-[state=active]:scale-105 transition-all font-bold py-2.5 px-5 rounded-2xl text-gray-400 hover:text-white hover:bg-white/5 border border-transparent data-[state=active]:border-zinc-400/50">🗞️ أخبار</TabsTrigger>
+          <TabsList className="flex flex-nowrap sm:flex-wrap overflow-x-auto justify-start sm:justify-center bg-[#13213a] border border-white/20 p-1.5 rounded-2xl mb-8 gap-2 h-auto shadow-lg custom-scrollbar touch-pan-x">
+            <TabsTrigger value="rosters" className="shrink-0 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-blue-400 border border-blue-500/30">القوائم 📋</TabsTrigger>
+            <TabsTrigger value="totw_admin" className="shrink-0 data-[state=active]:bg-emerald-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">التشكيلة 🏟️</TabsTrigger>
+            <TabsTrigger value="live" className="shrink-0 data-[state=active]:bg-red-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-red-400">مباشر</TabsTrigger>
+            <TabsTrigger value="knockout" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">إقصائيات 🏆</TabsTrigger>
+            <TabsTrigger value="motm" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">نجوم 🌟</TabsTrigger>
+            <TabsTrigger value="all" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">السابقة</TabsTrigger>
+            <TabsTrigger value="today" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">اليوم</TabsTrigger>
+            <TabsTrigger value="tomorrow" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">غداً</TabsTrigger>
+            <TabsTrigger value="predictions" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">توقعات 🎁</TabsTrigger>
+            <TabsTrigger value="goals" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
+            <TabsTrigger value="cards" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
+            <TabsTrigger value="media" className="shrink-0 data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">أخبار البطولة</TabsTrigger>
+            <TabsTrigger value="shop_admin" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">المتجر 🛒</TabsTrigger>
+            <TabsTrigger value="notify" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
+            <TabsTrigger value="ticker" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
 
           {/* نموذج إضافة وتعديل المباريات (Match Form) */}
@@ -1105,7 +1089,7 @@ const addMedia = async () => {
                        <Input placeholder="اسم اللاعب" value={formationForm.players[item.idx]?.name || ""} onChange={e => updateFormationPlayer(item.idx, 'name', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white font-bold" />
                        <select value={formationForm.players[item.idx]?.team || ""} onChange={e => updateFormationPlayer(item.idx, 'team', e.target.value)} className="bg-[#0a1428] border border-emerald-500/30 rounded-xl p-2 text-white outline-none w-full lg:w-48"><option value="">-- اختر الفريق --</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
                        <Input placeholder="رابط الصورة" value={formationForm.players[item.idx]?.imageUrl || ""} onChange={e => updateFormationPlayer(item.idx, 'imageUrl', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white" />
-                       <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-emerald-300 font-bold">التقييم (1-10)</label><Input type="number" step="0.1" min="1" max="10" value={formationForm.players[item.idx]?.rating || 10} onChange={e => updateFormationPlayer(item.idx, 'rating', Number(e.target.value))} className="bg-[#0a1428] border-emerald-500 text-white w-16 text-center font-black" /></div>
+                       <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-emerald-300 font-bold">التقييم</label><Input type="number" value={formationForm.players[item.idx]?.rating || 99} onChange={e => updateFormationPlayer(item.idx, 'rating', Number(e.target.value))} className="bg-[#0a1428] border-emerald-500 text-white w-16 text-center font-black" /></div>
                      </div>
                    ))}
                    <div className="bg-gradient-to-r from-emerald-900/50 to-[#1e2a4a] p-4 rounded-2xl border border-yellow-400/30 flex flex-col lg:flex-row gap-4 items-center shadow-lg">
@@ -1113,7 +1097,7 @@ const addMedia = async () => {
                      <Input placeholder="اسم المدير الفني" value={formationForm.coach?.name || ""} onChange={e => updateFormationCoach('name', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white font-bold" />
                      <select value={formationForm.coach?.team || ""} onChange={e => updateFormationCoach('team', e.target.value)} className="bg-[#0a1428] border border-yellow-400/30 rounded-xl p-2 text-white outline-none w-full lg:w-48"><option value="">-- اختر الفريق --</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
                      <Input placeholder="رابط صورة المدير الفني" value={formationForm.coach?.imageUrl || ""} onChange={e => updateFormationCoach('imageUrl', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white" />
-                     <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-yellow-300 font-bold">التقييم (1-10)</label><Input type="number" step="0.1" min="1" max="10" value={formationForm.coach?.rating || 10} onChange={e => updateFormationCoach('rating', Number(e.target.value))} className="bg-[#0a1428] border-yellow-400 text-white w-16 text-center font-black" /></div>
+                     <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-yellow-300 font-bold">التقييم</label><Input type="number" value={formationForm.coach?.rating || 99} onChange={e => updateFormationCoach('rating', Number(e.target.value))} className="bg-[#0a1428] border-yellow-400 text-white w-16 text-center font-black" /></div>
                    </div>
                    <Button onClick={saveFormation} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl mt-4 shadow-lg">حفظ تشكيلة "{formationForm.round}" 🚀</Button>
                  </div>
