@@ -95,7 +95,7 @@ const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: s
   <div className="flex-1 flex flex-col items-center gap-3">
     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
       {logoUrl ? (
-        <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
+        <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" loading="lazy" />
       ) : (
         <Shield className="h-8 w-8 text-gray-500 opacity-50" />
       )}
@@ -121,8 +121,6 @@ const renderMatchScore = (match: any) => {
     </div>
   );
 };
-
-
 
 const getAccurateLiveMinute = (match: any) => {
   const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0;
@@ -158,7 +156,6 @@ const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: 
   );
 };
 
-// ================= الكارت الاحترافي الجديد =================
 const MiniFutCard = ({ player, position }: { player: any, position: string }) => {
   const baseSize = "w-[74px] sm:w-[88px] md:w-[104px] lg:w-[118px]";
   if(!player || !player.name) return (
@@ -193,7 +190,6 @@ const MiniFutCard = ({ player, position }: { player: any, position: string }) =>
     </div>
   );
 };
-// ========================================================
 
 export default function Page() {
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
@@ -239,7 +235,6 @@ export default function Page() {
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
 
-  // ========== نظام التحديث الإجباري والذكي للكاش ==========
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const forceAppUpdate = async () => {
@@ -272,7 +267,6 @@ export default function Page() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
-  // =======================================================
 
   useEffect(() => {
     setLoading(true);
@@ -520,7 +514,7 @@ export default function Page() {
     return scorers.filter(s => String(s.player || "").toLowerCase().includes(term) || String(s.team || "").toLowerCase().includes(term));
   }, [scorers, searchScorers]);
 
-  const topMotmPlayer = useMemo(() => {
+  const topMotmPlayers = useMemo(() => {
     const counts: Record<string, any> = {};
     motmList.forEach(m => { 
       const p = String(m.player || "").trim();
@@ -528,7 +522,7 @@ export default function Page() {
       if(!counts[p]) counts[p] = { name: p, team: m.team, count: 0, imageUrl: m.imageUrl, sponsorLogo: m.sponsorLogo }; 
       counts[p].count++; 
     });
-    return Object.values(counts).sort((a: any, b: any) => b.count - a.count)[0] as any;
+    return Object.values(counts).sort((a: any, b: any) => b.count - a.count).slice(0, 3);
   }, [motmList]);
 
   const fantasyLeaderboard = useMemo(() => {
@@ -1463,14 +1457,34 @@ if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center 
 
         {activeTab === "stats" && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {topMotmPlayer && (
-              <Card className="bg-gradient-to-r from-cyan-600 to-cyan-900 border-none p-8 rounded-3xl text-center shadow-2xl relative overflow-hidden"><Star className="absolute -left-4 -top-4 h-32 w-32 text-white/10 rotate-12" /><h3 className="text-white font-black text-xl mb-4 relative z-10">🌟 ملك جوائز رجل المباراة</h3><div className="text-5xl font-black text-yellow-300 mb-2 relative z-10">{topMotmPlayer.name}</div><div className="text-white text-xl opacity-90 mb-4 relative z-10">{topMotmPlayer.team}</div><Badge className="bg-black text-yellow-400 px-6 py-2 text-lg relative z-10">حصل على الجائزة {topMotmPlayer.count} مرات</Badge></Card>
+            {topMotmPlayers.length > 0 && (
+              <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+                <Star className="absolute -left-10 -top-10 h-40 w-40 text-yellow-400/5 rotate-12 pointer-events-none" />
+                <h3 className="text-2xl sm:text-3xl font-black text-yellow-300 text-center mb-8 flex items-center justify-center gap-3">
+                  <Star className="text-yellow-400 fill-yellow-400" /> أكثر اللاعبين حصداً للقب (رجل المباراة)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 relative z-10">
+                  {topMotmPlayers.map((p: any, i: number) => (
+                    <div key={i} className={`bg-[#1e2a4a] border p-6 rounded-2xl text-center shadow-lg relative transition-transform hover:scale-105 ${i === 0 ? 'border-yellow-400 bg-gradient-to-b from-yellow-400/10 to-[#1e2a4a]' : 'border-white/5'}`}>
+                      <Badge className={`absolute top-4 right-4 ${i === 0 ? 'bg-yellow-400 text-black' : 'bg-black/50 text-yellow-300'} font-bold`}>المركز {i + 1}</Badge>
+                      <div className={`w-20 h-20 mx-auto rounded-full border-4 ${i === 0 ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'border-cyan-500/50'} overflow-hidden mb-4 bg-[#0a1428]`}>
+                        {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" /> : <div className="text-4xl mt-3 opacity-50">👤</div>}
+                      </div>
+                      <div className="text-xl font-black text-white mb-1 truncate">{p.name}</div>
+                      <div className="text-cyan-300 text-sm font-bold mb-4 truncate">{p.team}</div>
+                      <Badge className="bg-yellow-400 text-black px-5 py-1.5 text-lg font-black">{p.count} مرات</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {[ { label: "الأهداف", val: statsData.totalGoals, icon: "⚽", color: "text-yellow-400", sub: `${statsData.goalsPerMatch} / م` }, { label: "المباريات", val: statsData.totalMatches, icon: "🏟️", color: "text-cyan-400", sub: "إجمالي" }, { label: "تعادل 0-0", val: statsData.draws00, icon: "🤝", color: "text-white", sub: `${statsData.draws00Percent}%` }, { label: "تعادل إيجابي", val: statsData.drawsPositive, icon: "🔥", color: "text-cyan-400", sub: `${statsData.drawsPosPercent}%` }, { label: "إنذار", val: statsData.totalYellow, icon: "🟨", color: "text-yellow-500", sub: "أصفر" }, { label: "طرد", val: statsData.totalRed, icon: "🟥", color: "text-red-500", sub: "أحمر" } ].map((s, i) => (
                 <Card key={i} className="bg-[#13213a] border-white/5 text-center p-4 relative overflow-hidden group hover:border-yellow-400/50 transition-colors"><div className={`text-4xl font-black ${s.color} mb-1`}>{s.val}</div><div className="text-[10px] text-white font-bold uppercase">{s.label}</div><Badge className="mt-2 bg-black/40 text-white text-[10px] border-none">{s.sub}</Badge></Card>
               ))}
             </div>
+
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Target className="mx-auto mb-4 text-cyan-400 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أقوى هجوم</h4><div className="text-xl font-black text-white">{statsData.bestAttack?.team || "—"}</div><Badge className="mt-2 bg-cyan-500/10 text-cyan-400 border-none">{statsData.bestAttack?.gf || 0} هدف</Badge></Card>
                <Card className="bg-[#13213a] border-yellow-400/20 p-6 text-center shadow-lg"><Zap className="mx-auto mb-4 text-yellow-400 h-10 w-10" /><h4 className="text-white text-sm font-bold mb-2">أضعف هجوم</h4><div className="text-xl font-black text-white">{statsData.worstAttack?.team || "—"}</div><Badge className="mt-2 bg-yellow-500/10 text-yellow-400 border-none">{statsData.worstAttack?.gf || 0} هدف</Badge></Card>
@@ -1492,55 +1506,42 @@ if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center 
             </div>
 
             {(() => {
-              const filteredMotmList = motmList.filter(m => {
-                const q = searchMotm.trim().toLowerCase();
-                if (!q) return true;
-                return `${m.player || ""} ${m.team || ""} ${m.matchName || ""} ${m.sponsorName || ""}`.toLowerCase().includes(q);
-              });
+              const q = searchMotm.trim().toLowerCase();
+              const filteredMotmList = q ? motmList.filter(m => `${m.player || ""} ${m.team || ""} ${m.matchName || ""} ${m.sponsorName || ""}`.toLowerCase().includes(q)) : motmList;
 
               if (filteredMotmList.length === 0) {
                 return (
                   <div className="text-center py-20 bg-[#1e2a4a] w-full rounded-3xl border border-yellow-400/30">
-                    <p className="text-white font-black text-2xl mb-2">{searchMotm.trim() ? "لا توجد نتائج مطابقة للبحث" : "انتظروا نجوم المباريات 🌟"}</p>
+                    <p className="text-white font-black text-2xl mb-2">{q ? "لا توجد نتائج مطابقة للبحث" : "انتظروا نجوم المباريات 🌟"}</p>
                   </div>
                 );
               }
 
               return (
-                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 justify-items-center">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 justify-items-center">
                   {filteredMotmList.map((m, i) => (
-                    <div key={i} className="relative w-[300px] group transition-transform duration-300 hover:scale-105 mx-auto">
-                      <div className="bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] rounded-[2.5rem] border-2 border-yellow-400/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col">
-                        <div className="relative w-full aspect-[2/3] bg-[#050a14]">
-                           {m.imageUrl ? (
-                              <img src={m.imageUrl} className="w-full h-full object-cover object-top" alt={m.player} loading="lazy" />
-                           ) : (
-                              <div className="w-full h-full flex items-center justify-center text-8xl opacity-10">👤</div>
-                           )}
-                           <div className="absolute top-6 right-6 bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-2xl shadow-lg border-2 border-black/20">
-                             {m.rating || 99}
+                    <div key={i} className="w-full max-w-[300px] bg-[#1e2a4a] rounded-3xl border border-yellow-400/30 overflow-hidden shadow-lg hover:scale-105 transition-transform duration-300">
+                      <div className="w-full aspect-[4/3] bg-[#0a1428] relative">
+                         {m.imageUrl ? (
+                            <img src={m.imageUrl} className="w-full h-full object-cover object-top" alt={m.player} loading="lazy" />
+                         ) : (
+                            <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">👤</div>
+                         )}
+                         <div className="absolute top-4 right-4 bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-xl shadow-md border-2 border-black/10">
+                           {m.rating || 99}
+                         </div>
+                         {m.sponsorLogo && (
+                           <div className="absolute bottom-3 left-3 bg-white/10 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-lg">
+                             <img src={m.sponsorLogo} alt="Sponsor" className="h-8 w-auto object-contain" />
                            </div>
-                           {m.sponsorLogo && (
-                             <div className="absolute bottom-4 left-4 bg-white/10 backdrop-blur-md p-2 rounded-xl border border-white/20 shadow-lg">
-                               <img src={m.sponsorLogo} alt="Sponsor" className="h-10 w-auto object-contain" />
-                             </div>
-                           )}
-                        </div>
-                        <div className="p-6 text-center relative">
-                          <h3 className="text-2xl font-black text-white mb-1 truncate">{m.player}</h3>
-                          <div className="flex items-center justify-center gap-2">
-                            <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">{m.team}</Badge>
-                          </div>
-                          <div className="mt-4 pt-4 border-t border-white/5">
-                             <div className="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-widest">مباراة</div>
-                             <div className="text-xs font-black text-white bg-[#0a1428] py-2 px-3 rounded-xl border border-white/5 italic">
-                               {m.matchName || "مباراة رسمية"}
-                             </div>
-                          </div>
-                          <div className="flex justify-center items-center gap-2 mt-4">
-                             <img src="/logo.png" className="h-6 w-auto opacity-80" alt="Matrouh Cup" />
-                             <span className="text-[10px] font-black text-yellow-400 opacity-50 uppercase tracking-widest">MAN OF THE MATCH</span>
-                          </div>
+                         )}
+                      </div>
+                      <div className="p-5 text-center">
+                        <h3 className="text-xl font-black text-white mb-2 truncate">{m.player}</h3>
+                        <Badge className="bg-cyan-500/20 text-cyan-300 font-bold px-3 py-1 mb-3">{m.team}</Badge>
+                        <div className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-widest">مباراة</div>
+                        <div className="text-sm font-black text-white bg-[#0a1428] py-2 px-3 rounded-xl border border-white/5 truncate italic">
+                           {m.matchName || "مباراة رسمية"}
                         </div>
                       </div>
                     </div>
