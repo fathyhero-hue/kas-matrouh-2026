@@ -131,6 +131,9 @@ const getAccurateLiveMinute = (match: any) => {
   return baseMinute + Math.floor(elapsed / 60000);
 };
 
+// الدالة التي كانت مفقودة:
+const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
+
 const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => {
   const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive;
   return (
@@ -1145,7 +1148,14 @@ export default function Page() {
                                   <div className="flex flex-col sm:flex-row gap-4">
                                      <Input placeholder="رقم العملية (اختياري)" value={checkoutForm.transactionRef} onChange={e=>setCheckoutForm(p=>({ ...p, transactionRef: e.target.value }))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-bold flex-1" />
                                      <div className="flex-1 relative">
-                                        <input type="file" accept="image/*" onChange={e=>handleReceiptImageUpload(e.target.files?.[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                        <input type="file" accept="image/*" onChange={e=>{
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          if (!file.type.startsWith("image/")) return alert("يرجى اختيار صورة فقط");
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => setCheckoutForm(p => ({ ...p, receiptImage: reader.result as string, receiptFileName: file.name }));
+                                          reader.readAsDataURL(file);
+                                        }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                         <div className="bg-[#1e2a4a] border border-yellow-400/50 text-white font-bold h-10 rounded-xl flex items-center justify-center px-4 overflow-hidden truncate">
                                            {checkoutForm.receiptFileName || "إرفاق صورة الإيصال 📸"}
                                         </div>
