@@ -64,16 +64,6 @@ const getLabelSuggestions = (round: string) => {
   return [];
 };
 
-const generatePostContent = (match: any) => {
-  return `🏆 بطولة كأس مطروح - النسخة الثالثة 🦅\n\n` +
-         `🔥 انتهت المباراة المشتعلة بين:\n` +
-         `⚽ ${match.teamA} [ ${match.homeGoals} - ${match.awayGoals} ] ${match.teamB}\n\n` +
-         `📅 ${getArabicDay(match.date)} • ${match.date}\n` +
-         (match.matchLabel ? `📌 ${match.matchLabel} - ${match.round}\n` : `📌 ${match.round}\n`) +
-         ((match.redCardsHome > 0 || match.redCardsAway > 0) ? `\n🟥 حالات الطرد: ${match.redCardsHome + match.redCardsAway}\n` : "") +
-         `\n#كأس_مطروح_2026 #النسخة_الثالثة #مطروح_الرياضية #فتحي_هيرو 🦅`;
-};
-
 const pushNotification = async (title: string, body: string) => {
   try {
   const res = await fetch("/api/push-service", {
