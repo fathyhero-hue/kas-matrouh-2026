@@ -1725,5 +1725,3 @@ if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center 
     </div>
   );
 }
-
-
