@@ -113,7 +113,6 @@ const renderMatchScore = (match: any) => {
   );
 };
 
-
 const getAccurateLiveMinute = (match: any) => {
   const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0;
   const startedAt = Number(match?.timerStartedAt || 0);
@@ -122,6 +121,11 @@ const getAccurateLiveMinute = (match: any) => {
   const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal);
   return baseMinute + Math.floor(elapsed / 60000);
 };
+
+const getPenaltyScore = (match: any) => ({
+  home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length,
+  away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length
+});
 
 const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
 
@@ -154,7 +158,7 @@ export default function AdminPage() {
   const [notifyTitle, setNotifyTitle] = useState("");
   const [notifyBody, setNotifyBody] = useState("");
   const [isSending, setIsSending] = useState(false);
-  
+
   // البوستر والإعدادات
   const [posterMatch, setPosterMatch] = useState<any | null>(null);
   const [posterLogos, setPosterLogos] = useState({ a: "", b: "" });
@@ -207,16 +211,6 @@ export default function AdminPage() {
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
   const [rosterFormAdmin, setRosterFormAdmin] = useState({
     managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "",
-    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
-  });
-
-  const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
-  const [rosterAccessTeam, setRosterAccessTeam] = useState("");
-  const [rosterAccessPassword, setRosterAccessPassword] = useState("");
-  const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
-  const [selectedRosterToView, setSelectedRosterToView] = useState<any>(null);
-  const [rosterForm, setRosterForm] = useState({
-    managerName: "", managerPhone: "", logoUrl: "",
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
 
@@ -348,36 +342,6 @@ export default function AdminPage() {
   const lockRoster = async (teamName: string) => {
     await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
     alert("تم قفل القائمة واعتمادها. 🔒");
-  };
-
-  const submitFinalRoster = async () => {
-    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
-    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
-    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
-
-    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
-        try {
-            const suffix = activeTournament === "juniors" ? "_juniors" : "";
-            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
-                teamName: unlockedRoster,
-                managerName: rosterForm.managerName,
-                managerPhone: rosterForm.managerPhone,
-                logoUrl: rosterForm.logoUrl,
-                players: rosterForm.players,
-                password: rosterAccessPassword,
-                isSubmitted: true,
-                updatedAt: new Date().toISOString()
-            }, { merge: true });
-            
-            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
-            setUnlockedRoster(null);
-            setRosterAccessTeam("");
-            setRosterAccessPassword("");
-            setRosterViewMode('list');
-        } catch(e) {
-            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
-        }
-    }
   };
 
   // دوال نافذة نجم المباراة السريعة

@@ -161,17 +161,17 @@ const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yello
 const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => {
   const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive;
   return (
-    <div className={`bg-gradient-to-br from-[#1e2a4a] to-[#0a1428] rounded-xl flex flex-col items-center justify-center p-3 border-2 ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-cyan-500/30'} shadow-lg relative min-h-[90px] transition-transform hover:-translate-y-1 hover:shadow-2xl hover:border-yellow-400 w-full mx-auto`}>
-      <Badge className="absolute -top-3 sm:-top-4 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black text-[10px] sm:text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md z-10">{label}</Badge>
-      <div className="w-full flex justify-between items-center gap-1 sm:gap-2 mt-2">
-        <div className={`flex-1 text-center font-bold text-[10px] sm:text-sm leading-tight truncate ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`} title={t1}>{t1}</div>
-        <div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-lg text-cyan-400 shrink-0 shadow-inner">
+    <div className={`bg-[#1e2a4a] rounded-2xl flex flex-col items-center justify-center p-4 border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-yellow-400/30'} shadow-lg relative min-h-[95px] transition-transform hover:scale-105 shrink-0`}>
+      <Badge className="absolute -top-3 bg-yellow-400 text-black text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md">{label}</Badge>
+      <div className="w-full flex justify-between items-center gap-2 mt-2">
+        <div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t1}</div>
+        <div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-md text-cyan-400 shrink-0">
           {renderMatchScore(match)}
         </div>
-        <div className={`flex-1 text-center font-bold text-[10px] sm:text-sm leading-tight truncate ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`} title={t2}>{t2}</div>
+        <div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t2}</div>
       </div>
-      {win && <div className="mt-2 text-[9px] sm:text-[11px] bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-3 py-0.5 rounded-full font-bold shadow-sm whitespace-nowrap">صعد: {win}</div>}
-      {isLive && <div className="mt-2 text-[9px] sm:text-[10px] bg-red-500 text-white px-3 py-0.5 rounded-full font-bold shadow-md flex items-center gap-1"><span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span> مباشر</div>}
+      {win && <div className="mt-3 text-[11px] bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1 rounded-full font-bold shadow-inner">صعد: {win}</div>}
+      {isLive && <div className="mt-3 text-[10px] bg-red-500 text-white px-4 py-1 rounded-full font-bold">مباشر الآن 🔴</div>}
     </div>
   );
 };
@@ -1144,81 +1144,99 @@ if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center 
           <div className="space-y-12 relative pb-10 animate-in fade-in duration-500">
             <div className="text-center mb-8"><h2 className="text-4xl font-black text-yellow-300 drop-shadow-lg">الطريق إلى النهائي 🏆</h2><p className="text-cyan-300 mt-2 font-bold text-lg">{activeTournament === 'youth' ? "مباريات إقصائيات الشباب" : "إقصائيات بطولة الناشئين"}</p></div>
             {activeTournament === 'youth' ? (
-              <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="ltr">
-                <div className="flex gap-8 min-w-[1200px] p-8 bg-[#13213a] rounded-3xl border border-yellow-400/30 shadow-xl mx-auto items-stretch">
-                  
-                  {/* Column 1: Mula7aq */}
-                  <div className="flex flex-col justify-around space-y-4 w-56 shrink-0 relative">
-                     <TreeMatchBox label="م 104" t1="اتحاد المثاني" t2="دبي للزي العربي" data={youthTree.p104} />
-                     <TreeMatchBox label="م 97" t1="اسماك باسط العوامي" t2="اصدقاء عز بوالمجدوبة" data={youthTree.p97} />
-                     <TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} />
-                     <TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} />
-                     <TreeMatchBox label="م 103" t1="ام القبائل" t2="شباب القناشات" data={youthTree.p103} />
-                     <TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} />
-                     <TreeMatchBox label="م 102" t1="محاربي الصحراء" t2="اصدقاء خالد" data={youthTree.p102} />
-                     <TreeMatchBox label="م 99" t1="17 فبراير" t2="الفهود" data={youthTree.p99} />
+              <>
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[900px] bg-[#1e2a4a]/40 p-4 sm:p-6 rounded-3xl border border-cyan-500/30 shadow-xl mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-xl px-8 py-2 font-black">مباريات الملحق</Badge></div>
+                    <div className="grid grid-cols-4 gap-6">
+                      <TreeMatchBox label="م 97" t1="اسماك باسط العوامي" t2="اصدقاء عز بوالمجدوبة" data={youthTree.p97} />
+                      <TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} />
+                      <TreeMatchBox label="م 99" t1="17 فبراير" t2="الفهود" data={youthTree.p99} />
+                      <TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} />
+                      <TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} />
+                      <TreeMatchBox label="م 102" t1="محاربي الصحراء" t2="اصدقاء خالد" data={youthTree.p102} />
+                      <TreeMatchBox label="م 103" t1="ام القبائل" t2="شباب القناشات" data={youthTree.p103} />
+                      <TreeMatchBox label="م 104" t1="اتحاد المثاني" t2="دبي للزي العربي" data={youthTree.p104} />
+                    </div>
                   </div>
-
-                  {/* Column 2: Round of 16 */}
-                  <div className="flex flex-col justify-around space-y-8 w-56 shrink-0 relative">
-                    <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2={youthTree.p104.win || "الفائز (م 104)"} data={youthTree.r1} />
-                    <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز (م 97)"} data={youthTree.r2} />
-                    <TreeMatchBox label="م 3" t1="غوط رباح" t2="القدس" data={youthTree.r3} />
-                    <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز (م 100)"} data={youthTree.r4} />
-                    <TreeMatchBox label="م 5" t1="سامي سعيد" t2="شباب القناشات" data={youthTree.r5} />
-                    <TreeMatchBox label="م 6" t1={youthTree.getT(7)} t2={youthTree.p98.win || "الفائز (م 98)"} data={youthTree.r6} />
-                    <TreeMatchBox label="م 7" t1="اصدقاء خالد" t2="براني" data={youthTree.r7} />
-                    <TreeMatchBox label="م 8" t1={youthTree.getT(6)} t2={youthTree.p99.win || "الفائز (م 99)"} data={youthTree.r8} />
-                  </div>
-
-                  {/* Column 3: Quarter Finals */}
-                  <div className="flex flex-col justify-around space-y-16 w-56 shrink-0">
-                    <TreeMatchBox label="مربع 1" t1={youthTree.r1.win || "الفائز (م 1)"} t2={youthTree.r2.win || "الفائز (م 2)"} data={youthTree.q1} />
-                    <TreeMatchBox label="مربع 2" t1={youthTree.r3.win || "الفائز (م 3)"} t2={youthTree.r4.win || "الفائز (م 4)"} data={youthTree.q2} />
-                    <TreeMatchBox label="مربع 3" t1={youthTree.r5.win || "الفائز (م 5)"} t2={youthTree.r6.win || "الفائز (م 6)"} data={youthTree.q3} />
-                    <TreeMatchBox label="مربع 4" t1={youthTree.r7.win || "الفائز (م 7)"} t2={youthTree.r8.win || "الفائز (م 8)"} data={youthTree.q4} />
-                  </div>
-
-                  {/* Column 4: Semi Finals */}
-                  <div className="flex flex-col justify-around space-y-32 w-56 shrink-0">
-                    <TreeMatchBox label="نصف 1" t1={youthTree.q1.win || "الفائز (مربع 1)"} t2={youthTree.q2.win || "الفائز (مربع 2)"} data={youthTree.s1} />
-                    <TreeMatchBox label="نصف 2" t1={youthTree.q3.win || "الفائز (مربع 3)"} t2={youthTree.q4.win || "الفائز (مربع 4)"} data={youthTree.s2} />
-                  </div>
-
-                  {/* Column 5: Final */}
-                  <div className="flex flex-col justify-center w-56 shrink-0 relative">
-                    <div className="absolute -inset-4 bg-yellow-400/20 blur-2xl rounded-full"></div>
-                    <TreeMatchBox label="النهائي 🏆" t1={youthTree.s1.win || "الطرف الأول"} t2={youthTree.s2.win || "الطرف الثاني"} data={youthTree.f1} />
-                  </div>
-
                 </div>
-              </div>
+
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[900px] bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-yellow-400/50 shadow-2xl mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">دور الـ 16</Badge></div>
+                    <div className="grid grid-cols-4 gap-6">
+                      <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2={youthTree.p104.win || "الفائز (م 104)"} data={youthTree.r1} />
+                      <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز (م 97)"} data={youthTree.r2} />
+                      <TreeMatchBox label="م 3" t1="غوط رباح" t2="القدس" data={youthTree.r3} />
+                      <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز (م 100)"} data={youthTree.r4} />
+                      <TreeMatchBox label="م 5" t1="سامي سعيد" t2="شباب القناشات" data={youthTree.r5} />
+                      <TreeMatchBox label="م 6" t1={youthTree.getT(7)} t2={youthTree.p98.win || "الفائز (م 98)"} data={youthTree.r6} />
+                      <TreeMatchBox label="م 7" t1="اصدقاء خالد" t2="براني" data={youthTree.r7} />
+                      <TreeMatchBox label="م 8" t1={youthTree.getT(6)} t2={youthTree.p99.win || "الفائز (م 99)"} data={youthTree.r8} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[900px] bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-yellow-400/40 shadow-xl mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black">دور الثمانية (ربع النهائي)</Badge></div>
+                    <div className="grid grid-cols-2 gap-8 px-10 sm:px-20">
+                      <TreeMatchBox label="مربع 1" t1={youthTree.r1.win || "الفائز (م 1)"} t2={youthTree.r2.win || "الفائز (م 2)"} data={youthTree.q1} />
+                      <TreeMatchBox label="مربع 2" t1={youthTree.r3.win || "الفائز (م 3)"} t2={youthTree.r4.win || "الفائز (م 4)"} data={youthTree.q2} />
+                      <TreeMatchBox label="مربع 3" t1={youthTree.r5.win || "الفائز (م 5)"} t2={youthTree.r6.win || "الفائز (م 6)"} data={youthTree.q3} />
+                      <TreeMatchBox label="مربع 4" t1={youthTree.r7.win || "الفائز (م 7)"} t2={youthTree.r8.win || "الفائز (م 8)"} data={youthTree.q4} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[700px] bg-[#1e2a4a] p-4 sm:p-6 rounded-3xl border border-yellow-400/60 shadow-2xl mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-yellow-400 text-black text-2xl px-10 py-2 font-black">نصف النهائي</Badge></div>
+                    <div className="grid grid-cols-2 gap-12 px-10 sm:px-20">
+                      <TreeMatchBox label="نصف 1" t1={youthTree.q1.win || "الفائز مربع 1"} t2={youthTree.q2.win || "الفائز مربع 2"} data={youthTree.s1} />
+                      <TreeMatchBox label="نصف 2" t1={youthTree.q3.win || "الفائز مربع 3"} t2={youthTree.q4.win || "الفائز مربع 4"} data={youthTree.s2} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative pt-6 pb-6 px-4 text-center">
+                  <div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div>
+                  <div className="max-w-xl mx-auto relative z-10">
+                    <TreeMatchBox label="مباراة التتويج" t1={youthTree.s1.win || "الطرف الأول"} t2={youthTree.s2.win || "الطرف الثاني"} data={youthTree.f1} />
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="ltr">
-                <div className="flex gap-8 min-w-[900px] p-8 bg-[#13213a] rounded-3xl border border-cyan-500/30 shadow-xl mx-auto items-stretch">
-                  
-                  {/* Column 1: Quarter Finals */}
-                  <div className="flex flex-col justify-around space-y-8 w-64 shrink-0">
-                    <TreeMatchBox label="مربع 1" t1={juniorsTree.ja1} t2={juniorsTree.jb4} data={juniorsTree.q1} />
-                    <TreeMatchBox label="مربع 2" t1={juniorsTree.jb2} t2={juniorsTree.ja3} data={juniorsTree.q2} />
-                    <TreeMatchBox label="مربع 3" t1={juniorsTree.jb1} t2={juniorsTree.ja4} data={juniorsTree.q3} />
-                    <TreeMatchBox label="مربع 4" t1={juniorsTree.ja2} t2={juniorsTree.jb3} data={juniorsTree.q4} />
+              <>
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[800px] bg-[#13213a] p-4 sm:p-6 rounded-3xl border border-cyan-500/40 shadow-xl mb-10 mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-white text-black text-xl px-8 py-2 font-black border border-cyan-500">دور الثمانية (الناشئين)</Badge></div>
+                    <div className="grid grid-cols-2 gap-8 px-10 sm:px-20">
+                      <TreeMatchBox label="مربع 1" t1={juniorsTree.ja1} t2={juniorsTree.jb4} data={juniorsTree.q1} />
+                      <TreeMatchBox label="مربع 2" t1={juniorsTree.jb2} t2={juniorsTree.ja3} data={juniorsTree.q2} />
+                      <TreeMatchBox label="مربع 3" t1={juniorsTree.jb1} t2={juniorsTree.ja4} data={juniorsTree.q3} />
+                      <TreeMatchBox label="مربع 4" t1={juniorsTree.ja2} t2={juniorsTree.jb3} data={juniorsTree.q4} />
+                    </div>
                   </div>
-
-                  {/* Column 2: Semi Finals */}
-                  <div className="flex flex-col justify-around space-y-16 w-64 shrink-0">
-                    <TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} />
-                    <TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} />
-                  </div>
-
-                  {/* Column 3: Final */}
-                  <div className="flex flex-col justify-center w-64 shrink-0 relative">
-                    <div className="absolute -inset-4 bg-cyan-500/20 blur-2xl rounded-full"></div>
-                    <TreeMatchBox label="النهائي 🏅" t1={juniorsTree.s1.win || "الطرف الأول"} t2={juniorsTree.s2.win || "الطرف الثاني"} data={juniorsTree.f1} />
-                  </div>
-
                 </div>
-              </div>
+
+                <div className="w-full overflow-x-auto custom-scrollbar pb-6 touch-pan-x" dir="rtl">
+                  <div className="min-w-[700px] bg-[#1e2a4a]/60 p-4 sm:p-6 rounded-3xl border-2 border-cyan-500/50 shadow-2xl mx-auto">
+                    <div className="text-center mb-6"><Badge className="bg-cyan-500 text-white text-2xl px-10 py-2 font-black">نصف النهائي (الناشئين)</Badge></div>
+                    <div className="grid grid-cols-2 gap-12 px-10 sm:px-20">
+                      <TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} />
+                      <TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative pt-10 pb-6 px-4 text-center">
+                  <div className="mb-6 relative z-10"><Badge className="bg-yellow-400 text-black text-3xl px-16 py-3 font-black shadow-[0_0_30px_rgba(250,204,21,0.6)]">النهائي 🏆</Badge></div>
+                  <div className="max-w-xl mx-auto relative z-10">
+                    <TreeMatchBox label="مباراة التتويج" t1={juniorsTree.s1.win || "الفائز 1"} t2={juniorsTree.s2.win || "الفائز 2"} data={juniorsTree.f1} />
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
