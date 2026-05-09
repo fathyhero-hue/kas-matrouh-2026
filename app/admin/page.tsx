@@ -1,27 +1,32 @@
 "use client";
 
 // ================== LIVE IMPROVEMENTS ==================
-const calculateLiveMinute = (startTime:any) => {
+const calculateLiveMinute = (startTime: any) => {
   if (!startTime) return 0;
   const now = new Date().getTime();
   const started = new Date(startTime).getTime();
   return Math.max(0, Math.floor((now - started) / 60000));
 };
 // =======================================================
+
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, BellRing, Video, Gift, Star, Users, Share2, Copy, Activity, ArchiveRestore, Search, ShieldAlert, ClipboardList, Lock, Unlock, Phone, CheckCircle2, Shield, Camera, Loader2 } from "lucide-react";
+import { 
+  Trophy, LogOut, Edit, Trash2, Plus, Minus, Play, Pause, 
+  BellRing, Video, Gift, Star, Users, Activity, 
+  Search, ClipboardList, Lock, Unlock, Shield, Camera, Loader2 
+} from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
-// خريطة انتقال الفرق بناءً على الجداول الرسمية المرفقة للبطولة
+// خريطة انتقال الفرق بناءً على الجداول الرسمية للبطولة
 const BRACKET_MAP: Record<string, { targetLabel: string, targetSide: 'teamA' | 'teamB' }> = {
   "م 104": { targetLabel: "م 1", targetSide: 'teamB' },
   "م 103": { targetLabel: "م 5", targetSide: 'teamB' },
@@ -50,10 +55,7 @@ const JUNIORS_TEAMS = [...JUNIORS_GROUP_A, ...JUNIORS_GROUP_B];
 
 const SPONSORS = [
   { name: "الفهد للديكور", src: "/alfahd.png" }, { name: "أحمد عبدالعاطي المحامي", src: "/abdelaty.png" }, { name: "دثار للزي العربي", src: "/dithar.png" },
-  { name: "معصرة فرجينيا", src: "/virginia.png" }, { name: "دبي للزي العربي", src: "/dubai.png" }, { name: "معرض الأمانة", src: "/alamana.png" },
-  { name: "تراث البادية", src: "/torath.png" }, { name: "عبدالمقصود ستورز", src: "/abdelmaksoud.png" }, { name: "مياة حياة", src: "/hayah.png" },
-  { name: "القدس للأثاث", src: "/alquds.png" }, { name: "أيس كريم الملكة", src: "/almaleka.png" }, { name: "جزارة عبدالله الجراري", src: "/aljarari.png" },
-  { name: "M MART", src: "/mmart.png" }, { name: "هيرو سبورت", src: "/hero-sport.png" }, { name: "الفتح للفراشة", src: "/alfath.png" }, { name: "عادل العميري للديكور", src: "/alomairy.png" }
+  { name: "هيرو سبورت", src: "/hero-sport.png" }
 ];
 
 function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
@@ -79,29 +81,19 @@ const getLabelSuggestions = (round: string) => {
 
 const pushNotification = async (title: string, body: string) => {
   try {
-  const res = await fetch("/api/push-service", {
+    const res = await fetch("/api/push-service", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json" 
-        },
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
         body: JSON.stringify({ title, body })
-     });
-     return res.ok;
-  } catch(e) { 
-     console.error(e); 
-     return false; 
-  }
+    });
+    return res.ok;
+  } catch(e) { return false; }
 };
 
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (
   <div className="flex-1 flex flex-col items-center gap-3">
-    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">
-      {logoUrl ? (
-        <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" />
-      ) : (
-        <Shield className="h-8 w-8 text-gray-500 opacity-50" />
-      )}
+    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center shadow-inner overflow-hidden relative">
+      {logoUrl ? <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" /> : <Shield className="h-8 w-8 text-gray-500 opacity-50" />}
     </div>
     <div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div>
   </div>
@@ -135,9 +127,9 @@ const getAccurateLiveMinute = (match: any) => {
 };
 
 export default function AdminPage() {
+  // ================== STATES ==================
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
   const [activeTab, setActiveTab] = useState("knockout");
 
@@ -163,13 +155,13 @@ export default function AdminPage() {
   const [notifyBody, setNotifyBody] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // البوستر والإعدادات
+  // Poster States
   const [posterMatch, setPosterMatch] = useState<any | null>(null);
   const [posterLogos, setPosterLogos] = useState({ a: "", b: "" });
   const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
   const [isPreparingPoster, setIsPreparingPoster] = useState(false);
 
-  // إعدادات نافذة نجم المباراة السريعة
+  // Quick MOTM States
   const [motmPopupMatch, setMotmPopupMatch] = useState<any | null>(null);
   const [quickMotmForm, setQuickMotmForm] = useState({ player: "", team: "", rating: 99 });
 
@@ -179,43 +171,39 @@ export default function AdminPage() {
   const sortedJuniorsTeams = useMemo(() => [...JUNIORS_TEAMS].sort((a, b) => a.localeCompare(b, "ar")), []);
   const currentTeamsList = activeTournament === 'youth' ? sortedTeams : sortedJuniorsTeams;
 
+  // Forms States
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [matchForm, setMatchForm] = useState({
     teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "",
     round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ"
   });
-  const [editingId, setEditingId] = useState<string | null>(null);
   
-  // Smart Bracket Manager State
   const [bracketForm, setBracketForm] = useState({
-     round: "دور الستة عشر", matchLabel: "م 1", teamA: "", teamB: "", date: new Date().toISOString().slice(0, 10), time: "15:30"
+     round: "الملحق", matchLabel: "م 97", teamA: "", teamB: "", date: new Date().toISOString().slice(0, 10), time: "15:30"
   });
 
   const defaultStats = { rating: 99, pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99 };
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [goalForm, setGoalForm] = useState({ player: "", team: currentTeamsList[0] || "", goalsCount: 1, imageUrl: "", ...defaultStats });
+  
+  const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
   const [motmForm, setMotmForm] = useState({ player: "", team: currentTeamsList[0] || "", imageUrl: "", matchName: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats });
   
-  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
-  const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
   const [cardForm, setCardForm] = useState({ player: "", team: currentTeamsList[0] || "", type: "yellow" as "yellow" | "red" });
   const [mediaForm, setMediaForm] = useState({ type: "news", title: "", url: "", imageUrl: "", body: "" });
 
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
   const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
-  const [formationForm, setFormationForm] = useState({
-    round: "دور المجموعات",
-    players: Array(7).fill({...defaultPlayer}),
-    coach: {...defaultCoach}
-  });
+  const [formationForm, setFormationForm] = useState({ round: "دور المجموعات", players: Array(7).fill({...defaultPlayer}), coach: {...defaultCoach} });
 
   const [liveEventForms, setLiveEventForms] = useState<Record<string, { minute?: number, type: string, text: string }>>({});
 
-  // Roster Admin States
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
-  const [rosterFormAdmin, setRosterFormAdmin] = useState({
-    managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "",
-    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
-  });
+  const [rosterFormAdmin, setRosterFormAdmin] = useState({ managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
 
+  const getColl = (base: string) => activeTournament === "juniors" ? `${base}_juniors` : base;
+
+  // ================== EFFECTS ==================
   useEffect(() => {
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(clockTimer);
@@ -239,8 +227,6 @@ export default function AdminPage() {
         setFormationForm(p => ({ ...p, players: Array(7).fill({...defaultPlayer}), coach: {...defaultCoach} }));
     }
   }, [formationForm.round, formationsList]);
-
-  const getColl = (base: string) => activeTournament === "juniors" ? `${base}_juniors` : base;
 
   useEffect(() => { matchesRef.current = matches; }, [matches]);
 
@@ -277,183 +263,21 @@ export default function AdminPage() {
     };
   }, [isAuth, activeTournament]);
 
+  // ================== FUNCTIONS ==================
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
 
-  // Admin Roster Functions
-  const startEditRoster = (teamName: string) => {
-    const existing = rostersList.find(r => r.id === teamName);
-    let loadedPlayers = Array.from({ length: 12 }, () => ({ name: "", number: "" }));
-    if (existing && existing.players) {
-        loadedPlayers = [...existing.players];
-        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
-    }
-    setRosterFormAdmin({
-        managerName: existing?.managerName || "",
-        managerPhone: existing?.managerPhone || "",
-        password: existing?.password || "",
-        logoUrl: existing?.logoUrl || "",
-        isSubmitted: existing?.isSubmitted || false,
-        players: loadedPlayers.slice(0,12)
-    });
-    setEditingRosterId(teamName);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const updateAdminRosterPlayer = (index: number, field: string, value: string) => {
-    setRosterFormAdmin(prev => {
-        const newPlayers = [...prev.players];
-        newPlayers[index] = { ...newPlayers[index], [field]: value };
-        return { ...prev, players: newPlayers };
-    });
-  };
-
-  const saveRosterAdmin = async () => {
-    if(!editingRosterId) return;
-    try {
-        await setDoc(doc(db, getColl("team_rosters"), editingRosterId), {
-            teamName: editingRosterId,
-            managerName: rosterFormAdmin.managerName,
-            managerPhone: rosterFormAdmin.managerPhone,
-            password: rosterFormAdmin.password,
-            logoUrl: rosterFormAdmin.logoUrl,
-            isSubmitted: rosterFormAdmin.isSubmitted,
-            players: rosterFormAdmin.players,
-            updatedAt: new Date().toISOString()
-        }, { merge: true });
-        alert("تم حفظ بيانات القائمة بنجاح! ✔️");
-        setEditingRosterId(null);
-    } catch(e) {
-        alert("حدث خطأ أثناء الحفظ.");
-    }
-  };
-
-  const deleteRoster = async (teamName: string) => {
-    if(confirm(`⚠️ هل أنت متأكد من مسح قائمة فريق ${teamName} بالكامل؟`)) {
-        await deleteDoc(doc(db, getColl("team_rosters"), teamName));
-        alert("تم مسح القائمة بنجاح.");
-    }
-  };
-
-  const unlockRoster = async (teamName: string) => {
-    if(confirm(`هل تريد فتح القفل لقائمة فريق ${teamName} ليتمكن المدير من التعديل عليها؟`)) {
-        await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: false });
-        alert("تم فتح القائمة بنجاح. يمكن للمدير التعديل الآن. 🔓");
-    }
-  };
-
-  const lockRoster = async (teamName: string) => {
-    await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
-    alert("تم قفل القائمة واعتمادها. 🔒");
-  };
-
-  // دوال نافذة نجم المباراة السريعة
-  const openMotmPopup = (match: any) => {
-    setMotmPopupMatch(match);
-    setQuickMotmForm({ player: "", team: match.teamA, rating: 99 });
-  };
-
-  const saveQuickMotm = async () => {
-    if (!quickMotmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
-    try {
-      const matchName = `${motmPopupMatch.teamA} vs ${motmPopupMatch.teamB}`;
-      await addDoc(collection(db, getColl("motm")), {
-        player: quickMotmForm.player.trim(),
-        team: quickMotmForm.team,
-        matchName: matchName,
-        imageUrl: "", 
-        sponsorName: SPONSORS[0].name,
-        sponsorLogo: SPONSORS[0].src,
-        rating: Number(quickMotmForm.rating),
-        pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99
-      });
-      alert("✅ تم تسجيل نجم المباراة بنجاح! يمكنكم إضافة صورته لاحقاً من تبويب النجوم.");
-      setMotmPopupMatch(null);
-    } catch (e) {
-      alert("حدث خطأ أثناء حفظ نجم المباراة.");
-    }
-  };
-
-  const openPoster = async (match: any) => {
-    setPosterMatch(match);
-    setIsPreparingPoster(true);
-    setPosterLogos({ a: "", b: "" });
-
-    const fetchBase64 = async (url: string) => {
-      if (!url) return "";
-      try {
-        const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`);
-        const blob = await res.blob();
-        return await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        return url; 
-      }
-    };
-
-    const logoA = await fetchBase64(match.teamALogo);
-    const logoB = await fetchBase64(match.teamBLogo);
-    
-    setPosterLogos({ a: logoA, b: logoB });
-    setIsPreparingPoster(false);
-  };
-
-  const downloadPoster = async () => {
-    const element = document.getElementById("poster-canvas-node");
-    if (!element) return;
-    setIsGeneratingPoster(true);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      const htmlToImage = await import('html-to-image');
-      const dataUrl = await htmlToImage.toJpeg(element, { 
-         quality: 0.95,
-         backgroundColor: '#050a14',
-         pixelRatio: 2
-      });
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `Match_Result_${posterMatch.teamA}_vs_${posterMatch.teamB}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("خطأ في توليد البوستر:", err);
-      alert("حدث خطأ أثناء تحميل البوستر.");
-    }
-    setIsGeneratingPoster(false);
-  };
-
-  const saveMatch = async () => {
-    if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!");
-    const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()];
-    const data = { ...matchForm, dayName, isLive: false, streamClosed: false };
-    if (editingId) { 
-      await updateDoc(doc(db, getColl("matches"), editingId), data); 
-      setEditingId(null); 
-      alert("✅ تم تعديل المباراة بنجاح");
-    } else { 
-      await addDoc(collection(db, getColl("matches")), data); 
-      alert("✅ تم إضافة المباراة بنجاح");
-    }
-    setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
-  };
-  
-  // وظيفة التصعيد التلقائي الجديدة للإقصائيات
+  // --- Bracket Progression ---
   const handleAutoProgression = async (match: any) => {
     if (match.status !== "انتهت") return;
-    const winner = match.homeGoals > match.awayGoals ? match.teamA : match.teamB;
-    const progression = BRACKET_MAP[match.matchLabel];
+    const winner = match.homeGoals > match.awayGoals ? match.teamA : (match.awayGoals > match.homeGoals ? match.teamB : null);
+    if (!winner) return; 
     
-    if (progression) {
-      const nextMatch = matches.find(m => m.matchLabel === progression.targetLabel && m.round === "دور الستة عشر");
+    const prog = BRACKET_MAP[match.matchLabel];
+    if (prog) {
+      const nextMatch = matches.find(m => m.matchLabel === prog.targetLabel && m.round === "دور الستة عشر");
       if (nextMatch) {
-        await updateDoc(doc(db, getColl("matches"), nextMatch.id), {
-          [progression.targetSide]: winner
-        });
-        alert(`تم تصعيد فريق ${winner} تلقائياً إلى مباراة ${progression.targetLabel}`);
+        await updateDoc(doc(db, getColl("matches"), nextMatch.id), { [prog.targetSide]: winner });
+        alert(`🚀 تم تصعيد فريق ${winner} تلقائياً إلى مباراة ${prog.targetLabel} في دور الـ 16`);
       }
     }
   };
@@ -467,23 +291,35 @@ export default function AdminPage() {
          await updateDoc(doc(db, getColl("matches"), existingMatch.id), {
              teamA: bracketForm.teamA || existingMatch.teamA,
              teamB: bracketForm.teamB || existingMatch.teamB,
-             date: bracketForm.date,
-             time: bracketForm.time,
-             dayName
+             date: bracketForm.date, time: bracketForm.time, dayName
          });
          alert("✅ تم تحديث بيانات المباراة في الإقصائيات بنجاح!");
      } else {
          await addDoc(collection(db, getColl("matches")), {
-             round: bracketForm.round,
-             matchLabel: bracketForm.matchLabel,
-             teamA: bracketForm.teamA,
-             teamB: bracketForm.teamB,
+             round: bracketForm.round, matchLabel: bracketForm.matchLabel,
+             teamA: bracketForm.teamA, teamB: bracketForm.teamB,
              homeGoals: 0, awayGoals: 0,
              date: bracketForm.date, time: bracketForm.time, dayName,
              status: "لم تبدأ", isLive: false, streamClosed: false
          });
          alert("✅ تم إنشاء المباراة في الإقصائيات بنجاح!");
      }
+  };
+
+  // --- Match Functions ---
+  const saveMatch = async () => {
+    if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!");
+    const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()];
+    const data = { ...matchForm, dayName, isLive: false, streamClosed: false };
+    if (editingId) { 
+      await updateDoc(doc(db, getColl("matches"), editingId), data); 
+      setEditingId(null); 
+      alert("✅ تم تعديل المباراة بنجاح");
+    } else { 
+      await addDoc(collection(db, getColl("matches")), data); 
+      alert("✅ تم إضافة المباراة بنجاح");
+    }
+    setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
   };
 
   const startEdit = (match: any) => { 
@@ -525,8 +361,6 @@ export default function AdminPage() {
       nextUpdates.timerPausedTotal = 0;
     }
     await updateDoc(doc(db, getColl("matches"), id), nextUpdates);
-    
-    // إذا تم إنهاء المباراة وتحديث الأهداف، نفذ التصعيد التلقائي
     if (nextUpdates.status === "انتهت" && currentMatch) {
       handleAutoProgression({ ...currentMatch, ...nextUpdates });
     }
@@ -553,33 +387,160 @@ export default function AdminPage() {
     await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents });
   };
 
-  const sendQuickNotification = async (title: string, body: string) => {
-    const success = await pushNotification(title, body);
-    if(success) alert(`✅ تم إرسال الإشعار السريع بنجاح!`);
-    else alert("❌ حدث خطأ في الإرسال.");
-  };
-
-  const sendNotification = async () => {
-    if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
-    setIsSending(true);
-    const success = await pushNotification(notifyTitle, notifyBody);
-    if (success) {
-      alert(`✅ تم إرسال الإشعار لجميع الأجهزة!`);
-      setNotifyTitle(""); setNotifyBody("");
-    } else {
-      alert("❌ فشل الإرسال.");
+  // --- Roster Functions ---
+  const startEditRoster = (teamName: string) => {
+    const existing = rostersList.find(r => r.id === teamName);
+    let loadedPlayers = Array.from({ length: 12 }, () => ({ name: "", number: "" }));
+    if (existing && existing.players) {
+        loadedPlayers = [...existing.players];
+        while(loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" });
     }
-    setIsSending(false);
+    setRosterFormAdmin({
+        managerName: existing?.managerName || "",
+        managerPhone: existing?.managerPhone || "",
+        password: existing?.password || "",
+        logoUrl: existing?.logoUrl || "",
+        isSubmitted: existing?.isSubmitted || false,
+        players: loadedPlayers.slice(0,12)
+    });
+    setEditingRosterId(teamName);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const updateAdminRosterPlayer = (index: number, field: string, value: string) => {
+    setRosterFormAdmin(prev => {
+        const newPlayers = [...prev.players];
+        newPlayers[index] = { ...newPlayers[index], [field]: value };
+        return { ...prev, players: newPlayers };
+    });
+  };
+
+  const saveRosterAdmin = async () => {
+    if(!editingRosterId) return;
+    try {
+        await setDoc(doc(db, getColl("team_rosters"), editingRosterId), {
+            teamName: editingRosterId, managerName: rosterFormAdmin.managerName,
+            managerPhone: rosterFormAdmin.managerPhone, password: rosterFormAdmin.password,
+            logoUrl: rosterFormAdmin.logoUrl, isSubmitted: rosterFormAdmin.isSubmitted,
+            players: rosterFormAdmin.players, updatedAt: new Date().toISOString()
+        }, { merge: true });
+        alert("تم حفظ بيانات القائمة بنجاح! ✔️");
+        setEditingRosterId(null);
+    } catch(e) { alert("حدث خطأ أثناء الحفظ."); }
+  };
+
+  const deleteRoster = async (teamName: string) => {
+    if(confirm(`⚠️ هل أنت متأكد من مسح قائمة فريق ${teamName} بالكامل؟`)) {
+        await deleteDoc(doc(db, getColl("team_rosters"), teamName));
+        alert("تم مسح القائمة بنجاح.");
+    }
+  };
+
+  const unlockRoster = async (teamName: string) => {
+    if(confirm(`هل تريد فتح القفل لقائمة فريق ${teamName} ليتمكن المدير من التعديل عليها؟`)) {
+        await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: false });
+        alert("تم فتح القائمة بنجاح. يمكن للمدير التعديل الآن. 🔓");
+    }
+  };
+
+  const lockRoster = async (teamName: string) => {
+    await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
+    alert("تم قفل القائمة واعتمادها. 🔒");
+  };
+
+  // --- MOTM Functions ---
+  const openMotmPopup = (match: any) => {
+    setMotmPopupMatch(match);
+    setQuickMotmForm({ player: "", team: match.teamA, rating: 99 });
+  };
+
+  const saveQuickMotm = async () => {
+    if (!quickMotmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
+    try {
+      const matchName = `${motmPopupMatch.teamA} vs ${motmPopupMatch.teamB}`;
+      await addDoc(collection(db, getColl("motm")), {
+        player: quickMotmForm.player.trim(), team: quickMotmForm.team,
+        matchName: matchName, imageUrl: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src,
+        rating: Number(quickMotmForm.rating), pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99
+      });
+      alert("✅ تم تسجيل نجم المباراة بنجاح!");
+      setMotmPopupMatch(null);
+    } catch (e) { alert("حدث خطأ."); }
+  };
+
+  const addMotm = async () => {
+    if (!motmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
+    const data = { ...motmForm, rating: Number(motmForm.rating), pac: Number(motmForm.pac), sho: Number(motmForm.sho), pas: Number(motmForm.pas), dri: Number(motmForm.dri), def: Number(motmForm.def), phy: Number(motmForm.phy) };
+    if (editingMotmId) {
+      await updateDoc(doc(db, getColl("motm"), editingMotmId), data);
+      setEditingMotmId(null);
+      alert("✅ تم تعديل بيانات النجم بنجاح");
+    } else {
+      await addDoc(collection(db, getColl("motm")), data);
+      alert("✅ تم إضافة النجم بنجاح");
+    }
+    setMotmForm({ player: "", team: currentTeamsList[0] || "", imageUrl: "", matchName: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats }); 
+  };
+
+  const startEditMotm = (m: any) => {
+    setEditingMotmId(m.id);
+    setMotmForm({
+      player: m.player || "", team: m.team || currentTeamsList[0], imageUrl: m.imageUrl || "", matchName: m.matchName || "", sponsorName: m.sponsorName || SPONSORS[0].name, sponsorLogo: m.sponsorLogo || SPONSORS[0].src,
+      rating: m.rating || 99, pac: m.pac || 99, sho: m.sho || 99, pas: m.pas || 99, dri: m.dri || 99, def: m.def || 99, phy: m.phy || 99
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const deleteMotm = async (id: string) => confirm("حذف هذا اللاعب؟") && await deleteDoc(doc(db, getColl("motm"), id));
+
+  // --- Poster Functions ---
+  const openPoster = async (match: any) => {
+    setPosterMatch(match);
+    setIsPreparingPoster(true);
+    setPosterLogos({ a: "", b: "" });
+
+    const fetchBase64 = async (url: string) => {
+      if (!url) return "";
+      try {
+        const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(url)}&output=png`);
+        const blob = await res.blob();
+        return await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) { return url; }
+    };
+
+    const logoA = await fetchBase64(match.teamALogo);
+    const logoB = await fetchBase64(match.teamBLogo);
+    setPosterLogos({ a: logoA, b: logoB });
+    setIsPreparingPoster(false);
+  };
+
+  const downloadPoster = async () => {
+    const element = document.getElementById("poster-canvas-node");
+    if (!element) return;
+    setIsGeneratingPoster(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const htmlToImage = await import('html-to-image');
+      const dataUrl = await htmlToImage.toJpeg(element, { quality: 0.95, backgroundColor: '#050a14', pixelRatio: 2 });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `Match_Result_${posterMatch.teamA}_vs_${posterMatch.teamB}.jpg`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } catch (err) { alert("حدث خطأ أثناء تحميل البوستر."); }
+    setIsGeneratingPoster(false);
+  };
+
+  // --- Goals & Cards Functions ---
   const addOrUpdateGoal = async () => {
     if (!goalForm.player.trim()) return alert("اكتب اسم اللاعب");
     const playerNameTrimmed = goalForm.player.trim(); 
     const teamSelected = goalForm.team; 
     
     const statsData: any = {
-      goals: Number(goalForm.goalsCount),
-      rating: Number(goalForm.rating),
+      goals: Number(goalForm.goalsCount), rating: Number(goalForm.rating),
       pac: Number(goalForm.pac), sho: Number(goalForm.sho), pas: Number(goalForm.pas), dri: Number(goalForm.dri), def: Number(goalForm.def), phy: Number(goalForm.phy)
     };
     if (goalForm.imageUrl.trim()) statsData.imageUrl = goalForm.imageUrl.trim();
@@ -639,66 +600,20 @@ export default function AdminPage() {
           await updateDoc(doc(db, getColl("cards"), card.id), { yellow: 0, red: 0 });
         }
       }
-      alert(`✅ تمت عملية الأرشفة والتصفير بنجاح`);
-    } catch (e) { alert("حدث خطأ أثناء الأرشفة."); }
+      alert(`✅ تمت الأرشفة والتصفير بنجاح`);
+    } catch (e) { alert("حدث خطأ."); }
   };
 
+  // --- Other Data Functions ---
   const addMedia = async () => {
     if (!mediaForm.title.trim()) return alert("اكتب عنوان الخبر أو الفيديو");
     if ((mediaForm.type === "video" || mediaForm.type === "goal") && !mediaForm.url.trim()) return alert("اكتب رابط الفيديو أو الهدف");
     if (mediaForm.type === "news" && !mediaForm.body.trim() && !mediaForm.url.trim()) return alert("اكتب تفاصيل الخبر أو رابط الخبر");
     await addDoc(collection(db, getColl("media")), mediaForm);
     setMediaForm({ type: "news", title: "", url: "", imageUrl: "", body: "" }); 
-    alert(mediaForm.type === "news" ? "✅ تم إضافة الخبر بنجاح" : "✅ تم إضافة الفيديو/الهدف بنجاح");
+    alert(mediaForm.type === "news" ? "✅ تم إضافة الخبر" : "✅ تم إضافة الفيديو/الهدف");
   };
   const deleteMedia = async (id: string) => confirm("حذف هذا العنصر؟") && await deleteDoc(doc(db, getColl("media"), id));
-
-  const addMotm = async () => {
-    if (!motmForm.player.trim()) return alert("يجب كتابة اسم اللاعب!");
-    const data = { ...motmForm, rating: Number(motmForm.rating), pac: Number(motmForm.pac), sho: Number(motmForm.sho), pas: Number(motmForm.pas), dri: Number(motmForm.dri), def: Number(motmForm.def), phy: Number(motmForm.phy) };
-    if (editingMotmId) {
-      await updateDoc(doc(db, getColl("motm"), editingMotmId), data);
-      setEditingMotmId(null);
-      alert("✅ تم تعديل بيانات النجم بنجاح");
-    } else {
-      await addDoc(collection(db, getColl("motm")), data);
-      alert("✅ تم إضافة النجم بنجاح");
-    }
-    setMotmForm({ player: "", team: currentTeamsList[0] || "", imageUrl: "", matchName: "", sponsorName: SPONSORS[0].name, sponsorLogo: SPONSORS[0].src, ...defaultStats }); 
-  };
-
-  const startEditMotm = (m: any) => {
-    setEditingMotmId(m.id);
-    setMotmForm({
-      player: m.player || "", team: m.team || currentTeamsList[0], imageUrl: m.imageUrl || "", matchName: m.matchName || "", sponsorName: m.sponsorName || SPONSORS[0].name, sponsorLogo: m.sponsorLogo || SPONSORS[0].src,
-      rating: m.rating || 99, pac: m.pac || 99, sho: m.sho || 99, pas: m.pas || 99, dri: m.dri || 99, def: m.def || 99, phy: m.phy || 99
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  const deleteMotm = async (id: string) => confirm("حذف هذا اللاعب؟") && await deleteDoc(doc(db, getColl("motm"), id));
-
-  const deletePrediction = async (id: string) => {
-    if (confirm("هل أنت متأكد من حذف هذا التوقع؟")) {
-      try {
-        await deleteDoc(doc(db, getColl("predictions"), id));
-        alert("✅ تم حذف التوقع بنجاح");
-      } catch (e) {
-        alert("حدث خطأ أثناء الحذف.");
-      }
-    }
-  };
-
-  const deleteAllPredictions = async () => {
-     if (!confirm("⚠️ هل أنت متأكد من مسح جميع التوقعات؟")) return;
-     for (const p of predictions) { await deleteDoc(doc(db, getColl("predictions"), p.id)); }
-     alert("✅ تم التصفية بنجاح");
-  };
-
-  const saveTicker = async () => {
-    if (!tickerText.trim()) return alert("اكتب الخبر أولاً");
-    await setDoc(doc(db, "settings", "ticker"), { text: tickerText.trim() }); 
-    alert("✅ تم نشر الخبر بنجاح");
-  };
 
   const saveFormation = async () => {
     const existing = formationsList.find(f => f.round === formationForm.round);
@@ -723,6 +638,43 @@ export default function AdminPage() {
     setFormationForm(prev => ({ ...prev, coach: { ...(prev.coach || {...defaultCoach}), [field]: value } }));
   };
 
+  const deletePrediction = async (id: string) => {
+    if (confirm("هل أنت متأكد من حذف هذا التوقع؟")) {
+      await deleteDoc(doc(db, getColl("predictions"), id));
+      alert("✅ تم الحذف");
+    }
+  };
+
+  const deleteAllPredictions = async () => {
+     if (!confirm("⚠️ هل أنت متأكد من مسح جميع التوقعات؟")) return;
+     for (const p of predictions) { await deleteDoc(doc(db, getColl("predictions"), p.id)); }
+     alert("✅ تم التصفية بنجاح");
+  };
+
+  const saveTicker = async () => {
+    if (!tickerText.trim()) return alert("اكتب الخبر أولاً");
+    await setDoc(doc(db, "settings", "ticker"), { text: tickerText.trim() }); 
+    alert("✅ تم النشر");
+  };
+
+  const sendQuickNotification = async (title: string, body: string) => {
+    const success = await pushNotification(title, body);
+    if(success) alert(`✅ تم إرسال الإشعار السريع بنجاح!`);
+    else alert("❌ حدث خطأ في الإرسال.");
+  };
+
+  const sendNotification = async () => {
+    if (!notifyTitle || !notifyBody) return alert("اكتب عنوان وتفاصيل الإشعار!");
+    setIsSending(true);
+    const success = await pushNotification(notifyTitle, notifyBody);
+    if (success) {
+      alert(`✅ تم إرسال الإشعار لجميع الأجهزة!`);
+      setNotifyTitle(""); setNotifyBody("");
+    } else alert("❌ فشل الإرسال.");
+    setIsSending(false);
+  };
+
+  // --- Filtering & Calculations ---
   const safeGoalSearch = goalSearchTerm.toLowerCase(); 
   const filteredGoals = goals.filter(g => normalizeTeamName(g.player).includes(safeGoalSearch) || normalizeTeamName(g.team).includes(safeGoalSearch));
   const safeCardSearch = cardSearchTerm.toLowerCase(); 
@@ -731,20 +683,15 @@ export default function AdminPage() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
-  // ========== المنطق للمباريات المباشرة ==========
   const liveMatchesList = matches.filter(m => {
     if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
-
     if (m.date === todayStr && m.time) {
       const now = time || new Date();
       const [hours, minutes] = m.time.split(':').map(Number);
       const matchTime = new Date();
       matchTime.setHours(hours, minutes, 0, 0);
       const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
-      
-      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") {
-        return true;
-      }
+      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") return true;
     }
     return false;
   });
@@ -752,6 +699,7 @@ export default function AdminPage() {
   const liveMatches = sortMatches(liveMatchesList);
   const liveMatchIds = new Set(liveMatchesList.map(m => m.id));
 
+  // ================== RENDER ==================
   if (!isAuth) return (
     <div dir="rtl" className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-yellow-400 bg-[#13213a]">
@@ -765,7 +713,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white pb-20 font-sans">
       <datalist id="teams-list">{currentTeamsList.map(t => <option key={t} value={t} />)}</datalist>
       
-      {/* ===================== نافذة تسجيل نجم المباراة السريعة ===================== */}
+      {/* --- POPUPS --- */}
       {motmPopupMatch && (
         <div className="fixed inset-0 bg-black/95 z-[9999] flex flex-col items-center justify-center p-4">
           <Card className="w-full max-w-md bg-[#13213a] border-yellow-400 shadow-2xl">
@@ -774,10 +722,7 @@ export default function AdminPage() {
               <p className="text-cyan-300 text-center font-bold text-sm mt-2">{motmPopupMatch.teamA} <span className="text-white">VS</span> {motmPopupMatch.teamB}</p>
             </CardHeader>
             <CardContent className="space-y-4 p-6">
-              <div>
-                <label className="text-cyan-300 font-bold mb-2 block">اسم اللاعب</label>
-                <Input value={quickMotmForm.player} onChange={e => setQuickMotmForm(p => ({...p, player: e.target.value}))} placeholder="اكتب اسم نجم المباراة" className="bg-[#1e2a4a] border-yellow-400 text-white font-bold h-12" />
-              </div>
+              <div><label className="text-cyan-300 font-bold mb-2 block">اسم اللاعب</label><Input value={quickMotmForm.player} onChange={e => setQuickMotmForm(p => ({...p, player: e.target.value}))} placeholder="اكتب اسم نجم المباراة" className="bg-[#1e2a4a] border-yellow-400 text-white font-bold h-12" /></div>
               <div>
                 <label className="text-cyan-300 font-bold mb-2 block">فريق اللاعب</label>
                 <select value={quickMotmForm.team} onChange={e => setQuickMotmForm(p => ({...p, team: e.target.value}))} className="bg-[#1e2a4a] border border-yellow-400 w-full rounded-xl p-3 text-white font-bold outline-none cursor-pointer h-12">
@@ -785,27 +730,16 @@ export default function AdminPage() {
                   <option value={motmPopupMatch.teamB}>{motmPopupMatch.teamB}</option>
                 </select>
               </div>
-              <div>
-                <label className="text-cyan-300 font-bold mb-2 block">التقييم الأولي (Rating)</label>
-                <Input type="number" value={quickMotmForm.rating} onChange={e => setQuickMotmForm(p => ({...p, rating: Number(e.target.value)}))} className="bg-[#1e2a4a] border-yellow-400 text-white font-bold text-center h-12" />
-              </div>
-              <div className="flex gap-4 mt-6">
-                <Button onClick={saveQuickMotm} className="flex-1 bg-yellow-400 text-black font-black text-lg hover:bg-yellow-500 shadow-lg py-6">حفظ واعتماد ✔️</Button>
-                <Button onClick={() => setMotmPopupMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6 px-8">إلغاء</Button>
-              </div>
+              <div><label className="text-cyan-300 font-bold mb-2 block">التقييم الأولي</label><Input type="number" value={quickMotmForm.rating} onChange={e => setQuickMotmForm(p => ({...p, rating: Number(e.target.value)}))} className="bg-[#1e2a4a] border-yellow-400 text-white font-bold text-center h-12" /></div>
+              <div className="flex gap-4 mt-6"><Button onClick={saveQuickMotm} className="flex-1 bg-yellow-400 text-black font-black text-lg py-6">حفظ ✔️</Button><Button onClick={() => setMotmPopupMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-6">إلغاء</Button></div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* ===================== شاشة البوستر (Popup) ===================== */}
       {posterMatch && (
         <div className="fixed inset-0 bg-black/95 z-[9998] flex flex-col items-center justify-center p-4 overflow-y-auto">
-          <div 
-             id="poster-canvas-node" 
-             className="relative w-[400px] h-[711px] bg-gradient-to-b from-[#050a14] via-[#13213a] to-[#050a14] flex flex-col items-center overflow-hidden border border-yellow-400/20"
-             dir="rtl"
-          >
+          <div id="poster-canvas-node" className="relative w-[400px] h-[711px] bg-gradient-to-b from-[#050a14] via-[#13213a] to-[#050a14] flex flex-col items-center overflow-hidden border border-yellow-400/20" dir="rtl">
              <div className="absolute inset-0 opacity-10 bg-[url('/pattern.png')] bg-repeat"></div>
              <div className="mt-8 z-10 flex flex-col items-center">
                 <img src="/logo.png" className="w-28 h-28 object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="كأس مطروح" />
@@ -821,9 +755,7 @@ export default function AdminPage() {
                    <div className="text-center font-black text-white text-lg">{posterMatch.teamA}</div>
                 </div>
                 <div className="flex flex-col items-center justify-center w-1/3">
-                   <div className="text-5xl font-black text-white tracking-tighter" dir="ltr">
-                     {posterMatch.homeGoals} - {posterMatch.awayGoals}
-                   </div>
+                   <div className="text-5xl font-black text-white tracking-tighter" dir="ltr">{posterMatch.homeGoals} - {posterMatch.awayGoals}</div>
                    <div className="text-cyan-400 font-bold mt-2 text-sm bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/30">نتيجة نهائية</div>
                 </div>
                 <div className="flex flex-col items-center gap-3 w-1/3">
@@ -834,44 +766,36 @@ export default function AdminPage() {
                 </div>
              </div>
              <div className="absolute bottom-0 w-full flex flex-col items-center z-10 pb-6">
-                <div className="bg-[#1e2a4a] text-cyan-300 w-full text-center py-2 font-bold border-y border-white/5 text-sm mb-4">
-                   {getArabicDay(posterMatch.date)} • {posterMatch.date}
-                </div>
-                <div className="flex items-center gap-4 text-white/50 text-xs font-bold">
-                   <Star className="w-4 h-4 text-yellow-400/50" />
-                   <span>إدارة البطولة: فتحي هيرو 🦅</span>
-                   <Star className="w-4 h-4 text-yellow-400/50" />
-                </div>
+                <div className="bg-[#1e2a4a] text-cyan-300 w-full text-center py-2 font-bold border-y border-white/5 text-sm mb-4">{getArabicDay(posterMatch.date)} • {posterMatch.date}</div>
+                <div className="flex items-center gap-4 text-white/50 text-xs font-bold"><Star className="w-4 h-4 text-yellow-400/50" /><span>إدارة البطولة: فتحي هيرو 🦅</span><Star className="w-4 h-4 text-yellow-400/50" /></div>
              </div>
           </div>
           <div className="flex gap-4 mt-6">
              <Button onClick={downloadPoster} disabled={isGeneratingPoster || isPreparingPoster} className="bg-yellow-400 text-black hover:bg-yellow-500 font-black py-6 px-8 text-xl shadow-[0_0_15px_rgba(250,204,21,0.5)]">
-               {isGeneratingPoster || isPreparingPoster ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : <Camera className="h-6 w-6 mr-2" />} 
-               تحميل البوستر ⬇️
+               {isGeneratingPoster || isPreparingPoster ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : <Camera className="h-6 w-6 mr-2" />} تحميل البوستر
              </Button>
              <Button onClick={() => setPosterMatch(null)} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-6 px-8 font-bold text-lg">إغلاق</Button>
           </div>
         </div>
       )}
 
+      {/* --- MAIN DASHBOARD --- */}
       <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
         <header className="mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-center sm:text-right">
-             <h1 className="text-3xl sm:text-4xl font-black text-yellow-300">لوحة الإدارة الاحترافية</h1>
-             <p className="text-cyan-300">بطولة كأس مطروح ٢٠٢٦</p>
+             <h1 className="text-3xl sm:text-4xl font-black text-yellow-300">لوحة الإدارة الاحترافية 🦅</h1>
+             <p className="text-cyan-300 font-bold mt-1">كأس مطروح - الإدارة: فتحي هيرو</p>
           </div>
           <Button onClick={() => setIsAuth(false)} variant="outline" className="border-yellow-400 text-white hover:bg-yellow-400 hover:text-black font-bold">خروج <LogOut className="ml-2 h-4 w-4" /></Button>
         </header>
 
-        {/* التبويبات الرئيسية (الشباب والناشئين) */}
         <div className="flex justify-center mb-6">
           <div className="bg-[#13213a] p-2 rounded-xl border border-yellow-400/30 inline-flex shadow-xl gap-2 w-full max-w-md">
-            <button onClick={() => setActiveTournament('youth')} className={`flex-1 py-3 rounded-lg text-lg sm:text-xl font-black transition-all ${activeTournament === 'youth' ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>إدارة الشباب 🏆</button>
-            <button onClick={() => setActiveTournament('juniors')} className={`flex-1 py-3 rounded-lg text-lg sm:text-xl font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>إدارة الناشئين 🏅</button>
+            <button onClick={() => setActiveTournament('youth')} className={`flex-1 py-3 rounded-lg text-lg sm:text-xl font-black transition-all ${activeTournament === 'youth' ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>الشباب 🏆</button>
+            <button onClick={() => setActiveTournament('juniors')} className={`flex-1 py-3 rounded-lg text-lg sm:text-xl font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>الناشئين 🏅</button>
           </div>
         </div>
 
-        {/* نظام التبويبات الفرعية أسفل الرئيسية مباشرة */}
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
           <TabsList className="flex flex-nowrap sm:flex-wrap overflow-x-auto justify-start sm:justify-center bg-[#13213a] border border-white/20 p-1.5 rounded-2xl mb-8 gap-2 h-auto shadow-lg custom-scrollbar touch-pan-x">
             <TabsTrigger value="rosters" className="shrink-0 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-blue-400 border border-blue-500/30">القوائم 📋</TabsTrigger>
@@ -885,81 +809,77 @@ export default function AdminPage() {
             <TabsTrigger value="predictions" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">توقعات 🎁</TabsTrigger>
             <TabsTrigger value="goals" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أهداف</TabsTrigger>
             <TabsTrigger value="cards" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">كروت</TabsTrigger>
-            <TabsTrigger value="media" className="shrink-0 data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">أخبار البطولة</TabsTrigger>
+            <TabsTrigger value="media" className="shrink-0 data-[state=active]:bg-emerald-500 data-[state=active]:text-white font-bold py-2 px-4 rounded-xl text-emerald-400">ميديا</TabsTrigger>
             <TabsTrigger value="shop_admin" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/30">المتجر 🛒</TabsTrigger>
             <TabsTrigger value="notify" className="shrink-0 data-[state=active]:bg-yellow-400 data-[state=active]:text-black font-black py-2 px-4 rounded-xl text-yellow-400 border border-yellow-400/20">إشعارات 🔔</TabsTrigger>
             <TabsTrigger value="ticker" className="shrink-0 data-[state=active]:bg-gray-800 data-[state=active]:text-yellow-300 font-bold py-2 px-4 rounded-xl text-white">أخبار</TabsTrigger>
           </TabsList>
 
-          {/* نموذج إضافة وتعديل المباريات (Match Form) */}
+          {/* Form Create/Edit Match */}
           <Card className={`border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} bg-[#13213a] mb-8 mt-4 shadow-2xl transition-colors`}>
-            <CardHeader><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>{editingId ? "تعديل مباراة" : `إضافة مباراة (${activeTournament === 'youth' ? 'شباب' : 'ناشئين'})`}</CardTitle></CardHeader>
+            <CardHeader><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>{editingId ? "تعديل مباراة" : `إضافة مباراة`}</CardTitle></CardHeader>
             <CardContent className="space-y-6 p-6 text-white">
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-start">
                  <div className="space-y-2">
-                   <Input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
-                   <Input value={matchForm.teamALogo} onChange={e => setMatchForm(p => ({...p, teamALogo: e.target.value}))} placeholder="رابط شعار الفريق الأول (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
+                   <Input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center`} />
+                   <Input value={matchForm.teamALogo} onChange={e => setMatchForm(p => ({...p, teamALogo: e.target.value}))} placeholder="رابط شعار الفريق الأول" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
                  </div>
                  <div className="flex flex-col items-center justify-center mt-2 md:mt-0">
                    <div className="text-3xl text-yellow-400 font-black mb-2">VS</div>
                    <Input value={matchForm.matchLabel} onChange={e => setMatchForm(p => ({...p, matchLabel: e.target.value}))} placeholder="رقم (مثال: م 97)" className="bg-[#0a1428] border-white/20 text-yellow-300 h-8 w-32 text-center text-xs font-bold" />
-                   <div className="flex flex-wrap justify-center gap-1 mt-2 max-w-[150px]">
-                     {getLabelSuggestions(matchForm.round).map(l => (<Badge key={l} className="cursor-pointer bg-white/10 border-white/5 hover:bg-yellow-400 hover:text-black text-[10px] py-1" onClick={() => setMatchForm(p => ({...p, matchLabel: l}))}>{l}</Badge>))}
-                   </div>
+                   <div className="flex flex-wrap justify-center gap-1 mt-2 max-w-[150px]">{getLabelSuggestions(matchForm.round).map(l => (<Badge key={l} className="cursor-pointer bg-white/10 hover:bg-yellow-400 hover:text-black py-1" onClick={() => setMatchForm(p => ({...p, matchLabel: l}))}>{l}</Badge>))}</div>
                  </div>
                  <div className="space-y-2">
-                   <Input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center md:text-right`} />
-                   <Input value={matchForm.teamBLogo} onChange={e => setMatchForm(p => ({...p, teamBLogo: e.target.value}))} placeholder="رابط شعار الفريق الثاني (اختياري)" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
+                   <Input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold h-14 text-center`} />
+                   <Input value={matchForm.teamBLogo} onChange={e => setMatchForm(p => ({...p, teamBLogo: e.target.value}))} placeholder="رابط شعار الفريق الثاني" className="bg-[#0a1428] border-white/20 text-white text-xs h-10 text-center" dir="ltr" />
                  </div>
               </div>
-              <div className="grid grid-cols-2 gap-6 mt-4"><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamA || 'الأول'}</label><Input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm(p => ({...p, homeGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamB || 'الثاني'}</label><Input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm(p => ({...p, awayGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div></div>
+              <div className="grid grid-cols-2 gap-6 mt-4"><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamA}</label><Input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm(p => ({...p, homeGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div><div><label className="block mb-2 text-cyan-300 font-bold text-center">أهداف {matchForm.teamB}</label><Input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm(p => ({...p, awayGoals: Number(e.target.value)}))} className="text-6xl text-center h-20 text-white font-black bg-[#1e2a4a]" /></div></div>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <select value={matchForm.round} onChange={e => setMatchForm(p => ({...p, round: e.target.value, matchLabel: ""}))} className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold outline-none cursor-pointer`}>{["الجولة الأولى","الجولة الثانية","الجولة الثالثة","الجولة الرابعة","الجولة الخامسة","الملحق","دور الستة عشر","دور الثمانية","نصف النهائي","النهائي"].map(r => <option key={r} value={r}>{r}</option>)}</select>
+                <select value={matchForm.round} onChange={e => setMatchForm(p => ({...p, round: e.target.value, matchLabel: ""}))} className={`bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 text-white font-bold`}>{["الجولة الأولى","الجولة الثانية","الجولة الثالثة","الجولة الرابعة","الجولة الخامسة","الملحق","دور الستة عشر","دور الثمانية","نصف النهائي","النهائي"].map(r => <option key={r} value={r}>{r}</option>)}</select>
                 <Input type="time" value={matchForm.time} onChange={e => setMatchForm(p => ({...p, time: e.target.value}))} className={`text-white bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 font-bold`} />
                 <Input type="date" value={matchForm.date} onChange={e => setMatchForm(p => ({...p, date: e.target.value}))} className={`text-white bg-[#1e2a4a] border ${activeTournament === 'juniors' ? 'border-cyan-500' : 'border-yellow-400'} rounded-2xl p-4 font-bold`} />
-                <select value={matchForm.status} onChange={e => setMatchForm(p => ({...p, status: e.target.value}))} className="bg-[#1e2a4a] border border-red-500 rounded-2xl p-4 text-white font-bold outline-none cursor-pointer"><option value="لم تبدأ">حالة المباراة: لم تبدأ</option><option value="انتهت">حالة المباراة: انتهت ✔️</option></select>
+                <select value={matchForm.status} onChange={e => setMatchForm(p => ({...p, status: e.target.value}))} className="bg-[#1e2a4a] border border-red-500 rounded-2xl p-4 text-white font-bold"><option value="لم تبدأ">حالة المباراة: لم تبدأ</option><option value="انتهت">حالة المباراة: انتهت ✔️</option></select>
               </div>
               <div className="flex gap-4 mt-6">
-                <Button onClick={saveMatch} className={`flex-1 font-black py-7 text-xl transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white hover:bg-cyan-600' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}>{editingId ? "حفظ التعديل" : "إضافة المباراة"}</Button>
+                <Button onClick={saveMatch} className={`flex-1 font-black py-7 text-xl ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white' : 'bg-yellow-400 text-black'}`}>{editingId ? "حفظ التعديل" : "إضافة المباراة"}</Button>
                 {editingId && <Button onClick={() => {setEditingId(null); setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });}} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-7 px-8">إلغاء</Button>}
               </div>
             </CardContent>
           </Card>
 
-          {/* محتويات التبويبات الفرعية */}
+          {/* TABS CONTENT */}
           <TabsContent value="rosters">
             <Card className="border-blue-500 bg-[#13213a] shadow-xl">
-               <CardHeader className="border-b border-white/5 pb-4">
-                  <CardTitle className="text-blue-400 flex items-center gap-2"><ClipboardList /> إدارة قوائم الفرق</CardTitle>
-               </CardHeader>
+               <CardHeader className="border-b border-white/5 pb-4"><CardTitle className="text-blue-400 flex items-center gap-2"><ClipboardList /> إدارة قوائم الفرق</CardTitle></CardHeader>
                <CardContent className="p-6">
                   {editingRosterId ? (
-                     <div className="animate-in fade-in duration-300 bg-[#1e2a4a] border border-blue-500/50 p-6 rounded-3xl">
-                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-                           <h3 className="text-2xl font-black text-white flex items-center gap-2"><Edit className="text-yellow-400"/> تعديل قائمة: <span className="text-yellow-400">{editingRosterId}</span></h3>
-                           <Button variant="outline" onClick={() => setEditingRosterId(null)} className="border-red-500 text-white hover:bg-red-500 font-bold">إلغاء</Button>
+                     <div className="animate-in fade-in bg-[#1e2a4a] border border-blue-500/50 p-6 rounded-3xl">
+                        <div className="flex justify-between mb-6 pb-4 border-b border-white/10">
+                           <h3 className="text-2xl font-black text-white">تعديل قائمة: <span className="text-yellow-400">{editingRosterId}</span></h3>
+                           <Button variant="outline" onClick={() => setEditingRosterId(null)} className="border-red-500 text-white hover:bg-red-500">إلغاء</Button>
                         </div>
-                        <div className="grid md:grid-cols-4 gap-6 mb-8 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
-                           <div><label className="block text-cyan-300 text-sm font-bold mb-2">اسم المسئول</label><Input placeholder="الاسم" value={rosterFormAdmin.managerName} onChange={e => setRosterFormAdmin(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold" /></div>
-                           <div><label className="block text-cyan-300 text-sm font-bold mb-2">رقم التليفون</label><Input dir="ltr" placeholder="01xxxxxxxxx" value={rosterFormAdmin.managerPhone} onChange={e => setRosterFormAdmin(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold text-right" /></div>
-                           <div><label className="block text-yellow-400 text-sm font-bold mb-2">الباسورد السري</label><Input placeholder="كلمة المرور" value={rosterFormAdmin.password} onChange={e => setRosterFormAdmin(p => ({...p, password: e.target.value}))} className="bg-[#1e2a4a] border-yellow-500/40 text-white font-bold text-center tracking-wider" /></div>
-                           <div><label className="block text-emerald-400 text-sm font-bold mb-2">رابط اللوجو</label><Input dir="ltr" placeholder="Logo URL" value={rosterFormAdmin.logoUrl} onChange={e => setRosterFormAdmin(p => ({...p, logoUrl: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/40 text-white font-bold" /></div>
+                        <div className="grid md:grid-cols-4 gap-6 mb-8 bg-[#0a1428] p-4 rounded-2xl">
+                           <div><label className="block text-cyan-300 text-sm font-bold mb-2">اسم المسئول</label><Input value={rosterFormAdmin.managerName} onChange={e => setRosterFormAdmin(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white" /></div>
+                           <div><label className="block text-cyan-300 text-sm font-bold mb-2">رقم التليفون</label><Input value={rosterFormAdmin.managerPhone} onChange={e => setRosterFormAdmin(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white text-right" /></div>
+                           <div><label className="block text-yellow-400 text-sm font-bold mb-2">الباسورد السري</label><Input value={rosterFormAdmin.password} onChange={e => setRosterFormAdmin(p => ({...p, password: e.target.value}))} className="bg-[#1e2a4a] border-yellow-500/40 text-white text-center" /></div>
+                           <div><label className="block text-emerald-400 text-sm font-bold mb-2">رابط اللوجو</label><Input value={rosterFormAdmin.logoUrl} onChange={e => setRosterFormAdmin(p => ({...p, logoUrl: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/40 text-white" /></div>
                         </div>
                         <div className="flex items-center gap-4 mb-8 bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
-                           <input type="checkbox" id="isSubmittedCheck" checked={rosterFormAdmin.isSubmitted} onChange={e => setRosterFormAdmin(p => ({...p, isSubmitted: e.target.checked}))} className="w-6 h-6 rounded border-blue-500 text-blue-600 focus:ring-blue-500 bg-[#0a1428] cursor-pointer" />
-                           <label htmlFor="isSubmittedCheck" className="text-white font-bold text-lg cursor-pointer select-none">قفل القائمة واعتمادها (منع المدير من التعديل) 🔒</label>
+                           <input type="checkbox" id="isSub" checked={rosterFormAdmin.isSubmitted} onChange={e => setRosterFormAdmin(p => ({...p, isSubmitted: e.target.checked}))} className="w-6 h-6 rounded border-blue-500 text-blue-600 bg-[#0a1428]" />
+                           <label htmlFor="isSub" className="text-white font-bold text-lg">قفل القائمة واعتمادها 🔒</label>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                            {rosterFormAdmin.players.map((player, index) => (
-                              <div key={index} className="flex gap-3 items-center bg-[#0a1428] p-2 pr-4 rounded-xl border border-white/5 focus-within:border-blue-400">
+                              <div key={index} className="flex gap-3 items-center bg-[#0a1428] p-2 pr-4 rounded-xl border border-white/5">
                                  <span className="text-gray-500 font-black w-6">{index + 1}.</span>
-                                 <Input placeholder="اسم اللاعب" value={player.name} onChange={e => updateAdminRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-transparent border-none text-white font-bold focus-visible:ring-0 px-0" />
+                                 <Input placeholder="اسم اللاعب" value={player.name} onChange={e => updateAdminRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-transparent border-none text-white focus-visible:ring-0 px-0" />
                                  <div className="h-8 w-px bg-white/10 mx-1"></div>
                                  <Input type="number" placeholder="رقم" value={player.number} onChange={e => updateAdminRosterPlayer(index, 'number', e.target.value)} className="w-16 bg-[#1e2a4a] border-none text-yellow-400 font-black text-center focus-visible:ring-0" />
                               </div>
                            ))}
                         </div>
-                        <div className="mt-8 pt-6 border-t border-white/10"><Button onClick={saveRosterAdmin} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-7 text-xl shadow-lg">حفظ التعديلات الإدارية ✔️</Button></div>
+                        <div className="mt-8 pt-6 border-t border-white/10"><Button onClick={saveRosterAdmin} className="w-full bg-blue-600 text-white font-black py-7 text-xl">حفظ التعديلات ✔️</Button></div>
                      </div>
                   ) : (
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -968,21 +888,21 @@ export default function AdminPage() {
                            const isSubmitted = rosterData?.isSubmitted || false;
                            const hasData = !!rosterData;
                            return (
-                              <Card key={teamName} className={`bg-[#1e2a4a] border ${isSubmitted ? 'border-emerald-500/50' : hasData ? 'border-blue-500/30' : 'border-white/5'} overflow-hidden`}>
+                              <Card key={teamName} className={`bg-[#1e2a4a] border ${isSubmitted ? 'border-emerald-500/50' : hasData ? 'border-blue-500/30' : 'border-white/5'}`}>
                                  <div className={`p-3 text-center border-b ${isSubmitted ? 'bg-emerald-600/20 border-emerald-500/30' : hasData ? 'bg-blue-600/20 border-blue-500/30' : 'bg-gray-800 border-white/5'}`}>
                                     <h3 className="font-black text-white text-lg">{teamName}</h3>
-                                    {isSubmitted ? <Badge className="bg-emerald-500 text-white font-bold mt-1 text-[10px] px-2 py-0">معتمدة ومقفلة 🔒</Badge> : hasData ? <Badge className="bg-blue-500 text-white font-bold mt-1 text-[10px] px-2 py-0">مفتوحة للتعديل 🔓</Badge> : <Badge className="bg-gray-600 text-white font-bold mt-1 text-[10px] px-2 py-0">لم تسجل بعد ❌</Badge>}
+                                    {isSubmitted ? <Badge className="bg-emerald-500 mt-1 px-2 py-0">مقفلة 🔒</Badge> : hasData ? <Badge className="bg-blue-500 mt-1 px-2 py-0">مفتوحة 🔓</Badge> : <Badge className="bg-gray-600 mt-1 px-2 py-0">لم تسجل ❌</Badge>}
                                  </div>
                                  <CardContent className="p-4 space-y-3">
                                     <div className="text-sm">
                                        <div className="flex justify-between text-gray-300 mb-1"><span>المسئول:</span> <span className="text-white font-bold">{rosterData?.managerName || '—'}</span></div>
                                        <div className="flex justify-between text-gray-300 mb-1"><span>الموبايل:</span> <span className="text-white font-bold" dir="ltr">{rosterData?.managerPhone || '—'}</span></div>
-                                       <div className="flex justify-between text-gray-300"><span>الباسورد:</span> <span className="text-yellow-400 font-black tracking-widest">{rosterData?.password || '—'}</span></div>
+                                       <div className="flex justify-between text-gray-300"><span>الباسورد:</span> <span className="text-yellow-400 font-black">{rosterData?.password || '—'}</span></div>
                                     </div>
                                     <div className="flex gap-2 pt-3 border-t border-white/5">
-                                       <Button size="sm" onClick={() => startEditRoster(teamName)} className="flex-1 bg-blue-600 text-white hover:bg-blue-700 font-bold"><Edit className="h-4 w-4 mr-1"/> إعداد</Button>
-                                       {isSubmitted ? <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-black hover:bg-yellow-600 font-bold" title="فتح"><Unlock className="h-4 w-4"/></Button> : hasData ? <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500 text-white hover:bg-emerald-600 font-bold" title="قفل"><Lock className="h-4 w-4"/></Button> : null}
-                                       {hasData && <Button size="sm" variant="destructive" onClick={() => deleteRoster(teamName)} className="font-bold"><Trash2 className="h-4 w-4"/></Button>}
+                                       <Button size="sm" onClick={() => startEditRoster(teamName)} className="flex-1 bg-blue-600 font-bold"><Edit className="h-4 w-4 mr-1"/> إعداد</Button>
+                                       {isSubmitted ? <Button size="sm" onClick={() => unlockRoster(teamName)} className="bg-yellow-500 text-black"><Unlock className="h-4 w-4"/></Button> : hasData ? <Button size="sm" onClick={() => lockRoster(teamName)} className="bg-emerald-500"><Lock className="h-4 w-4"/></Button> : null}
+                                       {hasData && <Button size="sm" variant="destructive" onClick={() => deleteRoster(teamName)}><Trash2 className="h-4 w-4"/></Button>}
                                     </div>
                                  </CardContent>
                               </Card>
@@ -998,8 +918,8 @@ export default function AdminPage() {
             <Card className="border-emerald-500 bg-[#13213a] shadow-xl">
               <CardHeader className="border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
                 <CardTitle className="text-emerald-400 flex items-center gap-2"><Users /> إدارة تشكيلة الجولة</CardTitle>
-                <select value={formationForm.round} onChange={e => setFormationForm(p => ({...p, round: e.target.value}))} className="bg-[#0a1428] border-2 border-emerald-500 rounded-xl p-2 text-white font-black text-sm outline-none cursor-pointer w-full md:w-auto">
-                   {["دور المجموعات", "الملحق", "دور الستة عشر", "دور الثمانية", "دور الأربعة", "النهائي"].map(r => <option key={r} value={r}>{r}</option>)}
+                <select value={formationForm.round} onChange={e => setFormationForm(p => ({...p, round: e.target.value}))} className="bg-[#0a1428] border-2 border-emerald-500 rounded-xl p-2 text-white font-black text-sm">
+                   {["دور المجموعات", "الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </CardHeader>
               <CardContent className="p-6">
@@ -1007,23 +927,116 @@ export default function AdminPage() {
                    {[ { pos: "حارس المرمى (GK)", idx: 0 }, { pos: "مدافع (CB)", idx: 1 }, { pos: "مدافع (CB)", idx: 2 }, { pos: "خط وسط يسار (LM)", idx: 3 }, { pos: "خط وسط (CM)", idx: 4 }, { pos: "خط وسط يمين (RM)", idx: 5 }, { pos: "مهاجم (ST)", idx: 6 } ].map((item) => (
                      <div key={item.idx} className="bg-[#1e2a4a] p-4 rounded-2xl border border-white/10 flex flex-col lg:flex-row gap-4 items-center">
                        <Badge className="bg-emerald-600 text-white w-full lg:w-32 justify-center py-2 shrink-0">{item.pos}</Badge>
-                       <Input placeholder="اسم اللاعب" value={formationForm.players[item.idx]?.name || ""} onChange={e => updateFormationPlayer(item.idx, 'name', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white font-bold" />
-                       <select value={formationForm.players[item.idx]?.team || ""} onChange={e => updateFormationPlayer(item.idx, 'team', e.target.value)} className="bg-[#0a1428] border border-emerald-500/30 rounded-xl p-2 text-white outline-none w-full lg:w-48"><option value="">-- اختر الفريق --</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                       <Input placeholder="اسم اللاعب" value={formationForm.players[item.idx]?.name || ""} onChange={e => updateFormationPlayer(item.idx, 'name', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white" />
+                       <select value={formationForm.players[item.idx]?.team || ""} onChange={e => updateFormationPlayer(item.idx, 'team', e.target.value)} className="bg-[#0a1428] border border-emerald-500/30 rounded-xl p-2 text-white w-full lg:w-48"><option value="">الفريق</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
                        <Input placeholder="رابط الصورة" value={formationForm.players[item.idx]?.imageUrl || ""} onChange={e => updateFormationPlayer(item.idx, 'imageUrl', e.target.value)} className="bg-[#0a1428] border-emerald-500/30 text-white" />
-                       <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-emerald-300 font-bold">التقييم</label><Input type="number" value={formationForm.players[item.idx]?.rating || 99} onChange={e => updateFormationPlayer(item.idx, 'rating', Number(e.target.value))} className="bg-[#0a1428] border-emerald-500 text-white w-16 text-center font-black" /></div>
+                       <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-emerald-300 font-bold">تقييم</label><Input type="number" value={formationForm.players[item.idx]?.rating || 99} onChange={e => updateFormationPlayer(item.idx, 'rating', Number(e.target.value))} className="bg-[#0a1428] border-emerald-500 text-white w-16 text-center font-black" /></div>
                      </div>
                    ))}
-                   <div className="bg-gradient-to-r from-emerald-900/50 to-[#1e2a4a] p-4 rounded-2xl border border-yellow-400/30 flex flex-col lg:flex-row gap-4 items-center shadow-lg">
-                     <Badge className="bg-yellow-400 text-black w-full lg:w-32 justify-center py-2 shrink-0 font-black">أفضل مدير فني</Badge>
-                     <Input placeholder="اسم المدير الفني" value={formationForm.coach?.name || ""} onChange={e => updateFormationCoach('name', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white font-bold" />
-                     <select value={formationForm.coach?.team || ""} onChange={e => updateFormationCoach('team', e.target.value)} className="bg-[#0a1428] border border-yellow-400/30 rounded-xl p-2 text-white outline-none w-full lg:w-48"><option value="">-- اختر الفريق --</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                     <Input placeholder="رابط صورة المدير الفني" value={formationForm.coach?.imageUrl || ""} onChange={e => updateFormationCoach('imageUrl', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white" />
-                     <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-yellow-300 font-bold">التقييم</label><Input type="number" value={formationForm.coach?.rating || 99} onChange={e => updateFormationCoach('rating', Number(e.target.value))} className="bg-[#0a1428] border-yellow-400 text-white w-16 text-center font-black" /></div>
+                   <div className="bg-gradient-to-r from-emerald-900/50 to-[#1e2a4a] p-4 rounded-2xl border border-yellow-400/30 flex flex-col lg:flex-row gap-4 items-center">
+                     <Badge className="bg-yellow-400 text-black w-full lg:w-32 justify-center py-2 font-black">مدير فني</Badge>
+                     <Input placeholder="الاسم" value={formationForm.coach?.name || ""} onChange={e => updateFormationCoach('name', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white" />
+                     <select value={formationForm.coach?.team || ""} onChange={e => updateFormationCoach('team', e.target.value)} className="bg-[#0a1428] border border-yellow-400/30 rounded-xl p-2 text-white w-full lg:w-48"><option value="">الفريق</option>{currentTeamsList.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                     <Input placeholder="الصورة" value={formationForm.coach?.imageUrl || ""} onChange={e => updateFormationCoach('imageUrl', e.target.value)} className="bg-[#0a1428] border-yellow-400/30 text-white" />
+                     <div className="flex items-center gap-2 shrink-0"><label className="text-xs text-yellow-300">تقييم</label><Input type="number" value={formationForm.coach?.rating || 99} onChange={e => updateFormationCoach('rating', Number(e.target.value))} className="bg-[#0a1428] border-yellow-400 text-white w-16 text-center font-black" /></div>
                    </div>
-                   <Button onClick={saveFormation} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl mt-4 shadow-lg">حفظ تشكيلة "{formationForm.round}" 🚀</Button>
+                   <Button onClick={saveFormation} className="w-full bg-emerald-500 text-white font-black py-6 text-xl shadow-lg">حفظ التشكيلة 🚀</Button>
                  </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="knockout" className="space-y-6">
+             <div className="bg-[#13213a] p-6 rounded-3xl border border-yellow-400/30 shadow-2xl relative">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+                   <div>
+                      <h3 className="text-2xl font-black text-yellow-300 flex items-center gap-2"><Trophy /> مدير الإقصائيات الذكي</h3>
+                      <p className="text-cyan-300 font-bold mt-1 text-sm">حدد الدور ورقم المباراة، ثم اختر الفرق. الفائز في الملحق سيتم تصعيده تلقائياً لدور الـ 16.</p>
+                   </div>
+                   <div className="relative w-full max-w-sm">
+                      <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-yellow-400" />
+                      <Input value={koSearchTerm} onChange={e => setKoSearchTerm(e.target.value)} placeholder="بحث في الإقصائيات..." className="bg-[#0a1428] border-yellow-400/50 text-white font-bold pl-4 pr-12 h-12 rounded-2xl" />
+                   </div>
+                </div>
+                
+                <div className="mt-8 grid md:grid-cols-[auto_1fr_1fr_auto] gap-4 items-end relative z-10 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
+                   <div className="space-y-2">
+                      <label className="text-cyan-300 font-bold text-xs">الدور</label>
+                      <select value={bracketForm.round} onChange={e => setBracketForm(p => ({...p, round: e.target.value, matchLabel: getLabelSuggestions(e.target.value)[0] || ""}))} className="w-full bg-[#1e2a4a] border border-cyan-500/30 rounded-xl p-3 text-white font-bold outline-none cursor-pointer">
+                         {["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"].map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-yellow-400 font-bold text-xs">رقم المباراة (للتصعيد)</label>
+                      <div className="flex gap-2">
+                         <Input value={bracketForm.matchLabel} onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/30 text-yellow-300 font-black text-center" />
+                         <select onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} value={bracketForm.matchLabel} className="bg-[#1e2a4a] border border-yellow-400/30 rounded-xl px-2 text-white outline-none">
+                            {getLabelSuggestions(bracketForm.round).map(l => <option key={l} value={l}>{l}</option>)}
+                         </select>
+                      </div>
+                   </div>
+                   <div className="space-y-2 col-span-1 md:col-span-2">
+                      <label className="text-emerald-400 font-bold text-xs">الفرق</label>
+                      <div className="flex items-center gap-2">
+                         <Input list="teams-list" value={bracketForm.teamA} onChange={e => setBracketForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className="bg-[#1e2a4a] border-emerald-500/30 text-white font-bold text-center" />
+                         <span className="text-yellow-400 font-black text-xs">VS</span>
+                         <Input list="teams-list" value={bracketForm.teamB} onChange={e => setBracketForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className="bg-[#1e2a4a] border-emerald-500/30 text-white font-bold text-center" />
+                      </div>
+                   </div>
+                   <div className="col-span-1 md:col-span-4 mt-2 flex gap-4">
+                      <div className="flex-1 flex gap-2">
+                         <Input type="date" value={bracketForm.date} onChange={e => setBracketForm(p => ({...p, date: e.target.value}))} className="bg-[#1e2a4a] border-white/10 text-white" />
+                         <Input type="time" value={bracketForm.time} onChange={e => setBracketForm(p => ({...p, time: e.target.value}))} className="bg-[#1e2a4a] border-white/10 text-white" />
+                      </div>
+                      <Button onClick={saveBracketMatch} className="bg-yellow-400 text-black font-black px-8">تثبيت ✔️</Button>
+                   </div>
+                </div>
+             </div>
+
+             {["النهائي", "نصف النهائي", "دور الثمانية", "دور الستة عشر", "الملحق"].map((roundName) => {
+               const roundMatches = sortMatches(matches.filter(m => m.round === roundName && (
+                  !koSearchTerm || 
+                  (m.teamA && m.teamA.includes(koSearchTerm)) || 
+                  (m.teamB && m.teamB.includes(koSearchTerm)) || 
+                  (m.matchLabel && m.matchLabel.includes(koSearchTerm))
+               )));
+               if (roundMatches.length === 0) return null;
+               return (
+                 <div key={roundName} className="mb-10 bg-[#1e2a4a]/30 p-6 rounded-3xl border border-white/5">
+                   <div className="flex justify-center mb-6"><Badge className="bg-gradient-to-r from-yellow-600 to-yellow-400 text-black text-xl px-10 py-1.5 font-black">{roundName}</Badge></div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     {roundMatches.map(match => (
+                       <div key={match.id} className="bg-[#13213a] p-5 rounded-2xl flex flex-col justify-between gap-4 border-2 border-yellow-400/20 shadow-xl transition-transform hover:-translate-y-1">
+                         <div>
+                            <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+                               {match.matchLabel && <Badge className="bg-cyan-500 text-white font-black">{match.matchLabel}</Badge>}
+                               <span className="text-cyan-300 text-xs font-bold">{getArabicDay(match.date)} • {match.time}</span>
+                            </div>
+                            <div className="flex items-center justify-center gap-2">
+                               <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                               <div className="bg-[#0a1428] rounded-xl py-2 px-5 border border-white/10 text-yellow-400 shadow-inner"><span className="font-black text-2xl">{match.homeGoals} - {match.awayGoals}</span></div>
+                               <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                            </div>
+                         </div>
+                         <div className="flex gap-2 justify-center flex-wrap mt-4 border-t border-white/5 pt-4">
+                            <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل" }); setActiveTab("live"); }} className="bg-red-600 text-white flex-1 font-bold">بث مباشر 🔴</Button>
+                            <Button size="sm" onClick={async () => {
+                              const h = prompt(`أهداف ${match.teamA || 'A'}`, match.homeGoals || "0");
+                              const a = prompt(`أهداف ${match.teamB || 'B'}`, match.awayGoals || "0");
+                              if (h !== null && a !== null) {
+                                const updated = { ...match, homeGoals: Number(h), awayGoals: Number(a), status: "انتهت" };
+                                await updateMatchLive(match.id, updated);
+                              }
+                            }} className="bg-emerald-600 text-white flex-1 font-bold">إنهاء وتصعيد 🚀</Button>
+                            <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 text-black flex-1 font-bold">تعديل ⚙️</Button>
+                            <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1 font-bold"><Trash2 size={16}/></Button>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )
+             })}
           </TabsContent>
 
           <TabsContent value="live" className="space-y-6">
@@ -1065,6 +1078,7 @@ export default function AdminPage() {
                         <span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span>
                         <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button>
                       </div>
+                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsHome || 0}</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div>
                     </div>
                     <div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div>
                     <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5">
@@ -1074,6 +1088,7 @@ export default function AdminPage() {
                         <span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span>
                         <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button>
                       </div>
+                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsAway || 0}</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div>
                     </div>
                   </div>
                   <div className="mt-8 bg-[#0a1428] p-6 rounded-3xl border-2 border-cyan-500/30">
@@ -1090,94 +1105,6 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             ))}
-          </TabsContent>
-
-          <TabsContent value="knockout">
-             <div className="space-y-6">
-                <div className="bg-[#13213a] p-6 rounded-3xl border border-yellow-400/30 shadow-2xl relative overflow-hidden">
-                   <div className="absolute inset-0 bg-yellow-400/5 pointer-events-none"></div>
-                   <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                      <div>
-                         <h3 className="text-2xl font-black text-yellow-300 flex items-center gap-2"><Trophy /> مدير الإقصائيات الذكي</h3>
-                         <p className="text-cyan-300 font-bold mt-1 text-sm">حدد الدور ورقم المباراة، ثم اختر الفرق. الفائز في الملحق سيتم تصعيده تلقائياً.</p>
-                      </div>
-                      <div className="relative w-full max-w-sm">
-                         <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-yellow-400" />
-                         <Input value={koSearchTerm} onChange={e => setKoSearchTerm(e.target.value)} placeholder="بحث في مباريات الإقصائيات..." className="bg-[#0a1428] border-yellow-400/50 text-white font-bold pl-4 pr-12 h-12 rounded-2xl" />
-                      </div>
-                   </div>
-                   
-                   <div className="mt-8 grid md:grid-cols-[auto_1fr_1fr_auto] gap-4 items-end relative z-10 bg-[#0a1428] p-4 rounded-2xl border border-white/5">
-                      <div className="space-y-2">
-                         <label className="text-cyan-300 font-bold text-xs">الدور</label>
-                         <select value={bracketForm.round} onChange={e => setBracketForm(p => ({...p, round: e.target.value, matchLabel: getLabelSuggestions(e.target.value)[0] || ""}))} className="w-full bg-[#1e2a4a] border border-cyan-500/30 rounded-xl p-3 text-white font-bold outline-none cursor-pointer">
-                            {["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"].map(r => <option key={r} value={r}>{r}</option>)}
-                         </select>
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-yellow-400 font-bold text-xs">رقم المباراة (مهم للتصعيد)</label>
-                         <div className="flex gap-2">
-                            <Input value={bracketForm.matchLabel} onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/30 text-yellow-300 font-black text-center" />
-                            <select onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} value={bracketForm.matchLabel} className="bg-[#1e2a4a] border border-yellow-400/30 rounded-xl px-2 text-white outline-none cursor-pointer">
-                               {getLabelSuggestions(bracketForm.round).map(l => <option key={l} value={l}>{l}</option>)}
-                            </select>
-                         </div>
-                      </div>
-                      <div className="space-y-2 col-span-1 md:col-span-2">
-                         <label className="text-emerald-400 font-bold text-xs">تحديد الفرق (المواجهة)</label>
-                         <div className="flex items-center gap-2">
-                            <Input list="teams-list" value={bracketForm.teamA} onChange={e => setBracketForm(p => ({...p, teamA: e.target.value}))} placeholder="الفريق الأول" className="bg-[#1e2a4a] border-emerald-500/30 text-white font-bold text-center" />
-                            <span className="text-yellow-400 font-black text-xs">VS</span>
-                            <Input list="teams-list" value={bracketForm.teamB} onChange={e => setBracketForm(p => ({...p, teamB: e.target.value}))} placeholder="الفريق الثاني" className="bg-[#1e2a4a] border-emerald-500/30 text-white font-bold text-center" />
-                         </div>
-                      </div>
-                      <div className="col-span-1 md:col-span-4 mt-2 flex gap-4">
-                         <div className="flex-1 flex gap-2">
-                            <Input type="date" value={bracketForm.date} onChange={e => setBracketForm(p => ({...p, date: e.target.value}))} className="bg-[#1e2a4a] border-white/10 text-white" />
-                            <Input type="time" value={bracketForm.time} onChange={e => setBracketForm(p => ({...p, time: e.target.value}))} className="bg-[#1e2a4a] border-white/10 text-white" />
-                         </div>
-                         <Button onClick={saveBracketMatch} className="bg-yellow-400 text-black font-black hover:bg-yellow-500 px-8">حفظ في الإقصائيات ✔️</Button>
-                      </div>
-                   </div>
-                </div>
-
-                {["النهائي", "نصف النهائي", "دور الثمانية", "دور الستة عشر", "الملحق"].map((roundName) => {
-                  const roundMatches = sortMatches(matches.filter(m => m.round === roundName && (
-                     !koSearchTerm || 
-                     (m.teamA && m.teamA.includes(koSearchTerm)) || 
-                     (m.teamB && m.teamB.includes(koSearchTerm)) || 
-                     (m.matchLabel && m.matchLabel.includes(koSearchTerm))
-                  )));
-                  if (roundMatches.length === 0) return null;
-                  return (
-                    <div key={roundName} className="mb-10 bg-[#1e2a4a]/30 p-6 rounded-3xl border border-white/5">
-                      <div className="flex justify-center mb-6"><Badge className="bg-gradient-to-r from-yellow-600 to-yellow-400 text-black text-xl px-10 py-1.5 border-2 border-yellow-700 shadow-lg font-black">{roundName}</Badge></div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {roundMatches.map(match => (
-                          <div key={match.id} className="bg-[#13213a] p-5 rounded-2xl flex flex-col justify-between gap-4 border-2 border-yellow-400/20 shadow-xl transition-transform hover:-translate-y-1">
-                            <div>
-                               <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-                                  {match.matchLabel && <Badge className="bg-cyan-500 text-white font-black text-sm px-3">{match.matchLabel}</Badge>}
-                                  <span className="text-cyan-300 text-xs font-bold">{getArabicDay(match.date)} • {match.time}</span>
-                               </div>
-                               <div className="flex items-center justify-center gap-2">
-                                  <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
-                                  <div className="bg-[#0a1428] rounded-xl py-2 px-5 border border-white/10 text-yellow-400 shadow-inner"><span className="font-black text-2xl">{match.homeGoals} - {match.awayGoals}</span></div>
-                                  <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
-                               </div>
-                            </div>
-                            <div className="flex gap-2 justify-center flex-wrap mt-4 border-t border-white/5 pt-4">
-                               <Button size="sm" onClick={() => { updateMatchLive(match.id, { isLive: true, streamClosed: false, status: "ستبدأ بعد قليل" }); setActiveTab("live"); }} className="bg-red-600 hover:bg-red-700 text-white flex-1 font-bold shadow-md">بث مباشر 🔴</Button>
-                               <Button size="sm" onClick={() => startEdit(match)} className="bg-yellow-400 hover:bg-yellow-500 text-black flex-1 font-bold shadow-md">تعديل ⚙️</Button>
-                               <Button size="sm" onClick={() => deleteMatch(match.id)} variant="destructive" className="flex-1 font-bold shadow-md">حذف 🗑️</Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-             </div>
           </TabsContent>
 
           <TabsContent value="motm">
@@ -1272,7 +1199,7 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="predictions">
-            <Card className="border-yellow-400 bg-[#13213a]">
+            <Card className="bg-[#13213a] border-yellow-400">
               <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <CardTitle className="text-yellow-300"><Gift /> توقعات الجماهير</CardTitle>
                 <Button variant="destructive" onClick={deleteAllPredictions} className="font-bold">مسح الكل</Button>
@@ -1342,7 +1269,7 @@ export default function AdminPage() {
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader><CardTitle className="text-yellow-300">إدارة المتجر والطلبات</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-8">
-                  <div className="text-center text-cyan-300 font-bold p-10">تبويب المتجر قيد التحديث...</div>
+                  <div className="text-center text-cyan-300 font-bold p-10">قريباً..</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1361,7 +1288,10 @@ export default function AdminPage() {
           <TabsContent value="ticker">
             <Card className="border-yellow-400 bg-[#13213a]">
                <CardHeader><CardTitle className="text-yellow-300">شريط الأخبار</CardTitle></CardHeader>
-               <CardContent className="p-6 space-y-6"><Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white font-bold" /><Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ ونشر</Button></CardContent>
+               <CardContent className="p-6 space-y-6">
+                 <Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white font-bold" />
+                 <Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ</Button>
+               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
