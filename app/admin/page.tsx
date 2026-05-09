@@ -21,6 +21,18 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 
+// خريطة انتقال الفرق بناءً على الجداول الرسمية المرفقة للبطولة
+const BRACKET_MAP: Record<string, { targetLabel: string, targetSide: 'teamA' | 'teamB' }> = {
+  "م 104": { targetLabel: "م 1", targetSide: 'teamB' },
+  "م 103": { targetLabel: "م 5", targetSide: 'teamB' },
+  "م 102": { targetLabel: "م 7", targetSide: 'teamB' },
+  "م 101": { targetLabel: "م 3", targetSide: 'teamB' },
+  "م 100": { targetLabel: "م 4", targetSide: 'teamB' },
+  "م 99": { targetLabel: "م 8", targetSide: 'teamB' },
+  "م 98": { targetLabel: "م 6", targetSide: 'teamB' },
+  "م 97": { targetLabel: "م 2", targetSide: 'teamB' },
+};
+
 const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
 const CLEANED_TEAM_NAMES = Array.from(new Set(TEAM_NAMES.map(t => cleanTeamString(t))));
 
@@ -122,13 +134,6 @@ const getAccurateLiveMinute = (match: any) => {
   return baseMinute + Math.floor(elapsed / 60000);
 };
 
-const getPenaltyScore = (match: any) => ({
-  home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length,
-  away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length
-});
-
-const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
-
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
@@ -153,7 +158,6 @@ export default function AdminPage() {
   const [koSearchTerm, setKoSearchTerm] = useState("");
   const [goalSearchTerm, setGoalSearchTerm] = useState("");
   const [cardSearchTerm, setCardSearchTerm] = useState("");
-  const [motmSearchTerm, setMotmSearchTerm] = useState("");
 
   const [notifyTitle, setNotifyTitle] = useState("");
   const [notifyBody, setNotifyBody] = useState("");
@@ -194,8 +198,6 @@ export default function AdminPage() {
   const [editingMotmId, setEditingMotmId] = useState<string | null>(null); 
   const [cardForm, setCardForm] = useState({ player: "", team: currentTeamsList[0] || "", type: "yellow" as "yellow" | "red" });
   const [mediaForm, setMediaForm] = useState({ type: "news", title: "", url: "", imageUrl: "", body: "" });
-  const [productForm, setProductForm] = useState({ title: "", price: "", imageUrl: "", description: "", stock: "", isActive: true });
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
   const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
@@ -439,6 +441,23 @@ export default function AdminPage() {
     setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
   };
   
+  // وظيفة التصعيد التلقائي الجديدة للإقصائيات
+  const handleAutoProgression = async (match: any) => {
+    if (match.status !== "انتهت") return;
+    const winner = match.homeGoals > match.awayGoals ? match.teamA : match.teamB;
+    const progression = BRACKET_MAP[match.matchLabel];
+    
+    if (progression) {
+      const nextMatch = matches.find(m => m.matchLabel === progression.targetLabel && m.round === "دور الستة عشر");
+      if (nextMatch) {
+        await updateDoc(doc(db, getColl("matches"), nextMatch.id), {
+          [progression.targetSide]: winner
+        });
+        alert(`تم تصعيد فريق ${winner} تلقائياً إلى مباراة ${progression.targetLabel}`);
+      }
+    }
+  };
+
   const saveBracketMatch = async () => {
      if (!bracketForm.teamA.trim() && !bracketForm.teamB.trim()) return alert("يجب اختيار الفرق أولاً!");
      const existingMatch = matches.find(m => m.round === bracketForm.round && m.matchLabel === bracketForm.matchLabel);
@@ -481,6 +500,7 @@ export default function AdminPage() {
   };
 
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
+  
   const updateMatchLive = async (id: string, updates: any) => {
     const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id);
     const nextUpdates = { ...updates };
@@ -505,6 +525,11 @@ export default function AdminPage() {
       nextUpdates.timerPausedTotal = 0;
     }
     await updateDoc(doc(db, getColl("matches"), id), nextUpdates);
+    
+    // إذا تم إنهاء المباراة وتحديث الأهداف، نفذ التصعيد التلقائي
+    if (nextUpdates.status === "انتهت" && currentMatch) {
+      handleAutoProgression({ ...currentMatch, ...nextUpdates });
+    }
   };
 
   const addLiveEvent = async (matchId: string, currentLiveMinute: number) => {
@@ -706,7 +731,7 @@ export default function AdminPage() {
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
   const tomorrowStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 
-  // ========== المنطق الجديد للمباريات المباشرة ==========
+  // ========== المنطق للمباريات المباشرة ==========
   const liveMatchesList = matches.filter(m => {
     if (m.isLive === true || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
 
@@ -1040,7 +1065,6 @@ export default function AdminPage() {
                         <span className="text-7xl font-black text-white w-20">{match.homeGoals || 0}</span>
                         <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { homeGoals: Math.max(0, (match.homeGoals || 0) - 1) })}><Minus /></Button>
                       </div>
-                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: Math.max(0, (match.redCardsHome || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsHome || 0}</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsHome: (match.redCardsHome || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div>
                     </div>
                     <div className="text-center text-yellow-400 font-black text-4xl hidden md:block">VS</div>
                     <div className="text-center bg-[#13213a] p-6 rounded-3xl border border-white/5">
@@ -1050,7 +1074,6 @@ export default function AdminPage() {
                         <span className="text-7xl font-black text-white w-20">{match.awayGoals || 0}</span>
                         <Button variant="outline" className="rounded-full bg-[#0a1428] border-yellow-400 text-yellow-400 font-bold" onClick={() => updateMatchLive(match.id, { awayGoals: Math.max(0, (match.awayGoals || 0) - 1) })}><Minus /></Button>
                       </div>
-                      <div className="flex justify-center items-center gap-2 bg-red-500/10 py-2 rounded-xl border border-red-500/20"><span className="text-red-500 font-bold">طرد:</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: Math.max(0, (match.redCardsAway || 0) - 1) })}><Minus className="h-4 w-4" /></Button><span className="font-bold text-xl text-red-500">{match.redCardsAway || 0}</span><Button size="sm" variant="outline" className="h-8 w-8 p-0 border-red-500 text-red-500" onClick={() => updateMatchLive(match.id, { redCardsAway: (match.redCardsAway || 0) + 1 })}><Plus className="h-4 w-4" /></Button></div>
                     </div>
                   </div>
                   <div className="mt-8 bg-[#0a1428] p-6 rounded-3xl border-2 border-cyan-500/30">
@@ -1076,7 +1099,7 @@ export default function AdminPage() {
                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
                       <div>
                          <h3 className="text-2xl font-black text-yellow-300 flex items-center gap-2"><Trophy /> مدير الإقصائيات الذكي</h3>
-                         <p className="text-cyan-300 font-bold mt-1 text-sm">حدد الدور ورقم المباراة، ثم اختر الفرق أو اكتب اسم فريق جديد ليتأهل مباشرة في الشجرة.</p>
+                         <p className="text-cyan-300 font-bold mt-1 text-sm">حدد الدور ورقم المباراة، ثم اختر الفرق. الفائز في الملحق سيتم تصعيده تلقائياً.</p>
                       </div>
                       <div className="relative w-full max-w-sm">
                          <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-yellow-400" />
@@ -1092,7 +1115,7 @@ export default function AdminPage() {
                          </select>
                       </div>
                       <div className="space-y-2">
-                         <label className="text-yellow-400 font-bold text-xs">رقم المباراة (مهم لربط الشجرة)</label>
+                         <label className="text-yellow-400 font-bold text-xs">رقم المباراة (مهم للتصعيد)</label>
                          <div className="flex gap-2">
                             <Input value={bracketForm.matchLabel} onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/30 text-yellow-300 font-black text-center" />
                             <select onChange={e => setBracketForm(p => ({...p, matchLabel: e.target.value}))} value={bracketForm.matchLabel} className="bg-[#1e2a4a] border border-yellow-400/30 rounded-xl px-2 text-white outline-none cursor-pointer">
@@ -1319,7 +1342,7 @@ export default function AdminPage() {
             <Card className="border-yellow-400 bg-[#13213a]">
               <CardHeader><CardTitle className="text-yellow-300">إدارة المتجر والطلبات</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-8">
-                  {/* ... محتوى المتجر ... */}
+                  <div className="text-center text-cyan-300 font-bold p-10">تبويب المتجر قيد التحديث...</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1338,7 +1361,7 @@ export default function AdminPage() {
           <TabsContent value="ticker">
             <Card className="border-yellow-400 bg-[#13213a]">
                <CardHeader><CardTitle className="text-yellow-300">شريط الأخبار</CardTitle></CardHeader>
-               <CardContent className="p-6 space-y-6"><Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white font-bold" /><Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ</Button></CardContent>
+               <CardContent className="p-6 space-y-6"><Input value={tickerText} onChange={e => setTickerText(e.target.value)} placeholder="اكتب الخبر..." className="py-8 text-lg bg-[#1e2a4a] border-yellow-400 text-white font-bold" /><Button onClick={saveTicker} className="w-full bg-yellow-400 text-black py-7 font-bold">حفظ ونشر</Button></CardContent>
             </Card>
           </TabsContent>
         </Tabs>
