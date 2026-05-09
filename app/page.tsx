@@ -72,21 +72,39 @@ function sortMatchesAsc(arr: any[]) { return [...arr].sort((a, b) => { if (a.dat
 
 const getWinnerData = (t1: string, t2: string, round: string, labelId: string, allMatchesArr: any[]) => {
   if (!t1 || !t2) return { win: null, match: null };
+  
   let m = allMatchesArr.find(x => x.matchLabel === labelId);
+  
   if (!m) { 
     m = allMatchesArr.find(x => x.round === round && (
       (normalizeTeamName(x.teamA) === normalizeTeamName(t1) && normalizeTeamName(x.teamB) === normalizeTeamName(t2)) || 
       (normalizeTeamName(x.teamA) === normalizeTeamName(t2) && normalizeTeamName(x.teamB) === normalizeTeamName(t1))
     )); 
   }
-  if (!m || m.status !== "انتهت") return { win: null, match: m };
+  
+  if (!m) {
+    const isT1Real = !t1.includes("الفائز") && !t1.includes("المركز");
+    const isT2Real = !t2.includes("الفائز") && !t2.includes("المركز");
+    m = allMatchesArr.find(x => x.round === round && (
+      (isT1Real && (normalizeTeamName(x.teamA) === normalizeTeamName(t1) || normalizeTeamName(x.teamB) === normalizeTeamName(t1))) ||
+      (isT2Real && (normalizeTeamName(x.teamA) === normalizeTeamName(t2) || normalizeTeamName(x.teamB) === normalizeTeamName(t2)))
+    ));
+  }
+
+  if (!m) return { win: null, match: null };
+  
   let w = null;
-  if (Number(m.homeGoals) > Number(m.awayGoals)) w = m.teamA;
-  else if (Number(m.awayGoals) > Number(m.homeGoals)) w = m.teamB;
-  else {
-      const hPen = (m.penaltiesHome || []).filter((p:any)=>p==='scored').length;
-      const aPen = (m.penaltiesAway || []).filter((p:any)=>p==='scored').length;
-      if (hPen > aPen) w = m.teamA; else if (aPen > hPen) w = m.teamB;
+  if (m.status === "انتهت") {
+     const h = Number(m.homeGoals) || 0;
+     const a = Number(m.awayGoals) || 0;
+     if (h > a) w = m.teamA;
+     else if (a > h) w = m.teamB;
+     else {
+        const hPen = (m.penaltiesHome || []).filter((p:any)=>p==='scored').length;
+        const aPen = (m.penaltiesAway || []).filter((p:any)=>p==='scored').length;
+        if (hPen > aPen) w = m.teamA;
+        else if (aPen > hPen) w = m.teamB;
+     }
   }
   return { win: w, match: m };
 };
