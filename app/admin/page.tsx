@@ -154,8 +154,6 @@ export default function AdminPage() {
   const [notifyTitle, setNotifyTitle] = useState("");
   const [notifyBody, setNotifyBody] = useState("");
   const [isSending, setIsSending] = useState(false);
-
-  const [shareMatch, setShareMatch] = useState<any | null>(null);
   
   // البوستر والإعدادات
   const [posterMatch, setPosterMatch] = useState<any | null>(null);
@@ -209,6 +207,16 @@ export default function AdminPage() {
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
   const [rosterFormAdmin, setRosterFormAdmin] = useState({
     managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "",
+    players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
+  });
+
+  const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
+  const [rosterAccessTeam, setRosterAccessTeam] = useState("");
+  const [rosterAccessPassword, setRosterAccessPassword] = useState("");
+  const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
+  const [selectedRosterToView, setSelectedRosterToView] = useState<any>(null);
+  const [rosterForm, setRosterForm] = useState({
+    managerName: "", managerPhone: "", logoUrl: "",
     players: Array.from({ length: 12 }, () => ({ name: "", number: "" }))
   });
 
@@ -320,6 +328,55 @@ export default function AdminPage() {
         setEditingRosterId(null);
     } catch(e) {
         alert("حدث خطأ أثناء الحفظ.");
+    }
+  };
+
+  const deleteRoster = async (teamName: string) => {
+    if(confirm(`⚠️ هل أنت متأكد من مسح قائمة فريق ${teamName} بالكامل؟`)) {
+        await deleteDoc(doc(db, getColl("team_rosters"), teamName));
+        alert("تم مسح القائمة بنجاح.");
+    }
+  };
+
+  const unlockRoster = async (teamName: string) => {
+    if(confirm(`هل تريد فتح القفل لقائمة فريق ${teamName} ليتمكن المدير من التعديل عليها؟`)) {
+        await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: false });
+        alert("تم فتح القائمة بنجاح. يمكن للمدير التعديل الآن. 🔓");
+    }
+  };
+
+  const lockRoster = async (teamName: string) => {
+    await updateDoc(doc(db, getColl("team_rosters"), teamName), { isSubmitted: true });
+    alert("تم قفل القائمة واعتمادها. 🔒");
+  };
+
+  const submitFinalRoster = async () => {
+    if(!rosterForm.managerName || !rosterForm.managerPhone) return alert("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف)");
+    const emptyPlayer = rosterForm.players.find(p => !p.name.trim() || !p.number.trim());
+    if(emptyPlayer) return alert("الرجاء ملء بيانات جميع اللاعبين الـ 12 (الاسم ورقم التيشرت لكل لاعب)");
+
+    if(confirm("تنبيه هام: بمجرد الضغط على تأكيد وحفظ، سيتم إرسال القائمة واعتمادها ولن تتمكن من تعديلها مرة أخرى. هل أنت متأكد من صحة البيانات؟")) {
+        try {
+            const suffix = activeTournament === "juniors" ? "_juniors" : "";
+            await setDoc(doc(db, `team_rosters${suffix}`, unlockedRoster!), {
+                teamName: unlockedRoster,
+                managerName: rosterForm.managerName,
+                managerPhone: rosterForm.managerPhone,
+                logoUrl: rosterForm.logoUrl,
+                players: rosterForm.players,
+                password: rosterAccessPassword,
+                isSubmitted: true,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            
+            alert("تم حفظ واعتماد قائمة الفريق بنجاح!");
+            setUnlockedRoster(null);
+            setRosterAccessTeam("");
+            setRosterAccessPassword("");
+            setRosterViewMode('list');
+        } catch(e) {
+            alert("حدث خطأ أثناء حفظ القائمة، حاول مرة أخرى.");
+        }
     }
   };
 
@@ -455,9 +512,10 @@ export default function AdminPage() {
       matchLabel: match.matchLabel || "", round: match.round, 
       date: match.date, time: match.time, status: match.status || "لم تبدأ" 
     }); 
-    setActiveTab("knockout"); // Or whatever tab is required, but usually just scroll up
+    setActiveTab("knockout");
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
+
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
   const updateMatchLive = async (id: string, updates: any) => {
     const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id);
@@ -483,21 +541,6 @@ export default function AdminPage() {
       nextUpdates.timerPausedTotal = 0;
     }
     await updateDoc(doc(db, getColl("matches"), id), nextUpdates);
-  };
-
-  const togglePenalty = async (matchId: string, team: 'home' | 'away', index: number, current: string) => {
-    const field = team === 'home' ? 'penaltiesHome' : 'penaltiesAway';
-    const match = matches.find(m => m.id === matchId);
-    let arr = match?.[field] || ['none','none','none','none','none'];
-    let next = current === 'none' ? 'scored' : current === 'scored' ? 'missed' : 'none';
-    let newArr = [...arr]; newArr[index] = next as any;
-    await updateDoc(doc(db, getColl("matches"), matchId), { [field]: newArr });
-  };
-
-  const addPenaltySlot = async (matchId: string) => {
-    const match = matches.find(m => m.id === matchId);
-    if(!match) return;
-    await updateDoc(doc(db, getColl("matches"), matchId), { penaltiesHome: [...(match.penaltiesHome || ['none','none','none','none','none']), 'none'], penaltiesAway: [...(match.penaltiesAway || ['none','none','none','none','none']), 'none'] });
   };
 
   const addLiveEvent = async (matchId: string, currentLiveMinute: number) => {
