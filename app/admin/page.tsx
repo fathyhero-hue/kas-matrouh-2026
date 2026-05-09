@@ -652,6 +652,17 @@ export default function AdminPage() {
   };
   const deleteMotm = async (id: string) => confirm("حذف هذا اللاعب؟") && await deleteDoc(doc(db, getColl("motm"), id));
 
+  const deletePrediction = async (id: string) => {
+    if (confirm("هل أنت متأكد من حذف هذا التوقع؟")) {
+      try {
+        await deleteDoc(doc(db, getColl("predictions"), id));
+        alert("✅ تم حذف التوقع بنجاح");
+      } catch (e) {
+        alert("حدث خطأ أثناء الحذف.");
+      }
+    }
+  };
+
   const deleteAllPredictions = async () => {
      if (!confirm("⚠️ هل أنت متأكد من مسح جميع التوقعات؟")) return;
      for (const p of predictions) { await deleteDoc(doc(db, getColl("predictions"), p.id)); }
@@ -1248,7 +1259,7 @@ export default function AdminPage() {
                     <thead className="bg-[#1e2a4a]"><tr><th className="p-4 text-cyan-300">المباراة</th><th className="p-4 text-cyan-300">الاسم</th><th className="p-4 text-cyan-300">الهاتف</th><th className="p-4 text-cyan-300 text-center">التوقع</th><th className="p-4"></th></tr></thead>
                     <tbody>
                       {predictions.map(p => (
-                        <tr key={p.id} className="border-b border-white/5"><td className="p-4 font-bold">{p.matchName}</td><td className="p-4">{p.name}</td><td className="p-4 text-yellow-400 font-bold">{p.phone}</td><td className="p-4 text-center"><Badge className="bg-emerald-500 text-white font-bold">{p.homeScore} - {p.awayScore}</Badge></td><td className="p-4"><Button size="sm" variant="ghost" onClick={() => deletePrediction(p.id)} className="font-bold"><Trash2 className="h-4 w-4"/></Button></td></tr>
+                        <tr key={p.id} className="border-b border-white/5"><td className="p-4 font-bold">{p.matchName}</td><td className="p-4">{p.name}</td><td className="p-4 text-yellow-400 font-bold">{p.phone}</td><td className="p-4 text-center"><Badge className="bg-emerald-500 text-white font-bold">{p.homeScore} - {p.awayScore}</Badge></td><td className="p-4"><Button size="sm" variant="ghost" onClick={() => deletePrediction(p.id)} className="font-bold hover:text-red-500"><Trash2 className="h-4 w-4"/></Button></td></tr>
                       ))}
                     </tbody>
                   </table>
