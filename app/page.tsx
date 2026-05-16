@@ -30,7 +30,7 @@ function buildStandings(matchRows: any[], allTeams: string[]) {
   return Array.from(table.values()).map(row => ({ ...row, gd: row.gf - row.ga })).sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team, "ar")).map((row, i) => ({ ...row, rank: i + 1 }));
 }
 function zoneColor(rank: number, tourneyType: string) { if (tourneyType === 'juniors') return rank <= 4 ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"; return rank <= 8 ? "bg-emerald-500 text-white" : rank <= 24 ? "bg-cyan-500 text-white" : "bg-rose-500 text-white"; }
-function sortMatchesAsc(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return a.date.localeCompare(b.date); return (a.time || "00:00").localeCompare(b.time || "00:00"); }); }
+function sortMatchesAsc(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return a.date.localeCompare(b.date); return (a.time || "00:00").localeCompare(a.time || "00:00"); }); }
 
 const getWinnerData = (t1: string, t2: string, round: string, labelId: string, allMatchesArr: any[]) => {
   if (!t1 || !t2) return { win: null, match: null }; let m = allMatchesArr.find(x => x.matchLabel === labelId);
@@ -103,7 +103,18 @@ export default function Page() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => { if (cupEdition === 'edition_3' && ['live', 'today', 'tomorrow'].includes(activeTab)) { setActiveTab('champion'); } }, [cupEdition, activeTab]);
-  const forceAppUpdate = async () => { setIsRefreshing(true); try { if ('caches' in window) { const cacheNames = await caches.keys(); await Promise.all(cacheNames.map(name => caches.delete(name))); } } catch (e) {} window.location.reload(); };
+  
+  const forceAppUpdate = async () => { 
+    setIsRefreshing(true); 
+    try { 
+      if ('caches' in window) { 
+        const cacheNames = await caches.keys(); 
+        await Promise.all(cacheNames.map(name => caches.delete(name))); 
+      } 
+    } catch (e) {} 
+    window.location.reload(); 
+  };
+
   useEffect(() => { let hiddenTime: number | null = null; const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') hiddenTime = Date.now(); else if (document.visibilityState === 'visible' && hiddenTime) { if (Date.now() - hiddenTime > 600000) forceAppUpdate(); } }; document.addEventListener("visibilitychange", handleVisibilityChange); return () => document.removeEventListener("visibilitychange", handleVisibilityChange); }, []);
 
   useEffect(() => {
@@ -375,8 +386,6 @@ export default function Page() {
           </div>
         </div>
 
-        {/* -------------------- MAIN TAB CONTENT -------------------- */}
-
         {/* MATROUH CUP SECTION */}
         {mainAppTab === 'matrouh_cup' && (
           <div className="space-y-6 animate-in fade-in duration-500">
@@ -386,13 +395,6 @@ export default function Page() {
                 <button onClick={() => setCupEdition('edition_4')} className={`flex-1 py-2 rounded-full text-sm sm:text-base font-bold transition-all ${cupEdition === 'edition_4' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>النسخة الرابعة</button>
               </div>
             </div>
-
-            {cupEdition === 'edition_3' && (
-              <div className="bg-gradient-to-r from-yellow-500/20 via-yellow-400/10 to-yellow-500/20 border border-yellow-500/50 text-yellow-300 text-center py-3 px-4 rounded-2xl mb-6 font-bold flex flex-col sm:flex-row items-center justify-center gap-3 shadow-lg">
-                <Archive className="w-6 h-6 animate-pulse" />
-                <span>هذه النسخة مؤرشفة (أرشيف البطولة) - جميع النتائج والإحصائيات نهائية.</span>
-              </div>
-            )}
 
             <div className="flex justify-center mb-8 px-2">
               <div className="bg-[#13213a] p-2 rounded-full border border-yellow-400/30 flex shadow-xl gap-2 w-full max-w-md">
@@ -487,8 +489,9 @@ export default function Page() {
                         {showPaymentForm ? (
                           <div className="space-y-4 animate-in fade-in">
                              <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
-                             <Input type="email" placeholder="البريد الإلكتروني لارساب الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             <Input type="tel" placeholder="رقم الهاتف (محفظة كاش الدفع)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                             <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                             {/* 👈 تم تحديث نص إدخال الموبايل ليصبح صريحاً لمحفظة الكاش المالي */}
+                             <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                              <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "دفع الاشتراك فودافون كاش 💳"}</Button>
                              <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                           </div>
@@ -511,11 +514,11 @@ export default function Page() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
                                <div className="md:col-span-2"><label className="block text-yellow-300 font-bold mb-2 text-lg">اسم الفريق</label><Input placeholder="اكتب اسم فريقك بدقة..." value={rosterForm.teamName} onChange={e => setRosterForm(p => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-black text-xl h-14" /></div>
                                <div><label className="block text-cyan-300 font-bold mb-2">اسم مسئول ومفوض الفريق</label><Input placeholder="الاسم ثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" /></div>
-                               <div><label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول</label><Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" /></div>
+                               <div><label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (الكاش)</label><Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" /></div>
                             </div>
                             <div className="space-y-4">
                                   {rosterForm.players.map((player, index) => (
-                                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-[#1e2a4a] p-3 sm:pr-4 rounded-2xl border border-white/5">
+                                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-[#1e2a4a] p-3 rounded-2xl border border-white/5">
                                         <Badge className="bg-[#0a1428] text-gray-400 font-black px-3 py-1.5 shrink-0">{index + 1}</Badge>
                                         <Input placeholder="اسم اللاعب ثلاثي" value={player.name} onChange={e => updateRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-[#0a1428] border-none text-white font-bold h-12" />
                                         <div className="flex items-center gap-2">
@@ -597,7 +600,6 @@ export default function Page() {
                   <Card className="bg-[#13213a] border border-yellow-400/20 rounded-3xl p-5 shadow-2xl h-fit">
                      <CardHeader className="pb-2 border-b border-white/5 mb-3"><CardTitle className="text-yellow-400 font-black text-lg flex items-center gap-2"><Trophy className="w-5 h-5"/> متصدري قائمة التوقعات</CardTitle></CardHeader>
                      <CardContent className="p-0 space-y-2">
-                        {/* 👈 تم تصليح السطر هنا من familyLeaderboard ليصبح بالإسم الصحيح fantasyLeaderboard */}
                         {fantasyLeaderboard.map((u:any, i:number)=>(
                           <div key={i} className="flex justify-between items-center bg-[#0a1428] p-3 border border-white/5 rounded-xl"><div className="flex items-center gap-3"><Badge className="bg-yellow-400 text-black font-black">{i+1}</Badge><span className="font-bold text-white text-sm">{u.name}</span></div><span className="text-emerald-400 font-black">{u.points} نقطة</span></div>
                         ))}
@@ -680,7 +682,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] shadow-xl overflow-hidden">
-                     <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب العام العام للشباب</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
+                     <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول التترتيب العام للشباب</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
                      <CardContent className="p-0">
                         <div className="overflow-auto w-full max-h-[60vh] touch-pan-x touch-pan-y relative" dir="rtl"><table className="w-full text-white text-right min-w-[800px]"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-20 shadow-md"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr></thead><tbody>{standingsYouth.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-cyan-400">{row.gf}</td><td className="px-4 py-4 text-center text-white">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></div>
                      </CardContent>
@@ -743,7 +745,7 @@ export default function Page() {
                </Card>
             )}
 
-            {/* TAB: STATS (👈 مدمج به لوحة الإحصائيات الكاملة والديناميكية 100%) */}
+            {/* TAB: STATS */}
             {activeTab === "stats" && (
                <div className="space-y-6 animate-in fade-in duration-500">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -839,7 +841,7 @@ export default function Page() {
                        <div className="space-y-4 animate-in fade-in">
                           <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12" />
                           <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                          <Input type="tel" placeholder="رقم الهاتف (محفظة الدفع)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                          <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                           <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-6 w-6" /> : "دفع اشتراك النخبة فودافون كاش 💳"}</Button>
                           <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-indigo-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                        </div>
@@ -879,11 +881,22 @@ export default function Page() {
 
         {/* 4. SETTINGS SECTION */}
         {mainAppTab === 'settings' && (
-          <Card className="max-w-xl mx-auto bg-[#13213a] border border-white/5 rounded-3xl p-6 text-center space-y-4 animate-in fade-in duration-500 mt-4">
-             <BellRing className="w-12 h-12 text-yellow-400 mx-auto animate-bounce" />
-             <h3 className="text-2xl font-black text-white">إشعارات المنصة الفورية</h3>
-             <Button onClick={handleSubscribe} className="bg-yellow-400 text-black font-black text-base px-8 py-5 rounded-2xl shadow-lg">تفعيل الإشعارات الفورية على هاتفي 🔔</Button>
-          </Card>
+          <div className="max-w-xl mx-auto space-y-6 mt-4 animate-in fade-in duration-500">
+             <Card className="bg-[#13213a] border border-white/5 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+                <BellRing className="w-12 h-12 text-yellow-400 mx-auto" />
+                <h3 className="text-2xl font-black text-white">إشعارات المنصة الفورية</h3>
+                <Button onClick={handleSubscribe} className="bg-yellow-400 text-black font-black text-base px-8 py-5 rounded-2xl shadow-md">تفعيل الإشعارات الفورية على هاتفي 🔔</Button>
+             </Card>
+
+             <Card className="bg-[#13213a] border border-cyan-500/20 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+                <RefreshCw className={`w-12 h-12 text-cyan-400 mx-auto ${isRefreshing ? 'animate-spin' : ''}`} />
+                <h3 className="text-2xl font-black text-white">مزامنة وتحديث بيانات التطبيق</h3>
+                <p className="text-gray-400 text-sm font-bold leading-relaxed px-4">إذا لاحظت تأخراً في تحديث نتائج المباريات أو لوحة الإحصائيات، اضغط على الزر أدناه لمسح الذاكرة المؤقتة (Cache) وجلب أحدث البيانات من السيرفر فوراً.</p>
+                <Button onClick={forceAppUpdate} disabled={isRefreshing} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-black py-5 rounded-2xl shadow-lg">
+                   {isRefreshing ? <><Loader2 className="animate-spin mr-2 h-5 w-5"/> جاري تحديث ومسح الكاش...</> : "تحديث إجباري ومسح الذاكرة المؤقتة 🔄"}
+                </Button>
+             </Card>
+          </div>
         )}
 
         {/* FOOTER */}
