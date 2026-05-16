@@ -46,7 +46,7 @@ const renderMatchScore = (match: any) => { const isPlayed = match && match.statu
 const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0; const startedAt = Number(match?.timerStartedAt || 0); const pausedTotal = Number(match?.timerPausedTotal || 0) || 0; if (!match?.isTimerRunning || !startedAt) return Number(match?.liveMinute ?? baseMinute) || 0; const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal); return baseMinute + Math.floor(elapsed / 60000); };
 const getPenaltyScore = (match: any) => ({ home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length, away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length });
 const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
-const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => { const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive; return (<div className={`bg-[#1e2a4a] rounded-2xl flex flex-col items-center justify-center p-4 border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-yellow-400/30'} shadow-lg relative min-h-[95px] transition-transform hover:scale-105 shrink-0`}><Badge className="absolute -top-3 bg-yellow-400 text-black text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md">{label}</Badge><div className="w-full flex justify-between items-center gap-2 mt-2"><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t1}</div><div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-md text-cyan-400 shrink-0">{renderMatchScore(match)}</div><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t2}</div></div>{win && <div className="mt-3 text-[11px] bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1 rounded-full font-bold shadow-inner">صعد: {win}</div>}{isLive && <div className="mt-3 text-[10px] bg-red-500 text-white px-4 py-1 rounded-full font-bold">مباشر الآن 🔴</div>}</div>); };
+const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => { const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive; return (<div className={`bg-[#1e2a4a] rounded-2xl flex flex-col items-center justify-center p-4 border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-yellow-400/30'} shadow-lg relative min-h-[95px] transition-transform hover:scale-105 shrink-0`}><Badge className="absolute -top-3 bg-yellow-400 text-black text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md">{label}</Badge><div className="w-full flex justify-between items-center gap-2 mt-2"><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t1}</div><div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-md text-cyan-400 shrink-0">{renderMatchScore(match)}</div><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t2}</div></div>{win && <div className="mt-3 text-[11px] bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1 rounded-full font-bold shadow-inner">صعد: {win}</div>}</div>); };
 const MiniFutCard = ({ player, position }: { player: any, position: string }) => { const baseSize = "w-[74px] sm:w-[88px] md:w-[104px] lg:w-[118px]"; if(!player || !player.name) return (<div className={`${baseSize} h-[112px] sm:h-[132px] md:h-[154px] lg:h-[172px] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/40 rounded-[1.4rem] flex flex-col items-center justify-center text-emerald-300/70 text-xs md:text-sm font-black shadow-inner backdrop-blur-sm transition-all hover:border-emerald-400/80`}><span className="text-2xl mb-1 opacity-60">＋</span>{position}</div>); return (<div className={`relative ${baseSize} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_12px_22px_rgba(0,0,0,0.65)]`}><div className="relative w-full rounded-[1.4rem] overflow-hidden border border-yellow-400/50 bg-gradient-to-b from-yellow-300/20 via-[#1e2a4a] to-[#07101f] shadow-[0_12px_28px_rgba(0,0,0,0.45)]"><div className="absolute inset-x-2 top-2 h-10 bg-gradient-to-r from-yellow-400/0 via-yellow-300/20 to-yellow-400/0 rounded-full blur-md"></div><div className="relative w-full aspect-[4/4.9] bg-gradient-to-b from-[#101b32] to-[#050a14] border-b border-white/10">{player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-contain object-center p-1.5 bg-[#050a14]" alt={player.name} loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">👤</div>}<div className="absolute top-1 left-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-300 to-yellow-600 min-w-[28px] md:min-w-[34px] px-1.5 py-1 rounded-xl shadow-md border border-yellow-700/50"><span className="text-[10px] md:text-sm font-black text-black leading-none">{player.rating || 99}</span><span className="text-[7px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span></div></div><div className="relative p-1.5 md:p-2 flex flex-col items-center justify-center w-full bg-gradient-to-b from-[#101b32] to-[#07101f]"><span className="text-[9px] sm:text-[10px] md:text-[12px] font-black text-white w-full text-center truncate mb-1 leading-tight" title={player.name}>{player.name}</span><span className="bg-yellow-400/10 border border-yellow-400/25 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-lg text-center w-full truncate" title={player.team}>{player.team}</span></div></div></div>); };
 
 export default function Page() {
@@ -60,6 +60,7 @@ export default function Page() {
   const [cardEvents, setCardEvents] = useState<any[]>([]);
   const [archivedCards, setArchivedCards] = useState<any[]>([]);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
+  const [mediaSubTab, setMediaSubTab] = useState<"news" | "videos">("news");
   const [motmList, setMotmList] = useState<any[]>([]);
   const [predictionsList, setPredictionsList] = useState<any[]>([]);
   const [formationsList, setFormationsList] = useState<any[]>([]); 
@@ -71,8 +72,8 @@ export default function Page() {
   
   const [bannedEntities, setBannedEntities] = useState<any[]>([]);
   const [restrictedPlayers, setRestrictedPlayers] = useState<any[]>([]);
-  const [regSettingsMatrouh, setRegSettingsMatrouh] = useState({ deadline: "", password: "" });
-  const [regSettingsElite, setRegSettingsElite] = useState({ deadline: "", password: "" });
+  const [regSettingsMatrouh, setRegSettingsMatrouh] = useState({ deadline: "", password: "", price: 500 });
+  const [regSettingsElite, setRegSettingsElite] = useState({ deadline: "", password: "", price: 1000 });
 
   const [search, setSearch] = useState("");
   const [searchScorers, setSearchScorers] = useState("");
@@ -127,8 +128,8 @@ export default function Page() {
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
-    const unsubRegMatrouh = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if(docSnap.exists()){ setRegSettingsMatrouh({ deadline: docSnap.data().deadline, password: docSnap.data().password }); } });
-    const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegSettingsElite({ deadline: docSnap.data().deadline, password: docSnap.data().password }); } });
+    const unsubRegMatrouh = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if(docSnap.exists()){ setRegSettingsMatrouh({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 500 }); } });
+    const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegSettingsElite({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 1000 }); } });
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
@@ -146,10 +147,13 @@ export default function Page() {
     if(!paymentForm.managerName || !paymentForm.email || !paymentForm.phone) return alert("يرجى إكمال جميع البيانات للدفع.");
     setIsInitiatingPay(true);
     try {
+       const currentSettings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh;
+       const priceInEgp = (currentSettings as any).price || (mainAppTab === 'elite_cup' ? 1000 : 500);
+
        const res = await fetch('/api/paymob/initiate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...paymentForm, tournament: mainAppTab })
+          body: JSON.stringify({ ...paymentForm, tournament: mainAppTab, price: priceInEgp })
        });
        const data = await res.json();
        if(data.url) {
@@ -233,12 +237,12 @@ export default function Page() {
 
   const youthTree = useMemo(() => {
     const getT = (rank: number) => standingsYouth.length >= rank ? standingsYouth[rank - 1].team : `المركز ${rank}`;
-    const p97 = getWinnerData("اسماك باسط العوامي", "اصدقاء عز بوالمجدوبة", "الملحق", "م 97", matches); const p98 = getWinnerData("السلوم", "اصدقاء عيسي المغواري", "الملحق", "م 98", matches); const p99 = getWinnerData("17 فبراير", "الفهود", "الملحق", "م 99", matches); const p100 = getWinnerData("اصدقاء قسم الله", "اصدقاء سلامة بدر", "الملحق", "م 100", matches); const p101 = getWinnerData("ايس كريم الملكة", "غوط رباح", "الملحق", "م 101", matches); const p102 = getWinnerData("محاربي الصحراء", "اصدقاء خالد", "الملحق", "م 102", matches); const p103 = getWinnerData("ام القبائل", "شباب القناشات", "الملحق", "م 103", matches); const p104 = getWinnerData("اتحاد المثاني", "دبي للزي العربي", "الملحق", "م 104", matches);
-    const r1 = getWinnerData(getT(1), p104.win || "الفائز من م 104", "دور الستة عشر", "م 1", matches); const r2 = getWinnerData(getT(8), p97.win || "الفائز من م 97", "دور الستة عشر", "م 2", matches); const r3 = getWinnerData("غوط رباح", "القدس", "دور الستة عشر", "م 3", matches); const r4 = getWinnerData(getT(5), p100.win || "الفائز من م 100", "دور الستة عشر", "م 4", matches); const r5 = getWinnerData("سامي سعيد", "شباب القناشات", "دور الستة عشر", "م 5", matches); const r6 = getWinnerData(getT(7), p98.win || "الفائز من م 98", "دور الستة عشر", "م 6", matches); const r7 = getWinnerData("اصدقاء خالد", "براني", "دور الستة عشر", "م 7", matches); const r8 = getWinnerData(getT(6), p99.win || "الفائز من م 99", "دور الستة عشر", "م 8", matches);
-    const q1 = getWinnerData(r1.win || "الفائز (م 1)", r2.win || "الفائز (م 2)", "دور الثمانية", "مربع 1", matches); const q2 = getWinnerData(r3.win || "الفائز (م 3)", r4.win || "الفائز (م 4)", "دور الثمانية", "مربع 2", matches); const q3 = getWinnerData(r5.win || "الفائز (م 5)", r6.win || "الفائز (م 6)", "دور الثمانية", "مربع 3", matches); const q4 = getWinnerData(r7.win || "الفائز (م 7)", r8.win || "الفائز (م 8)", "دور الثمانية", "مربع 4", matches);
-    const s1 = getWinnerData(q1.win || "الفائز مربع 1", q2.win || "الفائز مربع 2", "نصف النهائي", "نصف 1", matches); const s2 = getWinnerData(q3.win || "الفائز مربع 3", q4.win || "الفائز مربع 4", "نصف النهائي", "نصف 2", matches);
+    const p97 = getWinnerData("اسماك باسط العوامي", "اصدقاء عز بوالمجدوبة", "الملحق", "م 97", matches); const p98 = getWinnerData("السلوم", "اصدقاء عيسي المغواري", "الملحق", "م 98", matches); const p100 = getWinnerData("اصدقاء قسم الله", "اصدقاء سلامة بدر", "الملحق", "م 100", matches); const p101 = getWinnerData("ايس كريم الملكة", "غوط رباح", "الملحق", "م 101", matches); const p102 = getWinnerData("محاربي الصحراء", "اصدقاء خالد", "الملحق", "م 102", matches);
+    const r1 = getWinnerData(getT(1), "الفائز من م 104", "دور الستة عشر", "م 1", matches); const r2 = getWinnerData(getT(8), p97.win || "الفائز من م 97", "دور الستة عشر", "م 2", matches); const r3 = getWinnerData("غوط رباح", "القدس", "دور الستة عشر", "م 3", matches); const r4 = getWinnerData(getT(5), p100.win || "الفائز من م 100", "دور الستة عشر", "م 4", matches); const r5 = getWinnerData("سامي سعيد", "شباب القناشات", "دور الستة عشر", "م 5", matches); const r6 = getWinnerData(getT(7), p98.win || "الفائز من م 98", "دور الستة عشر", "م 6", matches); const r7 = getWinnerData("اصدقاء خالد", "براني", "دور الستة عشر", "م 7", matches);
+    const q1 = getWinnerData(r1.win || "الفائز (م 1)", r2.win || "الفائز (م 2)", "دور الثمانية", "مربع 1", matches); const q2 = getWinnerData(r3.win || "الفائز (م 3)", r4.win || "الفائز (م 4)", "دور الثمانية", "مربع 2", matches); const q3 = getWinnerData(r5.win || "الفائز (م 5)", r6.win || "الفائز (م 6)", "دور الثمانية", "مربع 3", matches);
+    const s1 = getWinnerData(q1.win || "الفائز مربع 1", q2.win || "الفائز مربع 2", "نصف النهائي", "نصف 1", matches); const s2 = getWinnerData(q3.win || "الفائز مربع 3", "الفائز مربع 4", "نصف النهائي", "نصف 2", matches);
     const f1 = getWinnerData(s1.win || "الطرف الأول", s2.win || "الطرف الثاني", "النهائي", "النهائي", matches);
-    return { p97, p98, p99, p100, p101, p102, p103, p104, r1, r2, r3, r4, r5, r6, r7, r8, q1, q2, q3, q4, s1, s2, f1, getT };
+    return { p97, p98, p100, p101, p102, r1, r2, r3, r4, r5, r6, r7, q1, q2, q3, s1, s2, f1, getT };
   }, [standingsYouth, matches]);
 
   const juniorsTree = useMemo(() => {
@@ -276,29 +280,15 @@ export default function Page() {
   const addToCart = (product: any) => { setCartItems(prev => { const found = prev.find(item => item.id === product.id); if (found) return prev.map(item => item.id === product.id ? { ...item, qty: (Number(item.qty) || 1) + 1 } : item); return [...prev, { ...product, qty: 1 }]; }); };
   const updateCartQty = (productId: string, qty: number) => { if (qty <= 0) return setCartItems(prev => prev.filter(item => item.id !== productId)); setCartItems(prev => prev.map(item => item.id === productId ? { ...item, qty } : item)); };
   
-  const handleReceiptImageUpload = (file?: File) => { 
-    if (!file) return; 
-    if (!file.type.startsWith("image/")) return alert("يرجى اختيار صورة فقط"); 
-    const previewUrl = URL.createObjectURL(file); 
-    setCheckoutForm((p:any) => ({ ...p, receiptImagePreview: previewUrl, receiptImageFile: file, receiptFileName: file.name })); 
-  };
+  const handleReceiptImageUpload = (file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); const previewUrl = URL.createObjectURL(file); setCheckoutForm((p:any) => ({ ...p, receiptImagePreview: previewUrl, receiptImageFile: file, receiptFileName: file.name })); };
   
   const submitOrder = async () => { 
-    if (cartItems.length === 0) return alert("السلة فارغة"); 
-    if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إدخال الاسم ورقم الهاتف والعنوان"); 
-    if (checkoutForm.paymentMethod !== "cash" && !checkoutForm.transactionRef.trim() && !checkoutForm.receiptImageFile) return alert("يرجى إدخال رقم العملية أو إرفاق صورة الإيصال"); 
-    setIsUploading(true);
+    if (cartItems.length === 0) return alert("السلة فارغة"); if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إكمال البيانات"); setIsUploading(true);
     try {
-        let receiptUrl = "";
-        if (checkoutForm.receiptImageFile) {
-            const rRef = ref(storage, `receipts/order_${Date.now()}`);
-            await uploadBytes(rRef, checkoutForm.receiptImageFile);
-            receiptUrl = await getDownloadURL(rRef);
-        }
-        await addDoc(collection(db, "orders"), { customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" }, items: cartItems.map(item => ({ id: item.id, title: item.title, price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })), total: cartTotal, paymentMethod: checkoutForm.paymentMethod, paymentStatus: checkoutForm.paymentMethod === "cash" ? "الدفع عند الاستلام" : "في انتظار التأكيد", status: "طلب جديد", createdAt: new Date().toISOString() }); 
-        alert("✅ تم إرسال الطلب بنجاح وسيتم التواصل معك للتأكيد"); setCartItems([]); setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
-    } catch(e) { alert("حدث خطأ."); }
-    setIsUploading(false);
+        let receiptUrl = ""; if (checkoutForm.receiptImageFile) { const rRef = ref(storage, `receipts/order_${Date.now()}`); await uploadBytes(rRef, checkoutForm.receiptImageFile); receiptUrl = await getDownloadURL(rRef); }
+        await addDoc(collection(db, "orders"), { customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" }, items: cartItems.map(item => ({ id: item.id, title: item.title, price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })), total: cartTotal, paymentMethod: checkoutForm.paymentMethod, status: "طلب جديد", createdAt: new Date().toISOString() }); 
+        alert("✅ تم إرسال الطلب بنجاح!"); setCartItems([]); setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
+    } catch(e) { alert("حدث خطأ."); } setIsUploading(false);
   };
 
   if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
@@ -406,15 +396,15 @@ export default function Page() {
 
             <div className="flex justify-center mb-8 px-2">
               <div className="bg-[#13213a] p-2 rounded-full border border-yellow-400/30 flex shadow-xl gap-2 w-full max-w-md">
-                <button onClick={() => { setActiveTournament('youth'); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'standings'); }} className={`flex-1 py-3 rounded-full text-base sm:text-xl font-black transition-all ${activeTournament === 'youth' ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 الشباب</button>
-                <button onClick={() => { setActiveTournament('juniors'); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'standings'); }} className={`flex-1 py-3 rounded-full text-base sm:text-xl font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.4)]' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏅 الناشئين</button>
+                <button onClick={() => { setActiveTournament('youth'); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'standings'); }} className={`flex-1 py-3 rounded-full text-base sm:text-xl font-black transition-all ${activeTournament === 'youth' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 الشباب</button>
+                <button onClick={() => { setActiveTournament('juniors'); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'standings'); }} className={`flex-1 py-3 rounded-full text-base sm:text-xl font-black transition-all ${activeTournament === 'juniors' ? 'bg-cyan-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏅 الناشئين</button>
               </div>
             </div>
 
             <div className="flex overflow-x-auto w-full touch-pan-x snap-x snap-mandatory gap-2 pb-4 mb-8 custom-scrollbar">
               {visibleTabs.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 snap-center px-4 sm:px-5 py-2.5 sm:py-3.5 rounded-2xl font-bold text-sm sm:text-base transition-all border ${activeTab === tab.key ? (tab.extraClass || "bg-yellow-400 text-black border-yellow-400 shadow-lg scale-105") : "bg-[#1e2a4a] text-white border-yellow-400/30 hover:bg-[#25345a]"}`}>
-                  <span className={`text-lg ${tab.key === "live" && activeTab === "live" ? "animate-pulse" : ""}`}>{tab.icon}</span> <span className="ml-1">{tab.label}</span>
+                  <span className={`text-lg`}>{tab.icon}</span> <span className="ml-1">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -423,110 +413,68 @@ export default function Page() {
             {activeTab === "champion" && cupEdition === 'edition_3' && (
               <div className="space-y-8 animate-in zoom-in duration-500 max-w-4xl mx-auto mt-4">
                  <Card className="bg-gradient-to-b from-[#facc15]/20 to-[#13213a] border-2 border-yellow-400 rounded-[2rem] overflow-hidden shadow-[0_0_40px_rgba(250,204,21,0.3)] text-center relative p-1">
-                   <div className="absolute inset-0 bg-[url('/pattern.png')] opacity-10 bg-repeat pointer-events-none"></div>
                    <CardContent className="p-8 sm:p-14 relative z-10 flex flex-col items-center bg-gradient-to-b from-[#13213a]/80 to-[#0a1428] rounded-[1.8rem]">
-                     <div className="w-28 h-28 sm:w-36 sm:h-36 bg-gradient-to-tr from-yellow-300 to-yellow-600 rounded-full flex items-center justify-center mb-6 shadow-2xl border-4 border-[#0a1428] relative">
+                     <div className="w-28 h-28 sm:w-36 sm:h-36 bg-gradient-to-tr from-yellow-300 to-yellow-600 rounded-full flex items-center justify-center mb-6 shadow-2xl border-4 border-[#0a1428]">
                         <Trophy className="h-14 w-14 sm:h-16 sm:w-16 text-[#0a1428]" />
-                        <div className="absolute -top-3 -right-3 text-4xl animate-bounce">👑</div>
                      </div>
-                     <Badge className="bg-yellow-400 text-black font-black px-6 py-2 text-sm sm:text-lg mb-6 border-2 border-[#0a1428] shadow-lg">بطل كأس مطروح (النسخة الثالثة) - {activeTournament === 'youth' ? 'شباب' : 'ناشئين'}</Badge>
-                     <h2 className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-500 mb-8 drop-shadow-2xl tracking-wider">
-                       {activeTournament === 'youth' ? 'وادي ماجد' : 'وادي الرمل'}
-                     </h2>
-                     <div className="w-full aspect-video bg-[#0a1428] rounded-2xl border-4 border-yellow-400/50 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative group">
-                        <img src={activeTournament === 'youth' ? '/champion.jpg' : '/champion_juniors.jpg'} alt={`صورة تتويج البطل ${activeTournament === 'youth' ? 'وادي ماجد' : 'وادي الرمل'}`} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" onError={(e) => { e.currentTarget.src = 'https://placehold.co/800x450/0a1428/facc15?text=صورة+تتويج+البطل+هنا' }} />
-                        <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md border border-yellow-400/50 text-yellow-300 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
-                           <Camera className="w-5 h-5"/> صورة التتويج
-                        </div>
+                     <Badge className="bg-yellow-400 text-black font-black px-6 py-2 text-sm sm:text-lg mb-6 border-2 border-[#0a1428]">بطل كأس مطروح (النسخة الثالثة)</Badge>
+                     <h2 className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-500 mb-8">{activeTournament === 'youth' ? 'وادي ماجد' : 'وادي الرمل'}</h2>
+                     <div className="w-full aspect-video bg-[#0a1428] rounded-2xl border-4 border-yellow-400/50 overflow-hidden shadow-2xl">
+                        <img src={activeTournament === 'youth' ? '/champion.jpg' : '/champion_juniors.jpg'} alt="صورة تتويج البطل" className="w-full h-full object-cover" />
                      </div>
                    </CardContent>
                  </Card>
               </div>
             )}
 
-            {/* TAB: ROSTERS (MATROUH CUP) */}
+            {/* TAB: ROSTERS */}
             {activeTab === "rosters" && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="space-y-8 animate-in fade-in duration-500">
                 <div className="flex justify-center mb-6">
                    <div className="bg-[#13213a] p-1.5 rounded-2xl border border-white/10 inline-flex shadow-lg gap-1 w-full max-w-md">
-                     <button onClick={() => { setRosterViewMode('list'); setSelectedRosterToView(null); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'list' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}><ClipboardList className="inline-block mr-1 h-5 w-5" /> عرض القوائم المشاركة</button>
+                     <button onClick={() => { setRosterViewMode('list'); setSelectedRosterToView(null); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'list' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}><ClipboardList className="inline-block mr-1 h-5 w-5" /> عرض القوائم المشاركة</button>
                      {cupEdition === 'edition_4' && (
-                        <button onClick={() => { setRosterViewMode('register'); setUnlockedRoster(null); setShowPaymentForm(true); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}><Lock className="inline-block mr-1 h-5 w-5" /> تسجيل فريق جديد</button>
+                        <button onClick={() => { setRosterViewMode('register'); setUnlockedRoster(null); setShowPaymentForm(true); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}><Lock className="inline-block mr-1 h-5 w-5" /> تسجيل فريق جديد</button>
                      )}
                    </div>
                 </div>
 
                 {rosterViewMode === 'list' && !selectedRosterToView && (
-                  <div className="space-y-6">
-                     <div className="text-center mb-6">
-                        <h2 className="text-3xl font-black text-yellow-300">القوائم الرسمية للفرق المشاركة</h2>
-                        <p className="text-cyan-300 mt-2 font-bold">اضغط على اسم الفريق لعرض قائمة اللاعبين المعتمدة من الإدارة</p>
-                     </div>
-                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {activeTeamsList.map(teamName => {
-                           const rosterData = rostersList.find(r => r.id === teamName);
-                           const isSubmitted = rosterData && rosterData.isSubmitted;
+                           const rosterData = rostersList.find(r => r.id === teamName); const isSubmitted = rosterData && rosterData.isSubmitted;
                            return (
-                             <Card key={teamName} onClick={() => isSubmitted && setSelectedRosterToView(rosterData)} className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:border-blue-400 hover:scale-105 shadow-lg' : 'bg-[#13213a] border-white/5 opacity-60 cursor-not-allowed'}`}>
-                                <CardContent className="p-6 flex flex-col items-center text-center justify-center h-full gap-3">
-                                   {isSubmitted && rosterData.logoUrl ? (
-                                      <div className="w-12 h-12 rounded-full bg-[#0a1428] border border-white/10 overflow-hidden flex items-center justify-center p-1"><img src={rosterData.logoUrl} alt={teamName} className="w-full h-full object-contain" /></div>
-                                   ) : (
-                                      <Shield className={`h-8 w-8 ${isSubmitted ? 'text-blue-400' : 'text-gray-500'}`} />
-                                   )}
+                             <Card key={teamName} onClick={() => isSubmitted && setSelectedRosterToView(rosterData)} className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:scale-105' : 'bg-[#13213a] border-white/5 opacity-55'}`}>
+                                <CardContent className="p-6 flex flex-col items-center justify-center text-center gap-3">
+                                   <Shield className="h-8 w-8 text-blue-400" />
                                    <span className="font-black text-white text-lg">{teamName}</span>
-                                   {isSubmitted ? (
-                                      <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 mt-2 font-bold px-3"><CheckCircle2 className="h-3 w-3 mr-1" /> قائمة معتمدة</Badge>
-                                   ) : (
-                                      <Badge className="bg-gray-800 text-gray-400 border border-gray-600 mt-2 font-bold px-3">لم تسجل بعد</Badge>
-                                   )}
+                                   <Badge className={isSubmitted ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" : "bg-gray-800 text-gray-400"}>{isSubmitted ? "قائمة معتمدة" : "لم تسجل بعد"}</Badge>
                                 </CardContent>
                              </Card>
                            );
                         })}
-                        {activeTeamsList.length === 0 && <div className="col-span-full text-center py-10 text-gray-400 font-bold">لا توجد فرق مسجلة حتى الآن في هذه النسخة.</div>}
-                     </div>
                   </div>
                 )}
 
                 {rosterViewMode === 'list' && selectedRosterToView && (
-                   <div className="animate-in zoom-in duration-300 max-w-4xl mx-auto">
-                     <Button onClick={() => setSelectedRosterToView(null)} variant="outline" className="mb-6 bg-white/5 border-white/20 text-white hover:bg-white/10 font-bold">العودة للقوائم ↩</Button>
-                     <Card className="bg-gradient-to-b from-[#1e2a4a] to-[#13213a] border border-blue-500/50 rounded-3xl shadow-2xl overflow-hidden">
-                        <CardHeader className="bg-blue-900/40 border-b border-blue-500/30 text-center py-8 relative">
-                           <div className="absolute top-4 right-4"><Badge className="bg-emerald-500 text-white font-black"><CheckCircle2 className="h-4 w-4 mr-1 inline-block"/> معتمدة</Badge></div>
-                           {selectedRosterToView.logoUrl ? (
-                             <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-[#0a1428] border-2 border-blue-500/50 p-2 shadow-inner"><img src={selectedRosterToView.logoUrl} alt={selectedRosterToView.teamName} className="w-full h-full object-contain" /></div>
-                           ) : (
-                             <Shield className="h-20 w-20 mx-auto text-blue-400 mb-4" />
-                           )}
-                           <CardTitle className="text-4xl font-black text-white tracking-wide">{selectedRosterToView.teamName}</CardTitle>
-                           <div className="mt-4 flex flex-col sm:flex-row justify-center gap-4 text-cyan-300 font-bold">
-                              <span className="flex items-center justify-center gap-2"><Users className="h-5 w-5"/> المسئول: {selectedRosterToView.managerName}</span>
-                              <span className="hidden sm:inline">•</span>
-                              <span className="flex items-center justify-center gap-2" dir="ltr"><Phone className="h-5 w-5"/> {selectedRosterToView.managerPhone}</span>
-                           </div>
+                   <div className="max-w-4xl mx-auto">
+                     <Button onClick={() => setSelectedRosterToView(null)} variant="outline" className="mb-4 text-white font-bold">العودة للقوائم ↩</Button>
+                     <Card className="bg-[#1e2a4a] border border-blue-500/50 rounded-3xl shadow-2xl overflow-hidden">
+                        <CardHeader className="text-center py-6 border-b border-white/5">
+                           <CardTitle className="text-3xl font-black text-white">{selectedRosterToView.teamName}</CardTitle>
+                           <p className="mt-2 text-cyan-300 font-bold">مسئول الفريق: {selectedRosterToView.managerName} | تليفون: {selectedRosterToView.managerPhone}</p>
                         </CardHeader>
                         <CardContent className="p-0">
-                           <div className="overflow-x-auto w-full">
-                              <table className="w-full text-right text-white text-lg">
-                                 <thead className="bg-[#0a1428]">
-                                    <tr><th className="p-4 w-20 text-center text-cyan-400 border-b border-white/5">الرقم</th><th className="p-4 text-cyan-400 border-b border-white/5">اسم اللاعب</th><th className="p-4 text-center text-cyan-400 border-b border-white/5">الصور المرفقة</th></tr>
-                                 </thead>
-                                 <tbody>
-                                    {selectedRosterToView.players.map((p: any, i: number) => (
-                                      <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                        <td className="p-4 text-center font-black text-yellow-400 text-2xl">{p.number}</td>
-                                        <td className="p-4 font-bold">{p.name}</td>
-                                        <td className="p-4 text-center flex justify-center gap-3">
-                                           {p.personalImage ? <div className="w-10 h-10 rounded-full border border-white/20 overflow-hidden"><img src={p.personalImage} className="w-full h-full object-cover"/></div> : <div className="w-10 h-10 rounded-full border border-white/10 bg-black/20 flex items-center justify-center text-xs opacity-50">لا يوجد</div>}
-                                           {p.idImage ? <div className="w-16 h-10 rounded-md border border-white/20 overflow-hidden"><img src={p.idImage} className="w-full h-full object-cover"/></div> : <div className="w-16 h-10 rounded-md border border-white/10 bg-black/20 flex items-center justify-center text-[10px] opacity-50">بدون بطاقة</div>}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                 </tbody>
-                              </table>
-                           </div>
+                           <table className="w-full text-right text-white"><thead className="bg-[#0a1428]"><tr><th className="p-4 text-center text-cyan-400">الرقم</th><th className="p-4 text-cyan-400">اسم اللاعب</th><th className="p-4 text-center text-cyan-400">الصورة والبطاقة</th></tr></thead>
+                              <tbody>
+                                 {selectedRosterToView.players.map((p: any, i: number) => (
+                                   <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                                     <td className="p-4 text-center font-black text-yellow-400 text-xl">{p.number}</td><td className="p-4 font-bold">{p.name}</td>
+                                     <td className="p-4 flex justify-center gap-3">{p.personalImage && <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20"><img src={p.personalImage} className="w-full h-full object-cover"/></div>}{p.idImage && <div className="w-14 h-10 rounded overflow-hidden border border-white/20"><img src={p.idImage} className="w-full h-full object-cover"/></div>}</td>
+                                   </tr>
+                                 ))}
+                              </tbody>
+                           </table>
                         </CardContent>
                      </Card>
                    </div>
@@ -534,34 +482,21 @@ export default function Page() {
 
                 {rosterViewMode === 'register' && !unlockedRoster && (
                    <Card className="max-w-xl mx-auto bg-[#13213a] border border-emerald-500/30 rounded-3xl shadow-2xl">
-                     <CardHeader className="text-center border-b border-white/5 pb-6">
-                        <Lock className="mx-auto h-12 w-12 text-emerald-400 mb-4" />
-                        <CardTitle className="text-2xl font-black text-white">تسجيل فريق جديد</CardTitle>
-                        <p className="text-gray-400 text-sm mt-2 font-bold">لإتمام التسجيل، يرجى دفع رسوم الاشتراك للحصول على الرقم السري.</p>
-                     </CardHeader>
+                     <CardHeader className="text-center pb-6 border-b border-white/5"><Lock className="mx-auto h-12 w-12 text-emerald-400" /><CardTitle className="text-2xl font-black text-white mt-4">تسجيل وبوابة الدفع الإلكتروني</CardTitle></CardHeader>
                      <CardContent className="p-8 space-y-6">
                         {showPaymentForm ? (
                           <div className="space-y-4 animate-in fade-in">
                              <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
-                             <Input type="email" placeholder="البريد الإلكتروني (لإرسال الباسورد)" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             <Input type="tel" placeholder="رقم الهاتف (واتساب)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">
-                               {isInitiatingPay ? <Loader2 className="animate-spin h-6 w-6" /> : "دفع الاشتراك الآن 💳"}
-                             </Button>
-                             <div className="text-center pt-4">
-                                <button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm hover:text-white">لدي الرقم السري بالفعل؟ الدخول للتسجيل</button>
-                             </div>
+                             <Input type="email" placeholder="البريد الإلكتروني لارساب الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                             <Input type="tel" placeholder="رقم الهاتف (محفظة كاش الدفع)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                             <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "دفع الاشتراك فودافون كاش 💳"}</Button>
+                             <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                           </div>
                         ) : (
                           <div className="space-y-4 animate-in fade-in">
-                             <div>
-                                <label className="block text-cyan-300 font-bold mb-2">الرقم السري للتسجيل</label>
-                                <Input type="password" value={rosterAccessPassword} onChange={e => setRosterAccessPassword(e.target.value)} placeholder="••••••••" className="bg-[#1e2a4a] border-emerald-500/50 text-white font-black text-center text-xl h-14 tracking-widest" />
-                             </div>
-                             <Button onClick={handleRosterLogin} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-7 text-xl shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-transform hover:scale-105">الدخول لاستمارة التسجيل <Unlock className="ml-2 h-5 w-5" /></Button>
-                             <div className="text-center pt-4">
-                                <button onClick={() => setShowPaymentForm(true)} className="text-gray-400 hover:text-white font-bold text-sm">العودة لصفحة الدفع</button>
-                             </div>
+                             <Input type="password" value={rosterAccessPassword} onChange={e => setRosterAccessPassword(e.target.value)} placeholder="أدخل الرقم السري المستلم بعد الدفع" className="bg-[#1e2a4a] border-emerald-500/50 text-white font-black text-center h-14" />
+                             <Button onClick={handleRosterLogin} className="w-full bg-emerald-500 text-white font-black py-6 text-xl">تحقق ودخول لاستمارة التسجيل 🔓</Button>
+                             <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(true)} className="text-gray-400 text-sm">العودة لبوابة الدفع المالي</button></div>
                           </div>
                         )}
                      </CardContent>
@@ -570,68 +505,37 @@ export default function Page() {
 
                 {rosterViewMode === 'register' && unlockedRoster && (
                    <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
-                      <div className="bg-yellow-400/10 border border-yellow-400 text-yellow-300 p-4 rounded-2xl mb-6 text-center font-bold">
-                         ⚠️ تنبيه هام: يرجى مراجعة الأسماء بدقة. بمجرد ضغط "حفظ واعتماد" سيتم قفل القائمة. تأكد من إرفاق صورة شخصية وصورة بطاقة لكل لاعب. 
-                         <br/><span className="text-sm mt-2 inline-block opacity-80">(ملاحظة: النظام يسمح بحد أقصى {MAX_PLAYERS} لاعبين، ولن يقبل تسجيل أكثر من 2 لاعبين من قائمة التقييد).</span>
-                      </div>
-                      <Card className="bg-[#13213a] border border-blue-500/30 rounded-3xl shadow-2xl overflow-hidden">
-                         <CardHeader className="bg-[#1e2a4a] border-b border-blue-500/20 py-6">
-                            <CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-3"><ClipboardList className="text-blue-400"/> استمارة تسجيل فريق (كأس مطروح)</CardTitle>
-                         </CardHeader>
+                      <Card className="bg-[#13213a] border border-blue-500/30 rounded-3xl overflow-hidden shadow-2xl">
+                         <CardHeader className="bg-[#1e2a4a] border-b border-blue-500/20 py-6"><CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-2"><ClipboardList/> استمارة تسجيل وتسكين الفريق السحابية</CardTitle></CardHeader>
                          <CardContent className="p-4 md:p-8 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5 relative overflow-hidden">
-                               <div className="absolute top-0 right-0 bg-blue-600 text-white px-4 py-1 rounded-bl-xl font-bold text-xs">بيانات الفريق والمسئول</div>
-                               <div className="md:col-span-2 pt-4">
-                                  <label className="block text-yellow-300 font-bold mb-2 text-lg">اسم الفريق</label>
-                                  <Input placeholder="اكتب اسم فريقك الجديد..." value={rosterForm.teamName} onChange={e => setRosterForm(p => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-black text-xl h-14" />
-                               </div>
-                               <div>
-                                  <label className="block text-cyan-300 font-bold mb-2">الاسم الثلاثي (لمسئول الفريق)</label>
-                                  <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" />
-                               </div>
-                               <div>
-                                  <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
-                                  <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" />
-                               </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
+                               <div className="md:col-span-2"><label className="block text-yellow-300 font-bold mb-2 text-lg">اسم الفريق</label><Input placeholder="اكتب اسم فريقك بدقة..." value={rosterForm.teamName} onChange={e => setRosterForm(p => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-black text-xl h-14" /></div>
+                               <div><label className="block text-cyan-300 font-bold mb-2">اسم مسئول ومفوض الفريق</label><Input placeholder="الاسم ثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" /></div>
+                               <div><label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول</label><Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" /></div>
                             </div>
-                            
-                            <div>
-                               <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-4">
-                                  <h3 className="text-xl font-black text-yellow-300">أسماء اللاعبين المرفقين ({MAX_PLAYERS} لاعب)</h3>
-                               </div>
-                               <div className="space-y-4">
+                            <div className="space-y-4">
                                   {rosterForm.players.map((player, index) => (
-                                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-[#1e2a4a] p-3 sm:pr-4 rounded-2xl border border-white/5 hover:border-blue-400/50 transition-colors relative">
-                                        <div className="flex items-center w-full sm:w-auto gap-3 flex-1">
-                                           <Badge className="bg-[#0a1428] text-gray-400 font-black px-3 py-1.5 border border-white/10 shrink-0">{index + 1}</Badge>
-                                           <Input placeholder="اسم اللاعب الثلاثي" value={player.name} onChange={e => updateRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-[#0a1428] border-none text-white font-bold focus-visible:ring-1 focus-visible:ring-blue-500 h-12" />
-                                        </div>
-                                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                                           <div className="flex items-center gap-2">
+                                     <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-[#1e2a4a] p-3 sm:pr-4 rounded-2xl border border-white/5">
+                                        <Badge className="bg-[#0a1428] text-gray-400 font-black px-3 py-1.5 shrink-0">{index + 1}</Badge>
+                                        <Input placeholder="اسم اللاعب ثلاثي" value={player.name} onChange={e => updateRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-[#0a1428] border-none text-white font-bold h-12" />
+                                        <div className="flex items-center gap-2">
                                               <span className="text-gray-400 text-xs font-bold">الرقم:</span>
-                                              <Input type="number" placeholder="00" value={player.number} onChange={e => updateRosterPlayer(index, 'number', e.target.value)} className="w-16 bg-[#0a1428] border-none text-yellow-400 font-black text-center focus-visible:ring-1 focus-visible:ring-yellow-500 h-12" />
-                                           </div>
-                                           <div className="flex gap-2 shrink-0">
-                                              <label className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl cursor-pointer transition-colors border ${player.personalImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10 text-gray-400 hover:bg-white/5'}`} title="صورة شخصية">
-                                                 {player.personalImagePreview ? <img src={player.personalImagePreview} className="w-full h-full object-cover rounded-xl"/> : <><Upload className="w-4 h-4 mb-1"/><span className="text-[8px] font-bold">شخصية</span></>}
+                                              <Input type="number" placeholder="00" value={player.number} onChange={e => updateRosterPlayer(index, 'number', e.target.value)} className="w-16 bg-[#0a1428] border-none text-yellow-400 font-black text-center h-12" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                              <label className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl cursor-pointer border ${player.personalImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10'}`}>
+                                                 {player.personalImagePreview ? <img src={player.personalImagePreview} className="w-full h-full object-cover rounded-xl"/> : <Upload className="w-4 h-4" />}
                                                  <input type="file" accept="image/*" onChange={e => handlePlayerImageUpload(index, 'personalImage', e.target.files?.[0])} className="hidden" />
                                               </label>
-                                              <label className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl cursor-pointer transition-colors border ${player.idImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10 text-gray-400 hover:bg-white/5'}`} title="صورة البطاقة">
-                                                 {player.idImagePreview ? <img src={player.idImagePreview} className="w-full h-full object-cover rounded-xl"/> : <><Camera className="w-4 h-4 mb-1"/><span className="text-[8px] font-bold">البطاقة</span></>}
+                                              <label className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl cursor-pointer border ${player.idImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10'}`}>
+                                                 {player.idImagePreview ? <img src={player.idImagePreview} className="w-full h-full object-cover rounded-xl"/> : <Camera className="w-4 h-4" />}
                                                  <input type="file" accept="image/*" onChange={e => handlePlayerImageUpload(index, 'idImage', e.target.files?.[0])} className="hidden" />
                                               </label>
-                                           </div>
                                         </div>
                                      </div>
                                   ))}
-                               </div>
                             </div>
-                            <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-4">
-                               <Button onClick={submitFinalRoster} disabled={isUploading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-8 text-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-transform hover:scale-105">
-                                 {isUploading ? <><Loader2 className="animate-spin mr-2 h-6 w-6"/> جاري رفع الصور والاعتماد...</> : "حفظ وإرسال القائمة نهائياً ✔️"}
-                               </Button>
-                               <Button onClick={() => { setUnlockedRoster(null); setRosterViewMode('list'); }} variant="outline" disabled={isUploading} className="bg-transparent border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-8 px-8 font-bold text-lg">إلغاء التسجيل</Button>
-                            </div>
+                            <Button onClick={submitFinalRoster} disabled={isUploading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-7 text-xl shadow-xl">{isUploading ? <><Loader2 className="animate-spin mr-2 h-6 w-6"/> جاري رفع الملفات السحابية بالتوازي...</> : "حفظ واعتماد قائمة الفريق نهائياً ✔️"}</Button>
                          </CardContent>
                       </Card>
                    </div>
@@ -639,16 +543,278 @@ export default function Page() {
               </div>
             )}
 
-            {/* Rest of unchanged content for token optimization */}
-            {activeTab === "standings" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">الترتيب (مطابق للسابق)</div> )}
-            {activeTab === "all" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">النتائج السابقة (مطابق للسابق)</div> )}
-            {activeTab === "today" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">مباريات اليوم (مطابق للسابق)</div> )}
-            {activeTab === "tomorrow" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">مباريات غداً (مطابق للسابق)</div> )}
-            {activeTab === "scorers" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">الهدافين (مطابق للسابق)</div> )}
-            {activeTab === "cards" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">الكروت (مطابق للسابق)</div> )}
-            {activeTab === "stats" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">الإحصائيات (مطابق للسابق)</div> )}
-            {activeTab === "motm_tab" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">نجوم المباريات (مطابق للسابق)</div> )}
-            {activeTab === "media" && ( <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-yellow-400/30 font-bold">الأخبار (مطابق للسابق)</div> )}
+            {/* TAB: TOTW */}
+            {activeTab === "totw" && (
+               <Card className="rounded-3xl border border-emerald-500/30 bg-[#13213a] p-6 animate-in zoom-in duration-500">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+                     <CardTitle className="text-emerald-400 font-black text-xl sm:text-2xl"> Stadium • تشكيلة الأسبوع المثالية</CardTitle>
+                     <select value={activeTotwRound} onChange={e => setActiveTotwRound(e.target.value)} className="bg-[#0a1428] border border-emerald-500/40 text-white p-2 rounded-xl font-bold"><option value="دور المجموعات">دور المجموعات</option><option value="الملحق">الملحق</option><option value="دور الستة عشر">دور الستة عشر</option><option value="دور الثمانية">دور الثمانية</option><option value="النهائي">النهائي</option></select>
+                  </div>
+                  <div className="relative w-full aspect-[4/3] max-w-3xl mx-auto bg-gradient-to-b from-emerald-800 to-green-950 border-4 border-white/20 rounded-[2rem] p-4 flex flex-col justify-between shadow-inner overflow-hidden">
+                     <div className="absolute inset-0 border-2 border-white/10 m-4 rounded-[1.5rem] pointer-events-none flex items-center justify-center"><div className="w-32 h-32 border-2 border-white/10 rounded-full"></div></div>
+                     <div className="flex justify-center gap-6 relative z-10"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
+                     <div className="flex justify-around gap-2 relative z-10"><MiniFutCard player={currentFormation.players[3]} position="LM" /><MiniFutCard player={currentFormation.players[4]} position="CM" /><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
+                     <div className="flex justify-center gap-12 relative z-10"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                     <div className="flex justify-center relative z-10"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
+                  </div>
+                  {currentFormation.coach?.name && (
+                     <div className="mt-6 bg-[#0a1428] p-4 border border-white/5 rounded-2xl flex items-center gap-4 max-w-md mx-auto shadow-md"><Trophy className="text-yellow-400 w-8 h-8 shrink-0"/><div className="min-w-0"><span className="text-xs text-gray-400 block font-bold">أفضل مدير فني في الجولة:</span><h4 className="font-black text-white text-lg truncate">{currentFormation.coach.name}</h4><p className="text-cyan-300 text-xs font-bold truncate">{currentFormation.coach.team}</p></div><Badge className="bg-yellow-400 text-black font-black mr-auto" dir="ltr">{currentFormation.coach.rating || 99} RAT</Badge></div>
+                  )}
+               </Card>
+            )}
+
+            {/* TAB: FANTASY */}
+            {activeTab === "fantasy" && (
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+                  <Card className="lg:col-span-2 bg-[#13213a] border border-emerald-500/30 rounded-3xl p-4 sm:p-6 shadow-xl">
+                     <CardHeader><CardTitle className="text-emerald-400 font-black flex items-center gap-2"><Zap/> توقع واكسب هدايا وجوائز البطولة!</CardTitle></CardHeader>
+                     <CardContent className="space-y-6">
+                        {liveMatches.length > 0 ? liveMatches.map(match => {
+                           const hasPred = predictedMatches[match.id];
+                           return (
+                             <div key={match.id} className="bg-[#1e2a4a] border border-white/5 p-4 rounded-2xl">
+                                <div className="text-center text-xs text-cyan-300 font-bold mb-3">{match.round} • توقع النتيجة بدقة قبل انطلاق المباراة</div>
+                                <div className="flex items-center justify-center gap-3 text-center mb-4"><span className="font-black text-white text-sm sm:text-base flex-1">{match.teamA}</span><span className="text-xs text-gray-400 px-3 py-1 bg-[#0a1428] rounded-full border border-white/5">VS</span><span className="font-black text-white text-sm sm:text-base flex-1">{match.teamB}</span></div>
+                                {hasPred ? (
+                                   <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center font-bold py-2 rounded-xl text-sm">✓ تم تسجيل توقعك للمباراة بنجاح، حظ سعيد!</div>
+                                ) : (
+                                   <div className="space-y-3 max-w-sm mx-auto">
+                                      <div className="flex gap-2 justify-center items-center" dir="ltr">
+                                         <Input type="number" placeholder="0" onChange={e => setPredForms(p => ({...p, [match.id]: {...p[match.id], homeScore: e.target.value}}))} className="bg-[#0a1428] border-none text-white text-center font-black text-xl h-11 w-16" />
+                                         <span className="text-white font-bold">:</span>
+                                         <Input type="number" placeholder="0" onChange={e => setPredForms(p => ({...p, [match.id]: {...p[match.id], awayScore: e.target.value}}))} className="bg-[#0a1428] border-none text-white text-center font-black text-xl h-11 w-16" />
+                                      </div>
+                                      <Input placeholder="اسمك بالكامل" onChange={e => setPredForms(p => ({...p, [match.id]: {...p[match.id], name: e.target.value}}))} className="bg-[#0a1428] border-none text-white h-10 text-sm font-bold" />
+                                      <Input placeholder="رقم الهاتف للتواصل" type="tel" onChange={e => setPredForms(p => ({...p, [match.id]: {...p[match.id], phone: e.target.value}}))} className="bg-[#0a1428] border-none text-white h-10 text-sm font-bold text-right" />
+                                      <Button onClick={() => submitPrediction(match.id, `${match.teamA} vs ${match.teamB}`)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-11 text-sm rounded-xl">إرسال التوقع 🎁</Button>
+                                   </div>
+                                )}
+                             </div>
+                           );
+                        }) : <p className="text-center text-gray-400 font-bold py-6">لا توجد مباريات قادمة متاحة للتوقع حالياً.</p>}
+                     </CardContent>
+                  </Card>
+                  <Card className="bg-[#13213a] border border-yellow-400/20 rounded-3xl p-5 shadow-2xl h-fit">
+                     <CardHeader className="pb-2 border-b border-white/5 mb-3"><CardTitle className="text-yellow-400 font-black text-lg flex items-center gap-2"><Trophy className="w-5 h-5"/> متصدري قائمة التوقعات</CardTitle></CardHeader>
+                     <CardContent className="p-0 space-y-2">
+                        {/* 👈 تم تصليح السطر هنا من familyLeaderboard ليصبح بالإسم الصحيح fantasyLeaderboard */}
+                        {fantasyLeaderboard.map((u:any, i:number)=>(
+                          <div key={i} className="flex justify-between items-center bg-[#0a1428] p-3 border border-white/5 rounded-xl"><div className="flex items-center gap-3"><Badge className="bg-yellow-400 text-black font-black">{i+1}</Badge><span className="font-bold text-white text-sm">{u.name}</span></div><span className="text-emerald-400 font-black">{u.points} نقطة</span></div>
+                        ))}
+                     </CardContent>
+                  </Card>
+               </div>
+            )}
+
+            {/* TAB: KNOCKOUT */}
+            {activeTab === "knockout" && (
+              <div className="space-y-12 animate-in fade-in duration-500 overflow-x-auto pb-6 w-full custom-scrollbar">
+                {activeTournament === 'youth' ? (
+                  <div className="min-w-[1200px] p-4 space-y-12">
+                     <div className="text-center mb-4"><Badge className="bg-cyan-500 text-white px-6 py-2 font-black text-lg">شجرة الأدوار الإقصائية لبطولة الشباب 🏆</Badge></div>
+                     
+                     <div className="bg-[#13213a] border border-cyan-500/20 p-6 rounded-3xl">
+                       <h3 className="text-yellow-400 font-black text-base mb-4 text-center">أدوار الملحق التمهيدي (النسخة الثالثة)</h3>
+                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <TreeMatchBox label="م 97" t1="اسماك باسط العوامي" t2="اصدقاء عز بوالمجدوبة" data={youthTree.p97} />
+                          <TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} />
+                          <TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} />
+                          <TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} />
+                       </div>
+                     </div>
+
+                     <div className="flex justify-between gap-4 items-start pt-6">
+                        <div className="flex flex-col gap-6 w-1/4">
+                           <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">دور الستة عشر</div>
+                           <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2="الفائز م 104" data={youthTree.r1} />
+                           <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز م 97"} data={youthTree.r2} />
+                           <TreeMatchBox label="م 3" t1="غوط رباح" t2="القدس" data={youthTree.r3} />
+                           <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز م 100"} data={youthTree.r4} />
+                        </div>
+                        <div className="flex flex-col gap-24 w-1/4 pt-16">
+                           <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">دور الثمانية</div>
+                           <TreeMatchBox label="مربع 1" t1="الفائز م 1" t2="الفائز م 2" data={youthTree.q1} />
+                           <TreeMatchBox label="مربع 2" t1="الفائز م 3" t2="الفائز م 4" data={youthTree.q2} />
+                        </div>
+                        <div className="flex flex-col gap-40 w-1/4 pt-32">
+                           <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">نصف النهائي والنهائي الكبير</div>
+                           <TreeMatchBox label="نصف 1" t1="الفائز مربع 1" t2="الفائز مربع 2" data={youthTree.s1} />
+                           <div className="mt-12"><TreeMatchBox label="النهائي الكبير 👑" t1="الطرف الأول" t2="الطرف الثاني" data={youthTree.f1} /></div>
+                        </div>
+                     </div>
+                  </div>
+                ) : (
+                  <div className="min-w-[1000px] p-4">
+                     <div className="text-center mb-6"><Badge className="bg-cyan-500 text-white px-6 py-2 font-black text-lg">شجرة الأدوار الإقصائية لبطولة الناشئين 🏅</Badge></div>
+                     <div className="flex justify-between gap-6 items-start pt-4">
+                        <div className="flex flex-col gap-6 w-1/3">
+                           <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">دور الثمانية (ربع النهائي)</div>
+                           <TreeMatchBox label="مربع 1" t1={juniorsTree.ja1} t2={juniorsTree.jb4} data={juniorsTree.q1} />
+                           <TreeMatchBox label="مربع 2" t1={juniorsTree.jb2} t2={juniorsTree.ja3} data={juniorsTree.q2} />
+                           <TreeMatchBox label="مربع 3" t1={juniorsTree.jb1} t2={juniorsTree.ja4} data={juniorsTree.q3} />
+                           <TreeMatchBox label="مربع 4" t1={juniorsTree.ja2} t2={juniorsTree.jb3} data={juniorsTree.q4} />
+                        </div>
+                        <div className="flex flex-col gap-28 w-1/3 pt-14">
+                           <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">نصف النهائي</div>
+                           <TreeMatchBox label="نصف 1" t1="الفائز مربع 1" t2="الفائز مربع 2" data={juniorsTree.s1} />
+                           <TreeMatchBox label="نصف 2" t1="الفائز مربع 3" t2="الفائز مربع 4" data={juniorsTree.s2} />
+                        </div>
+                        <div className="flex flex-col gap-6 w-1/3 pt-36">
+                           <div className="text-center text-yellow-400 font-black text-xs border-b border-white/5 pb-2">المباراة النهائية للناشئين</div>
+                           <TreeMatchBox label="النهائي الكبير 👑" t1="الطرف الأول" t2="الطرف الثاني" data={juniorsTree.f1} />
+                        </div>
+                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: STANDINGS */}
+            {activeTab === "standings" && (
+              <div className="space-y-8 animate-in fade-in duration-500">
+                {activeTournament === 'juniors' ? (
+                  <div className="grid md:grid-cols-2 gap-8">
+                    {[ { title: "المجموعة الأولى (أ) - ناشئين", data: standingsJunA }, { title: "المجموعة الثانية (ب) - ناشئين", data: standingsJunB } ].map(group => (
+                      <Card key={group.title} className="rounded-3xl border border-cyan-500/30 bg-[#13213a] shadow-xl overflow-hidden"><CardHeader className="flex flex-row items-center justify-between border-b border-cyan-500/20 pb-4"><CardTitle className="text-cyan-300 flex items-center gap-3"><Trophy className="h-6 w-6" /> {group.title}</CardTitle></CardHeader><CardContent className="p-0"><div className="overflow-auto w-full touch-pan-x touch-pan-y" dir="rtl"><table className="w-full text-white text-right min-w-[500px]"><thead className="bg-[#13213a] border-b border-cyan-500/30"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-3 py-3 font-bold text-cyan-300 text-xs whitespace-nowrap">{h}</th>))}</tr></thead><tbody>{group.data.map(row => (<tr key={row.team} className="border-b border-white/5 hover:bg-white/5 transition-colors"><td className="px-3 py-3"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-3 py-3 font-bold text-white whitespace-nowrap text-sm">{row.team}</td><td className="px-3 py-3 text-center">{row.played}</td><td className="px-3 py-3 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-3 py-3 text-center">{row.draws}</td><td className="px-3 py-3 text-center">{row.losses}</td><td className="px-3 py-3 text-center text-cyan-400">{row.gf}</td><td className="px-3 py-3 text-center text-white">{row.ga}</td><td className="px-3 py-3 text-center text-cyan-300">{row.gd}</td><td className="px-3 py-3 font-black text-yellow-300 text-center">{row.points}</td></tr>))}</tbody></table></div></CardContent></Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] shadow-xl overflow-hidden">
+                     <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب العام العام للشباب</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
+                     <CardContent className="p-0">
+                        <div className="overflow-auto w-full max-h-[60vh] touch-pan-x touch-pan-y relative" dir="rtl"><table className="w-full text-white text-right min-w-[800px]"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-20 shadow-md"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr></thead><tbody>{standingsYouth.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-cyan-400">{row.gf}</td><td className="px-4 py-4 text-center text-white">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></div>
+                     </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* TAB: ALL RESULTS */}
+            {activeTab === "all" && (
+               <Card className={`rounded-3xl border ${activeTournament === 'juniors' ? 'border-cyan-500/30' : 'border-yellow-400/30'} bg-[#13213a] animate-in fade-in duration-500`}>
+                 <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4"><div><CardTitle className={activeTournament === 'juniors' ? 'text-cyan-300' : 'text-yellow-300'}>النتائج والمباريات السابقة المؤرشفة بالكامل</CardTitle><Badge className="bg-cyan-500 mt-2 font-bold text-white">إجمالي مباريات الأرشيف: {finishedMatches.length}</Badge></div><div className="relative w-full sm:max-w-xs"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث عن فريق..." className="pr-10 bg-[#1e2a4a] border-yellow-400 text-white rounded-xl" /></div></CardHeader>
+                 <CardContent className="p-6 grid gap-4 md:grid-cols-2">
+                   {finishedMatches.filter(m => !search || String(m.teamA || "").includes(search.trim()) || String(m.teamB || "").includes(search.trim())).map(match => (
+                     <div key={match.id} className={`bg-[#1e2a4a] p-6 rounded-3xl border border-white/5 text-center transition-all hover:scale-[1.01] ${activeTournament === 'juniors' ? 'hover:border-cyan-400/50' : 'hover:border-yellow-400/50'}`}>
+                       <div className="text-cyan-300 text-xs sm:text-sm mb-3 font-bold border-b border-white/5 pb-2">{getArabicDay(match.date)} • {match.date} • {match.round}</div>
+                       <div className="flex items-center justify-center gap-2 sm:gap-6 mt-4">
+                         <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                         <div className="bg-[#0a1428] rounded-xl py-2 px-4 border border-white/5 text-yellow-400 shadow-inner shrink-0">{renderMatchScore(match)}</div>
+                         <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                       </div>
+                     </div>
+                   ))}
+                   {finishedMatches.length === 0 && <div className="col-span-full text-center text-gray-400 font-bold py-10">لا توجد مباريات مسجلة في قاعدة البيانات لهذه الفئة حالياً.</div>}
+                 </CardContent>
+               </Card>
+            )}
+
+            {/* TAB: TODAY & TOMORROW */}
+            {activeTab === "today" && ( <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] p-8 text-center font-bold text-gray-400">هذه البطولة مؤرشفة، لا توجد مباريات جارية اليوم 📅</Card> )}
+            {activeTab === "tomorrow" && ( <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] p-8 text-center font-bold text-gray-400">لا توجد مباريات مسجلة لليوم التالي 📆</Card> )}
+            
+            {/* TAB: SCORERS */}
+            {activeTab === "scorers" && (
+               <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] p-4 sm:p-6 animate-in fade-in duration-500">
+                  <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-4 border-b border-white/10 mb-4"><div><CardTitle className="text-yellow-300 font-black">قائمة هدافي البطولة الرسمية</CardTitle></div><div className="relative w-full sm:w-64"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={searchScorers} onChange={e => setSearchScorers(e.target.value)} placeholder="بحث عن لاعب..." className="pr-10 bg-[#1e2a4a] border-yellow-400/50 text-white rounded-xl" /></div></CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                     {filteredScorers.map((s, i) => (
+                        <div key={i} className="bg-[#1e2a4a] p-4 rounded-2xl border border-white/5 flex items-center justify-between shadow-md"><div className="flex items-center gap-3"><Badge className={i===0?"bg-yellow-400 text-black":i===1?"bg-gray-300 text-black shadow-md":"bg-gray-800"}>{i+1}</Badge><div><h4 className="font-black text-white text-base leading-tight">{s.player}</h4><span className="text-gray-400 text-xs font-bold mt-1 inline-block">{s.team}</span></div></div><Badge className="bg-cyan-500/20 text-cyan-400 text-lg font-black border border-cyan-500/30 px-3.5 py-1" dir="ltr">{s.goals} ⚽</Badge></div>
+                     ))}
+                  </CardContent>
+               </Card>
+            )}
+
+            {/* TAB: CARDS */}
+            {activeTab === "cards" && (
+               <Card className="rounded-3xl border border-red-500/30 bg-[#13213a] p-4 sm:p-6 animate-in fade-in duration-500">
+                  <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-4 border-b border-white/10 mb-4"><div className="flex items-center gap-3"><CardTitle className="text-red-400 font-black">سجل العقوبات والكروت</CardTitle><div className="flex gap-1 border border-white/10 rounded-xl p-1 bg-[#0a1428]"><button onClick={() => setShowArchivedCards(false)} className={`text-xs px-3 py-1 rounded-lg font-bold ${!showArchivedCards ? 'bg-red-500 text-white' : 'text-gray-400'}`}>الحالية</button><button onClick={() => setShowArchivedCards(true)} className={`text-xs px-3 py-1 rounded-lg font-bold ${showArchivedCards ? 'bg-red-500 text-white' : 'text-gray-400'}`}>الأرشيف</button></div></div><div className="relative w-full sm:w-64"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={searchCards} onChange={e => setSearchCards(e.target.value)} placeholder="بحث باسم اللاعب..." className="pr-10 bg-[#1e2a4a] border-red-500/40 text-white" /></div></CardHeader>
+                  <CardContent className="p-0"><div className="overflow-x-auto w-full custom-scrollbar"><table className="w-full text-right text-white"><thead className="bg-[#0a1428]"><tr><th className="p-4 text-cyan-300">اللاعب</th><th className="p-4 text-cyan-300">الفريق</th><th className="p-4 text-center text-cyan-300">البطاقات</th><th className="p-4 text-center text-cyan-300">الوضعية للمباراة القادمة</th></tr></thead>
+                     <tbody>
+                        {filteredCardsList.map((c, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                             <td className="p-4 font-bold text-white text-base">{c.player}</td><td className="p-4 text-sm text-gray-300">{c.team}</td>
+                             <td className="p-4 text-center flex justify-center gap-4 font-black text-sm"><span className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 px-2.5 py-0.5 rounded-md">🟨 {c.yellow}</span><span className="bg-red-500/10 text-red-500 border border-red-500/30 px-2.5 py-0.5 rounded-md">🟥 {c.red}</span></td>
+                             <td className="p-4 text-center"><Badge className={c.status === "طرد" || c.status === "إيقاف" ? "bg-red-500/20 text-red-400 border border-red-500/50" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"}>{c.status === "طرد" ? "🔴 موقف للطرد" : c.status === "إيقاف" ? "❌ موقف للتراكم" : "✔️ متاح للمشاركة"}</Badge></td>
+                          </tr>
+                        ))}
+                     </tbody></table></div>
+                  </CardContent>
+               </Card>
+            )}
+
+            {/* TAB: STATS (👈 مدمج به لوحة الإحصائيات الكاملة والديناميكية 100%) */}
+            {activeTab === "stats" && (
+               <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     {[ { t: "إجمالي الأهداف", v: statsData.totalGoals, i: "⚽", c: "text-yellow-400" }, { t: "المباريات المكتملة", v: statsData.totalMatches, i: "⏱️", c: "text-cyan-400" }, { t: "الكروت الصفراء", v: statsData.totalYellow, i: "🟨", c: "text-yellow-500" }, { t: "الكروت الحمراء", v: statsData.totalRed, i: "🟥", c: "text-red-500" } ].map((card, idx) => (
+                        <Card key={idx} className="bg-[#13213a] border border-white/5 p-4 flex flex-col items-center justify-center text-center shadow-md"><span className="text-3xl mb-1">{card.i}</span><span className="text-gray-400 text-xs font-bold">{card.t}</span><span className={`text-2xl sm:text-3xl font-black mt-2 ${card.c}`}>{card.v}</span></Card>
+                     ))}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <Card className="bg-[#13213a] border border-white/5 p-6 rounded-3xl space-y-4">
+                        <h3 className="text-cyan-300 font-black text-lg border-b border-white/5 pb-2">🎯 القوة الهجومية والدفاعية بالأرقام</h3>
+                        <div className="space-y-3">
+                           <div className="flex justify-between items-center bg-[#0a1428] p-3 rounded-xl"><span className="text-gray-400 font-bold text-sm">أقوى خط هجوم (الأكثر تسجيلاً):</span><span className="text-emerald-400 font-black text-sm">{statsData.bestAttack.team} <Badge className="bg-emerald-500/20 text-emerald-400 font-black mr-2">{statsData.bestAttack.gf} أهداف</Badge></span></div>
+                           <div className="flex justify-between items-center bg-[#0a1428] p-3 rounded-xl"><span className="text-gray-400 font-bold text-sm">أقوى خط دفاع (الأقل استقبالاً):</span><span className="text-emerald-400 font-black text-sm">{statsData.bestDefense.team} <Badge className="bg-emerald-500/20 text-emerald-400 font-black mr-2">{statsData.bestDefense.ga} أهداف</Badge></span></div>
+                        </div>
+                     </Card>
+                     <Card className="bg-[#13213a] border border-white/5 p-6 rounded-3xl space-y-4">
+                        <h3 className="text-cyan-300 font-black text-lg border-b border-white/5 pb-2">📈 المعدلات الرقمية لكل مباراة</h3>
+                        <div className="space-y-3">
+                           <div className="flex justify-between items-center bg-[#0a1428] p-3 rounded-xl"><span className="text-gray-400 font-bold text-sm">معدل التهديف العام:</span><span className="text-yellow-400 font-black text-sm">{statsData.goalsPerMatch} هدف / مباراة</span></div>
+                           <div className="flex justify-between items-center bg-[#0a1428] p-3 rounded-xl"><span className="text-gray-400 font-bold text-sm">معدل الإنذارات الكلي:</span><span className="text-yellow-500 font-black text-sm">{statsData.yellowPerMatch} إنذار / مباراة</span></div>
+                        </div>
+                     </Card>
+                  </div>
+               </div>
+            )}
+
+            {/* TAB: MOTM */}
+            {activeTab === "motm_tab" && (
+               <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] p-4 sm:p-6 animate-in fade-in duration-500">
+                  <CardHeader className="pb-4 border-b border-white/10 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4"><div><CardTitle className="text-yellow-300 font-black">🌟 سجل لوحة شرف نجوم اللقاءات (Man Of The Match)</CardTitle></div><div className="relative w-full sm:w-64"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={searchMotm} onChange={e => setSearchMotm(e.target.value)} placeholder="بحث باسم النجم..." className="pr-10 bg-[#1e2a4a] border-yellow-400/40 text-white" /></div></CardHeader>
+                  <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                     {motmList.filter(m => !searchMotm || String(m.player).toLowerCase().includes(searchMotm.trim().toLowerCase())).map((m, idx) => (
+                        <div key={idx} className="bg-gradient-to-b from-[#1e2a4a] to-[#0a1428] border border-yellow-400/30 rounded-2xl overflow-hidden p-4 flex gap-4 items-center shadow-lg relative group transition-transform hover:scale-[1.02]">
+                           <div className="w-16 h-16 rounded-full bg-[#0a1428] border-2 border-yellow-400 overflow-hidden shrink-0 flex items-center justify-center">{m.imageUrl ? <img src={m.imageUrl} className="w-full h-full object-cover"/> : <span className="text-2xl">👤</span>}</div>
+                           <div className="flex-1 min-w-0"><h4 className="font-black text-white text-base truncate">{m.player}</h4><span className="text-yellow-400 text-xs font-bold block mt-0.5 truncate">{m.team}</span><p className="text-[10px] text-gray-400 mt-2 truncate">مباراة: {m.matchName}</p></div>
+                        </div>
+                     ))}
+                  </CardContent>
+               </Card>
+            )}
+
+            {/* TAB: MEDIA */}
+            {activeTab === "media" && (
+               <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="flex justify-center mb-4"><div className="bg-[#1e2a4a] p-1 border border-white/5 rounded-xl flex gap-1"><button onClick={() => setMediaSubTab("news")} className={`text-sm px-4 py-2 rounded-lg font-bold ${mediaSubTab === 'news' ? 'bg-cyan-600 text-white' : 'text-gray-400'}`}>📰 الأخبار والمقالات</button><button onClick={() => setMediaSubTab("videos")} className={`text-sm px-4 py-2 rounded-lg font-bold ${mediaSubTab === 'videos' ? 'bg-cyan-600 text-white' : 'text-gray-400'}`}>🎥 استوديو الأهداف والملخصات</button></div></div>
+                  {mediaSubTab === "news" ? (
+                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {mediaItems.filter(item => item.type === "news").map(news => (
+                           <Card key={news.id} className="bg-[#13213a] border border-white/5 rounded-3xl overflow-hidden shadow-md">
+                              {news.imageUrl && <div className="w-full aspect-video bg-[#0a1428] overflow-hidden"><img src={news.imageUrl} className="w-full h-full object-cover" /></div>}
+                              <CardContent className="p-5 space-y-3"><h3 className="text-lg font-black text-white leading-snug">{news.title}</h3><p className="text-gray-300 text-sm font-bold leading-relaxed line-clamp-3">{news.body}</p></CardContent>
+                           </Card>
+                        ))}
+                     </div>
+                  ) : (
+                     <div className="grid gap-6 md:grid-cols-2">
+                        {mediaItems.filter(item => item.type === "video").map(video => {
+                           const ytId = getYoutubeId(video.url);
+                           return (
+                             <Card key={video.id} className="bg-[#13213a] border border-white/5 rounded-3xl overflow-hidden p-4 shadow-xl space-y-4">
+                                {ytId ? (
+                                   <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/5 shadow-inner"><iframe src={`https://www.youtube.com/embed/${ytId}`} className="w-full h-full border-none" allowFullScreen title={video.title} /></div>
+                                ) : <div className="w-full aspect-video bg-[#0a1428] flex items-center justify-center text-4xl">🎥</div>}
+                                <h3 className="text-base font-black text-white leading-tight px-1">{video.title}</h3>
+                             </Card>
+                           );
+                        })}
+                     </div>
+                  )}
+               </div>
+            )}
           </div>
         )}
 
@@ -656,142 +822,73 @@ export default function Page() {
         {mainAppTab === 'elite_cup' && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-center mb-8 px-2">
-                <button onClick={() => { setActiveTab('rosters'); setMainAppTab('elite_cup'); setRosterViewMode('register'); setUnlockedRoster(null); setShowPaymentForm(true); }} className="bg-gradient-to-r from-indigo-600 to-blue-700 hover:from-indigo-500 hover:to-blue-600 text-white font-black py-4 px-10 rounded-2xl text-xl shadow-[0_0_25px_rgba(79,70,229,0.5)] transition-transform hover:scale-105 flex items-center gap-3">
-                   تسجيل فريق النخبة الآن ✍️ <Users/>
-                </button>
+                <button onClick={() => { setActiveTab('rosters'); setMainAppTab('elite_cup'); setRosterViewMode('register'); setUnlockedRoster(null); setShowPaymentForm(true); }} className="bg-gradient-to-r from-indigo-600 to-blue-700 hover:from-indigo-500 hover:to-blue-600 text-white font-black py-4 px-10 rounded-2xl text-xl shadow-[0_0_25px_rgba(79,70,229,0.5)] transition-transform hover:scale-105 flex items-center gap-3">تسجيل فريق النخبة الآن ✍️ <Users/></button>
              </div>
-             
              {rosterViewMode === 'list' && (
                <div className="text-center py-20 bg-[#13213a] border border-indigo-500/30 rounded-3xl shadow-xl max-w-4xl mx-auto">
                  <Trophy className="w-24 h-24 mx-auto text-indigo-400 mb-6 drop-shadow-lg" />
                  <h2 className="text-4xl font-black text-indigo-400 mb-4">بطولة كأس النخبة</h2>
-                 <p className="text-white text-xl font-bold mb-8">استعدوا لأقوى المنافسات والأنظمة المتقدمة!</p>
+                 <p className="text-white text-xl font-bold mb-8">استعدوا لأقوى المنافسات والأنظمة المتقدمة بمحافظة مطروح!</p>
                </div>
              )}
-
              {rosterViewMode === 'register' && !unlockedRoster && (
                <Card className="max-w-xl mx-auto bg-[#13213a] border border-indigo-500/30 rounded-3xl shadow-2xl mt-8">
-                 <CardHeader className="text-center border-b border-white/5 pb-6">
-                    <Lock className="mx-auto h-12 w-12 text-indigo-400 mb-4" />
-                    <CardTitle className="text-2xl font-black text-white">تسجيل فريق النخبة</CardTitle>
-                    <p className="text-gray-400 text-sm mt-2 font-bold">لإتمام التسجيل، يرجى دفع رسوم الاشتراك للحصول على الرقم السري.</p>
-                 </CardHeader>
+                 <CardHeader className="text-center border-b border-white/5 pb-6"><Lock className="mx-auto h-12 w-12 text-indigo-400" /><CardTitle className="text-2xl font-black text-white mt-4">تسجيل فريق النخبة</CardTitle></CardHeader>
                  <CardContent className="p-8 space-y-6">
                     {showPaymentForm ? (
                        <div className="space-y-4 animate-in fade-in">
                           <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12" />
-                          <Input type="email" placeholder="البريد الإلكتروني (لإرسال الباسورد)" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                          <Input type="tel" placeholder="رقم الهاتف (واتساب)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                          <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-6 text-xl shadow-lg mt-4">
-                            {isInitiatingPay ? <Loader2 className="animate-spin h-6 w-6" /> : "دفع الاشتراك الآن 💳"}
-                          </Button>
-                          <div className="text-center pt-4">
-                             <button onClick={() => setShowPaymentForm(false)} className="text-indigo-400 underline font-bold text-sm hover:text-white">لدي الرقم السري بالفعل؟ الدخول للتسجيل</button>
-                          </div>
+                          <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                          <Input type="tel" placeholder="رقم الهاتف (محفظة الدفع)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                          <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-6 w-6" /> : "دفع اشتراك النخبة فودافون كاش 💳"}</Button>
+                          <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-indigo-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                        </div>
                     ) : (
                        <div className="space-y-4 animate-in fade-in">
-                          <div>
-                             <label className="block text-indigo-300 font-bold mb-2">الرقم السري للتسجيل</label>
-                             <Input type="password" value={rosterAccessPassword} onChange={e => setRosterAccessPassword(e.target.value)} placeholder="••••••••" className="bg-[#1e2a4a] border-indigo-500/50 text-white font-black text-center text-xl h-14 tracking-widest" />
-                          </div>
-                          <Button onClick={handleRosterLogin} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-7 text-xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-transform hover:scale-105">الدخول لاستمارة النخبة <Unlock className="ml-2 h-5 w-5" /></Button>
-                          <div className="text-center pt-4">
-                             <button onClick={() => setShowPaymentForm(true)} className="text-gray-400 hover:text-white font-bold text-sm">العودة لصفحة الدفع</button>
-                          </div>
+                          <Input type="password" value={rosterAccessPassword} onChange={e => setRosterAccessPassword(e.target.value)} placeholder="أدخل الرقم السري المستلم للنخبة" className="bg-[#1e2a4a] border-indigo-500/50 text-white font-black text-center text-xl h-14" />
+                          <Button onClick={handleRosterLogin} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-7 text-xl">الدخول لاستمارة النخبة <Unlock className="ml-2 h-5 w-5" /></Button>
+                          <div className="text-center pt-2"><button onClick={() => setRosterViewMode('list')} className="text-gray-400 text-sm">إلغاء والعودة</button></div>
                        </div>
                     )}
                  </CardContent>
                </Card>
              )}
-
-             {rosterViewMode === 'register' && unlockedRoster && (
-               <div className="max-w-5xl mx-auto animate-in fade-in duration-500 mt-8">
-                  <div className="bg-indigo-400/10 border border-indigo-400 text-indigo-300 p-4 rounded-2xl mb-6 text-center font-bold">
-                     ⚠️ تنبيه هام: يرجى مراجعة الأسماء بدقة. بمجرد ضغط "حفظ واعتماد" سيتم قفل القائمة. تأكد من إرفاق صورة شخصية وصورة بطاقة لكل لاعب. 
-                     <br/><span className="text-sm mt-2 inline-block opacity-80">(ملاحظة: بطولة النخبة تسمح بحد أقصى {MAX_PLAYERS} لاعبين، ولن يقبل تسجيل أكثر من 2 لاعبين من قائمة التقييد).</span>
-                  </div>
-                  <Card className="bg-[#13213a] border border-indigo-500/30 rounded-3xl shadow-2xl overflow-hidden">
-                     <CardHeader className="bg-[#1e2a4a] border-b border-indigo-500/20 py-6">
-                        <CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-3"><ClipboardList className="text-indigo-400"/> استمارة تسجيل (كأس النخبة)</CardTitle>
-                     </CardHeader>
-                     <CardContent className="p-4 md:p-8 space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5 relative overflow-hidden">
-                           <div className="absolute top-0 right-0 bg-indigo-600 text-white px-4 py-1 rounded-bl-xl font-bold text-xs">بيانات الفريق والمسئول</div>
-                           <div className="md:col-span-2 pt-4">
-                              <label className="block text-indigo-300 font-bold mb-2 text-lg">اسم الفريق</label>
-                              <Input placeholder="اكتب اسم فريق النخبة..." value={rosterForm.teamName} onChange={e => setRosterForm(p => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-black text-xl h-14" />
-                           </div>
-                           <div>
-                              <label className="block text-cyan-300 font-bold mb-2">الاسم الثلاثي (لمسئول الفريق)</label>
-                              <Input placeholder="الاسم الثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm(p => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/40 text-white font-bold h-12" />
-                           </div>
-                           <div>
-                              <label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (للتواصل)</label>
-                              <Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm(p => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/40 text-white font-bold h-12 text-right" />
-                           </div>
-                        </div>
-                        
-                        <div>
-                           <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-4">
-                              <h3 className="text-xl font-black text-indigo-300">أسماء اللاعبين المرفقين ({MAX_PLAYERS} لاعب)</h3>
-                           </div>
-                           <div className="space-y-4">
-                              {rosterForm.players.map((player, index) => (
-                                 <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-[#1e2a4a] p-3 sm:pr-4 rounded-2xl border border-white/5 hover:border-indigo-400/50 transition-colors relative">
-                                    <div className="flex items-center w-full sm:w-auto gap-3 flex-1">
-                                       <Badge className="bg-[#0a1428] text-gray-400 font-black px-3 py-1.5 border border-white/10 shrink-0">{index + 1}</Badge>
-                                       <Input placeholder="اسم اللاعب الثلاثي" value={player.name} onChange={e => updateRosterPlayer(index, 'name', e.target.value)} className="flex-1 bg-[#0a1428] border-none text-white font-bold focus-visible:ring-1 focus-visible:ring-indigo-500 h-12" />
-                                    </div>
-                                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                                       <div className="flex items-center gap-2">
-                                          <span className="text-gray-400 text-xs font-bold">الرقم:</span>
-                                          <Input type="number" placeholder="00" value={player.number} onChange={e => updateRosterPlayer(index, 'number', e.target.value)} className="w-16 bg-[#0a1428] border-none text-indigo-400 font-black text-center focus-visible:ring-1 focus-visible:ring-indigo-500 h-12" />
-                                       </div>
-                                       <div className="flex gap-2 shrink-0">
-                                          <label className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl cursor-pointer transition-colors border ${player.personalImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10 text-gray-400 hover:bg-white/5'}`} title="صورة شخصية">
-                                             {player.personalImagePreview ? <img src={player.personalImagePreview} className="w-full h-full object-cover rounded-xl"/> : <><Upload className="w-4 h-4 mb-1"/><span className="text-[8px] font-bold">شخصية</span></>}
-                                             <input type="file" accept="image/*" onChange={e => handlePlayerImageUpload(index, 'personalImage', e.target.files?.[0])} className="hidden" />
-                                          </label>
-                                          <label className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl cursor-pointer transition-colors border ${player.idImagePreview ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-[#0a1428] border-white/10 text-gray-400 hover:bg-white/5'}`} title="صورة البطاقة">
-                                             {player.idImagePreview ? <img src={player.idImagePreview} className="w-full h-full object-cover rounded-xl"/> : <><Camera className="w-4 h-4 mb-1"/><span className="text-[8px] font-bold">البطاقة</span></>}
-                                             <input type="file" accept="image/*" onChange={e => handlePlayerImageUpload(index, 'idImage', e.target.files?.[0])} className="hidden" />
-                                          </label>
-                                       </div>
-                                    </div>
-                                 </div>
-                              ))}
-                           </div>
-                        </div>
-                        <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-4">
-                           <Button onClick={submitFinalRoster} disabled={isUploading} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-8 text-xl shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-transform hover:scale-105">
-                             {isUploading ? <><Loader2 className="animate-spin mr-2 h-6 w-6"/> جاري الرفع...</> : "حفظ وإرسال القائمة ✔️"}
-                           </Button>
-                           <Button onClick={() => { setUnlockedRoster(null); setRosterViewMode('list'); }} variant="outline" disabled={isUploading} className="bg-transparent border-red-500 text-red-400 hover:bg-red-500 hover:text-white py-8 px-8 font-bold text-lg">إلغاء التسجيل</Button>
-                        </div>
-                     </CardContent>
-                  </Card>
-               </div>
-             )}
           </div>
         )}
 
-        {/* 3. SHOP SECTION (Unchanged) */}
+        {/* 3. SHOP SECTION */}
         {mainAppTab === 'shop' && (
-          <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-orange-500/30 font-bold">المتجر (مطابق للسابق)</div>
+          <div className="space-y-8 animate-in fade-in duration-500 mt-4">
+            <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 shadow-xl text-center md:text-right"><h2 className="text-3xl font-black text-yellow-400 mb-2">🛒 متجر هيرو سبورت الرياضي</h2><p className="text-cyan-300 font-bold">اختر التيشرتات والجوائز المخصصة لفريقك مع الدفع السريع والآمن.</p></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {productsList.length > 0 ? productsList.map(product => (
+                  <Card key={product.id} className="bg-[#13213a] border-yellow-400/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-400 transition-colors">
+                    <div className="aspect-square bg-[#0a1428] overflow-hidden">{product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">🛍️</div>}</div>
+                    <CardContent className="p-5 space-y-3">
+                      <h3 className="text-xl font-black text-white truncate">{product.title}</h3>
+                      <div className="flex items-center justify-between"><Badge className="bg-yellow-400 text-black font-black text-lg px-3 py-1">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</Badge></div>
+                      <Button onClick={() => addToCart(product)} className="w-full bg-yellow-400 text-black font-black rounded-2xl py-6 mt-2">إضافة للسلة 🛒</Button>
+                    </CardContent>
+                  </Card>
+                )) : <div className="col-span-full text-center py-20 bg-[#13213a] border border-yellow-400/20 rounded-3xl text-white font-black text-xl">لا توجد منتجات معروضة للبيع حالياً.</div>}
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* 4. SETTINGS SECTION (Unchanged) */}
+        {/* 4. SETTINGS SECTION */}
         {mainAppTab === 'settings' && (
-          <div className="text-center bg-[#13213a] p-10 rounded-3xl border border-gray-500/30 font-bold">الإعدادات (مطابق للسابق)</div>
+          <Card className="max-w-xl mx-auto bg-[#13213a] border border-white/5 rounded-3xl p-6 text-center space-y-4 animate-in fade-in duration-500 mt-4">
+             <BellRing className="w-12 h-12 text-yellow-400 mx-auto animate-bounce" />
+             <h3 className="text-2xl font-black text-white">إشعارات المنصة الفورية</h3>
+             <Button onClick={handleSubscribe} className="bg-yellow-400 text-black font-black text-base px-8 py-5 rounded-2xl shadow-lg">تفعيل الإشعارات الفورية على هاتفي 🔔</Button>
+          </Card>
         )}
 
         {/* FOOTER */}
         <div className="mt-16 border-t border-white/5 pt-6 pb-2 flex flex-col items-center justify-center text-center">
-           <div className="text-gray-400 text-sm font-bold flex items-center gap-2">
-              <span>إدارة المنصة</span>
-              <Badge className="bg-[#13213a] text-yellow-400 border border-yellow-400/20 px-3 py-1 font-black text-sm hover:scale-105 transition-transform cursor-default shadow-md">فتحي هيرو 🦅</Badge>
-           </div>
+           <div className="text-gray-400 text-sm font-bold flex items-center gap-2"><span>إدارة المنصة</span><Badge className="bg-[#13213a] text-yellow-400 border border-yellow-400/20 px-3 py-1 font-black text-sm cursor-default shadow-md">فتحي هيرو 🦅</Badge></div>
            <div className="text-cyan-300 text-[10px] mt-2 opacity-60 font-bold tracking-wider">جميع الحقوق محفوظة © 2026 لمنصة مطروح الرياضية</div>
         </div>
 
