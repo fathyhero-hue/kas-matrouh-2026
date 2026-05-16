@@ -1,35 +1,22 @@
 {
-  "id": "/",
-  "name": "كأس مطروح",
-  "short_name": "كأس مطروح",
-  "description": "التطبيق الرسمي لمتابعة نتائج وأخبار بطولة كأس مطروح",
+  "name": "منصة مطروح الرياضية",
+  "short_name": "مطروح الرياضية",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a1428",
   "theme_color": "#0a1428",
-  "orientation": "portrait",
-  "categories": ["sports", "entertainment"],
-  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow"
+      "purpose": "any"
     },
     {
-      "src": "/logo.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "wide"
+      "purpose": "maskable"
     }
   ]
 }
