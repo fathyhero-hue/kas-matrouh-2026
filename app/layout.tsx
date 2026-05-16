@@ -1,13 +1,14 @@
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "بطولة كأس مطروح",
-  description: "التطبيق الرسمي لمتابعة نتائج وأخبار بطولة كأس مطروح النسخة الثالثة",
-  manifest: "/manifest.json",
+  title: "منصة مطروح الرياضية",
+  description: "التطبيق الرسمي لمتابعة نتائج وأخبار كل البطولات والأحداث الرياضية فى مطروح",
+  manifest: "/manifest.json?v=2",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/icon.png?v=2",
+    apple: "/apple-touch-icon.png?v=2",
   },
 };
 
@@ -20,6 +21,9 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body>
         {children}
+        
+        {/* 🚀 عداد قياس السرعة والأداء من فيرسيل */}
+        <SpeedInsights />
         
         {/* كود تشغيل الـ Service Worker لضمان عمل التطبيق (PWA) بشكل سليم */}
         <script
