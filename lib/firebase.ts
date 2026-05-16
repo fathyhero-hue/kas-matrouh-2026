@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage"; // 👈 استدعاء مكتبة التخزين
 
 // وضع البيانات مباشرة لحل مشكلة Vercel Environment Variables
 const firebaseConfig = {
@@ -15,5 +16,6 @@ const firebaseConfig = {
 // تهيئة التطبيق
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
+const storage = getStorage(app); // 👈 تهيئة خدمة التخزين للصور
 
-export { app, db };
+export { app, db, storage }; // 👈 تصدير التخزين عشان نقدر نستخدمه في الصفحات
