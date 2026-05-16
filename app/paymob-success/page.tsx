@@ -1,39 +1,85 @@
-"use client";
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Mail, ArrowLeft } from "lucide-react";
+import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-export default function PaymobSuccessPage() {
-  const router = useRouter();
+// دالة لجلب الباسورد الحقيقي لعرضه على الشاشة فوراً بعد الدفع
+async function getTournamentPassword(tournament: string) {
+  try {
+    const settingsDoc = tournament === 'elite_cup' ? 'registration_elite' : 'registration_matrouh';
+    const docRef = doc(db, "settings", settingsDoc);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data().password) {
+      return docSnap.data().password;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return "123456"; // باسورد افتراضي احتياطي في حال حدوث خطأ
+}
+
+export default async function PaymobSuccessPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const success = searchParams.get?.('success') || searchParams.success;
+  const isSuccess = success === 'true';
+  const merchantOrderId = (searchParams.get?.('merchant_order_id') || searchParams.merchant_order_id || "") as string;
+  const tournament = merchantOrderId.split('_')[0] || "matrouh_cup";
+  
+  const tournamentName = tournament === 'elite_cup' ? 'كأس النخبة' : 'كأس مطروح';
+  const password = await getTournamentPassword(tournament);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4 font-sans">
-      <Card className="w-full max-w-xl bg-[#13213a] border-2 border-emerald-500/50 rounded-[2.5rem] shadow-2xl overflow-hidden">
-        <CardHeader className="bg-[#1e2a4a] text-center border-b border-white/5 py-8">
-          <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.4)]" />
-          <CardTitle className="text-3xl font-black text-white mt-4 tracking-wide">تمت عملية الدفع بنجاح! ✔️</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6 sm:p-10 text-center space-y-6">
-          <div className="bg-[#0a1428] p-5 rounded-2xl border border-white/5 space-y-3">
-            <p className="text-xl font-bold text-yellow-400">شكراً لك كابتن، تم تأكيد اشتراك فريقك</p>
-            <div className="flex items-center justify-center gap-2 text-cyan-300 font-bold text-sm bg-cyan-500/10 py-2.5 px-4 rounded-xl border border-cyan-500/20">
-               <Mail className="h-5 w-5 shrink-0" />
-               <span>يتم الآن توليد الرقم السري وإرساله فوراً إلى بريدك الإلكتروني.</span>
-            </div>
-          </div>
-          <p className="text-gray-400 text-xs font-medium leading-relaxed">
-             يرجى فحص علبة الوارد (Inbox) أو مجلد الرسائل غير المرغوب فيها (Spam). بمجرد استلام الرقم السري، قم بنسخه وادخل على استمارة المنصة لتسكين قائمة اللاعبين ورفع الأوراق السحابية.
+    <div dir="rtl" className="min-h-screen bg-[#0a1428] text-white flex flex-col items-center justify-center p-4 font-sans">
+      <div className="max-w-md w-full bg-[#111c35] border-2 border-emerald-500 rounded-2xl p-8 text-center shadow-2xl space-y-6">
+        
+        {/* أيقونة النجاح */}
+        <div className="mx-auto w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500 animate-pulse">
+          <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+
+        {/* نصوص التأكيد بالعربي */}
+        <div className="space-y-2">
+          <h1 className="text-2xl font-black text-emerald-400">تمت عملية الدفع بنجاح! 🦅</h1>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            مرحباً بك في <span className="text-cyan-400 font-bold">{tournamentName}</span>. تم تأكيد اشتراك فريقك بالكامل في السيستم بنجاح.
           </p>
-          <Button 
-            onClick={() => router.push('/')} 
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black py-6 rounded-2xl text-lg shadow-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
+        </div>
+
+        {/* عرض كود التسجيل المباشر الاحترافي */}
+        <div className="bg-[#172544] border-2 border-dashed border-blue-500 p-5 rounded-xl space-y-2">
+          <span className="text-xs text-gray-400 block font-medium">الرقم السري الخاص بتسجيل قائمتك:</span>
+          <span className="text-3xl font-black text-yellow-400 tracking-widest block font-mono select-all">
+            {password}
+          </span>
+          <span className="text-[11px] text-cyan-300 block">قم بنسخ هذا الرقم لاستخدامه في لوحة تسجيل الفرق</span>
+        </div>
+
+        {/* تنويه إضافي للإيميل */}
+        <p className="text-[12px] text-gray-400 leading-normal">
+          💡 تم إرسال نسخة من هذا الرقم السري وإرشادات التسكين إلى بريدك الإلكتروني المسجل الآن.
+        </p>
+
+        {/* أزرار التوجيه */}
+        <div className="pt-2">
+          <Link 
+            href="/teams/register" 
+            className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-lg text-sm"
           >
-            <ArrowLeft className="h-5 w-5" /> العودة شاشة المنصة الرئيسية
-          </Button>
-        </CardContent>
-      </Card>
+            الانتقال لتسجيل قائمة اللاعبين فوراً ⚽
+          </Link>
+          <Link 
+            href="/" 
+            className="block w-full text-gray-400 hover:text-white text-xs mt-4 underline transition"
+          >
+            العودة للرئيسية
+          </Link>
+        </div>
+
+      </div>
     </div>
   );
 }
