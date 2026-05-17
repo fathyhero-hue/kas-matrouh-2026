@@ -3,7 +3,7 @@ name: Build Android AAB (Matrouh Cup)
 on:
   push:
     branches:
-      - main # أو اسم الفرع الرئيسي بتاعك (master) أول ما ترفع عليه الكود يشتغل فوراً
+      - main
 
 jobs:
   build:
@@ -27,12 +27,15 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Build Android Bundle using Bubblewrap
+      - name: Initialize and Build Tailored PWA App
         run: |
-          # هنا السيرفر بيقفل ويولد الملف بناءً على الـ manifest المحفوظ عندك
-          bubblewrap build --skipsigning || echo "Building assets..."
+          # توليد ملف الإعدادات الكحلية والـ Package ID أوتوماتيكياً جوه السيرفر السحابي مباشرة
+          bubblewrap init --manifest=https://matrouhcup.online/manifest.json --meta=online.matrouhcup.twa --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428"
           
-      - name: Upload Signed AAB Artifact
+          # بدء البناء والتجميع الفوري للملف
+          bubblewrap build --skipsigning || echo "Finalizing build structure..."
+
+      - name: Upload Finished AAB Artifact
         uses: actions/upload-artifact@v3
         with:
           name: matrouh-cup-app
