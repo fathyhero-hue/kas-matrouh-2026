@@ -1,4 +1,4 @@
-name: Build & Upload Android AAB (Matrouh Cup)
+name: Build & Upload Matrouh Cup Android App - Direct Download Pro
 
 on:
   push:
@@ -12,41 +12,34 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      # 1. Checkout code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js 24
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      # 3. Setup Java
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 4. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 5. Accept SDK licenses
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses
 
-      # 6. Install Bubblewrap CLI
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      # 7. Create manifest and build (full build)
       - name: Create Manifest and Build
         run: |
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
-          
+
           cat <<EOF > twa-manifest.json
           {
             "packageId": "online.matrouhcup.twa",
@@ -74,16 +67,32 @@ jobs:
           }
           EOF
 
-          # Build كامل مع التوقيع
           echo "yes" | bubblewrap build --signingKey ./matrouh-cup.keystore --alias android --no-interactive
 
-      # 8. Upload artifact
-      - name: Upload Android Artifact
+      - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          # يرفع أي ملف .aab أو .apk موجود في المشروع بعد البناء
           path: |
             **/*.aab
             **/*.apk
           if-no-files-found: warn
+
+      - name: Show Direct Download Links
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+            if(artifacts.data.total_count === 0){
+              console.log("No artifacts found!");
+            } else {
+              artifacts.data.artifacts.forEach(a => {
+                console.log(`Artifact: ${a.name}`);
+                console.log(`Direct Download Link: ${a.archive_download_url}`);
+              });
+            }
