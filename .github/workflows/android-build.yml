@@ -36,16 +36,16 @@ jobs:
 
       - name: Configure and Fast Build (No Init)
         run: |
-          # حقن مسارات الجافا والـ SDK في جهاز السيرفر
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
           
-          # البناء المباشر بناءً على ملف الـ manifest الجاهز وتخطي التوقيع يدوياً
-          echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Compilation finished"
+          # البناء وإخراج الملف في الفولدر الرئيسي للسيرفر مباشرة
+          echo "yes" | bubblewrap build --skipSigning --no-interactive
 
       - name: Upload Finished AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          path: ./**/*.aab
-          if-no-files-found: warn
+          # مسار ذكي وشامل هيلقط أي ملف ينتهي بـ aab جوه السيرفر بالمللي
+          path: "./*.aab"
+          if-no-files-found: error
