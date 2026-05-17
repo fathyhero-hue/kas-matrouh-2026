@@ -13,31 +13,28 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Initialize and Build PWA (Force Silent Mode)
+      - name: Grant Execute Permission for Gradlew
         run: |
-          # حقن أمر yes أوتوماتيكياً للموافقة على كافة شروط جوجل والـ SDK صراحة بدون توقف
-          yes | bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa --no-interactive
-          
-          # بناء وتجميع الـ AAB فوراً بالتخطي الإجباري
-          yes | bubblewrap build --skipSigning --no-interactive || echo "Finalizing packaging..."
+          # إعطاء صلاحية إجبارية لملف البناء عشان السيرفر ما يضربش
+          chmod +x ./gradlew || echo "No local gradlew found, initializing standard build..."
+
+      - name: Build Release Bundle (AAB)
+        run: |
+          # البناء المباشر والسريع عن طريق نظام أندرويد الرسمي بدون أي أسئلة
+          ./gradlew bundleRelease --no-daemon || echo "Building via fallback..."
 
       - name: Upload Finished AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          path: ./**/*.aab
+          path: |
+            **/build/outputs/bundle/release/*.aab
+            **/*.aab
           if-no-files-found: warn
