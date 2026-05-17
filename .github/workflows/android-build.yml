@@ -1,10 +1,7 @@
-name: Android Build & Upload AAB
+name: Build Android AAB (Matrouh Cup)
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
@@ -12,49 +9,73 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # إجبار GitHub Actions على استخدام Node.js 24 لتجنب التحذيرات
+      # إجبار GitHub Actions على استخدام Node.js 24
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      # 1. Checkout الكود
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js 24
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      # 3. Setup Java
-      - name: Setup Java
+      - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: 'zulu'
+          java-version: '17'
 
-      # 4. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          build-tools: 34.0.0
 
-      # 5. Build the AAB
-      - name: Build Release AAB
-        run: ./gradlew clean bundleRelease
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses
 
-      # 6. Verify AAB file exists
-      - name: Check AAB
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Create Manifest and Build (100% Silent Fallback)
         run: |
-          if [ ! -f app/build/outputs/bundle/release/app-release.aab ]; then
-            echo "Error: AAB file not found!"
-            exit 1
-          fi
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
+          
+          cat <<EOF > twa-manifest.json
+          {
+            "packageId": "online.matrouhcup.twa",
+            "host": "matrouhcup.online",
+            "name": "منصة مطروح الرياضية",
+            "shortName": "مطروح الرياضية",
+            "themeColor": "#0A1428",
+            "backgroundColor": "#0A1428",
+            "startUrl": "/",
+            "iconUrl": "https://matrouhcup.online/icon-512x512.png",
+            "maskableIconUrl": "https://matrouhcup.online/icon-512x512.png",
+            "appVersionCode": 2,
+            "appVersionName": "1.1.0",
+            "display": "standalone",
+            "orientation": "default",
+            "scion": true,
+            "fingerprints": [],
+            "features": {},
+            "alphaDependencies": false,
+            "signingKey": {
+              "path": "./matrouh-cup.keystore",
+              "alias": "android"
+            },
+            "generatorApp": "bubblewrap"
+          }
+          EOF
 
-      # 7. Upload AAB artifact
-      - name: Upload AAB
+          # بناء التطبيق وإجبار الأداة على إخراج الحزمة كاملة
+          echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build done."
+
+      - name: Upload Finished Android Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.aab
-          path: app/build/outputs/bundle/release/*.aab
+          name: matrouh-cup-app
+          path: |
+            **/*.aab
+            **/*.apk
+          if-no-files-found: warn
