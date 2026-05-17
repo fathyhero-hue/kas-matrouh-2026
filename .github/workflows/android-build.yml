@@ -24,24 +24,36 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
+        run: |
+          # الموافقة الإجبارية الصامتة على كل رخص وشروط أندرويد جوه السيرفر
+          yes | sdkmanager --licenses
+
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Configure and Build PWA (Silent Mode)
+      - name: Configure and Build PWA (Complete Silent Automation)
         run: |
-          # تجهيز موافقة مسبقة لبيئة العمل عشان الأداة ما تسألش عن الـ Java والـ SDK
+          # 1. خلق ملف إعدادات المسارات المسبقة للـ CLI لمنع أي أسئلة عن مسار الجافا أو الـ SDK
           mkdir -p ~/.bubblewrap
-          echo '{"jdkPath":"/usr/lib/jvm/zulu-17-amd64","androidSdkPath":"/home/runner/android-sdk"}' > ~/.bubblewrap/config.json
+          echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
           
-          # تشغيل أمر الـ init وتلقيم الإجابات أوتوماتيكياً بسطر واحد بدون تكرار لانهائي
-          printf '\n\n\n\n\n\n' | bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa
+          # 2. تشغيل الـ init وتمرير الموافقات وضغطات الـ Enter أوتوماتيكياً دفعة واحدة
+          echo -e "\n\n\n\n\n\n" | bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa
           
-          # بناء التطبيق النهائي مع تخطي التوقيع المحلي رقمياً (جوجل بلاي سيتولى التوقيع تلقائياً)
-          printf 'yes\n' | bubblewrap build --skipSigning || echo "Fallback compilation completed."
+          # 3. تعديل الـ Version Code ليكون 2 والـ Version Name ليكون 1.1.0 جوه ملف الـ manifest اللي اتخلق
+          sed -i 's/"versionCode": 1/"versionCode": 2/g' twa-manifest.json || echo "Setting code..."
+          sed -i 's/"versionName": "1.0.0"/"versionName": "1.1.0"/g' twa-manifest.json || echo "Setting name..."
+
+          # 4. بناء وتجميع الـ AAB صامت وتخطي التوقيع المحلي (جوجل بلاي سيتولى التوقيع)
+          echo "yes" | bubblewrap build --skipSigning
 
       - name: Upload Finished AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
           path: ./**/*.aab
-          if-no-files-found: warn
+          if-no-files-found: error
