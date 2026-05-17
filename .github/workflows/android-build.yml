@@ -27,13 +27,13 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Initialize and Build PWA (Silent Mode)
+      - name: Initialize and Build PWA (Force Silent Mode)
         run: |
-          # إنشاء الإعدادات الكحلية للمنصة صامت بدون أسئلة
-          bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa --no-interactive
+          # حقن أمر yes أوتوماتيكياً للموافقة على كافة شروط جوجل والـ SDK صراحة بدون توقف
+          yes | bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa --no-interactive
           
-          # بناء التطبيق والتخطي صامت
-          bubblewrap build --skipSigning --no-interactive || echo "Finalizing packaging..."
+          # بناء وتجميع الـ AAB فوراً بالتخطي الإجباري
+          yes | bubblewrap build --skipSigning --no-interactive || echo "Finalizing packaging..."
 
       - name: Upload Finished AAB Artifact
         uses: actions/upload-artifact@v4
