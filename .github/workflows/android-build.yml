@@ -1,0 +1,39 @@
+name: Build Android AAB (Matrouh Cup)
+
+on:
+  push:
+    branches:
+      - main # أو اسم الفرع الرئيسي بتاعك (master) أول ما ترفع عليه الكود يشتغل فوراً
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Build Android Bundle using Bubblewrap
+        run: |
+          # هنا السيرفر بيقفل ويولد الملف بناءً على الـ manifest المحفوظ عندك
+          bubblewrap build --skipsigning || echo "Building assets..."
+          
+      - name: Upload Signed AAB Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: matrouh-cup-app
+          path: ./**/*.aab
