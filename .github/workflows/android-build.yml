@@ -36,11 +36,9 @@ jobs:
 
       - name: Create Manifest and Build (100% Silent Fallback)
         run: |
-          # 1. إجبار السيرفر على حفظ مسارات الجافا والـ SDK
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
           
-          # 2. إنشاء ملف الـ manifest الحقيقي أوتوماتيكياً في ثانية واحدة لمنع أي أسئلة تفاعلية
           cat <<EOF > twa-manifest.json
           {
             "packageId": "online.matrouhcup.twa",
@@ -68,13 +66,15 @@ jobs:
           }
           EOF
 
-          # 3. تشغيل البناء الفوري الصامت بناءً على الملف المخلوق
-          echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build process done."
+          # بناء التطبيق وإجبار الأداة على إخراج الحزمة كاملة
+          echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build done."
 
-      - name: Upload Finished AAB Artifact
+      - name: Upload Finished Android Artifact
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          # مسار شامل وبسيط هيلقط الملف من أي مكان استقر فيه جوه السيرفر
-          path: "**/*.aab"
+          # مسار ذكي هيسحب أي ملف أندرويد نهائي خرج من العملية (.aab أو .apk)
+          path: |
+            **/*.aab
+            **/*.apk
           if-no-files-found: warn
