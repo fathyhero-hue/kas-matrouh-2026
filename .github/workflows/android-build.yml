@@ -1,4 +1,4 @@
-name: Build Android AAB (Matrouh Cup) - Smart Upload
+name: Build Android AAB (Matrouh Cup) - Smart Upload Pro
 
 on:
   push:
@@ -69,21 +69,12 @@ jobs:
 
           echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build done."
 
-      - name: Find and Upload All Android Artifacts
-        run: |
-          # البحث عن أي ملفات .aab أو .apk في كل المشروع
-          ARTIFACTS=$(find . -type f \( -name "*.aab" -o -name "*.apk" \))
-          if [ -z "$ARTIFACTS" ]; then
-            echo "Warning: No Android artifacts found!"
-          else
-            echo "Found the following artifacts:"
-            echo "$ARTIFACTS"
-            # رفع الملفات كـ artifact
-            echo "$ARTIFACTS" > files-to-upload.txt
-          fi
-      - name: Upload Artifacts
+      - name: Upload All Android Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          path: files-to-upload.txt
+          # يرفع كل ملفات .aab و .apk الموجودة في المشروع تلقائيًا
+          path: |
+            **/*.aab
+            **/*.apk
           if-no-files-found: warn
