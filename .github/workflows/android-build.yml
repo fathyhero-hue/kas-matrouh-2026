@@ -11,15 +11,15 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
       - name: Setup Java JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -29,14 +29,15 @@ jobs:
 
       - name: Initialize and Build PWA (Silent Mode)
         run: |
-          # أمر عبقري بيخلّق ملف الإعدادات الكحلية جوه السيرفر صامت وبدون أسئلة نهائياً
+          # إنشاء الإعدادات الكحلية للمنصة صامت بدون أسئلة
           bubblewrap init --manifest="https://matrouhcup.online/manifest.json" --meta="online.matrouhcup.twa" --metaName="منصة مطروح الرياضية" --metaShortName="مطروح الرياضية" --metaThemeColor="#0A1428" --metaBackgroundColor="#0A1428" --pwa --no-interactive
           
-          # تجميع وبناء ملف الـ AAB النهائي بدون تشفير محلي لأن جوجل بلاي سيتولى التشفير
+          # بناء التطبيق والتخطي صامت
           bubblewrap build --skipSigning --no-interactive || echo "Finalizing packaging..."
 
       - name: Upload Finished AAB Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
           path: ./**/*.aab
+          if-no-files-found: warn
