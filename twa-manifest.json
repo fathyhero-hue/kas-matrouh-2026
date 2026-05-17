@@ -1,0 +1,24 @@
+{
+  "packageId": "online.matrouhcup.twa",
+  "host": "matrouhcup.online",
+  "name": "منصة مطروح الرياضية",
+  "shortName": "مطروح الرياضية",
+  "themeColor": "#0A1428",
+  "backgroundColor": "#0A1428",
+  "startUrl": "/",
+  "iconUrl": "https://matrouhcup.online/icon-512x512.png",
+  "maskableIconUrl": "https://matrouhcup.online/icon-512x512.png",
+  "appVersionCode": 2,
+  "appVersionName": "1.1.0",
+  "display": "standalone",
+  "orientation": "default",
+  "scion": true,
+  "fingerprints": [],
+  "features": {},
+  "alphaDependencies": false,
+  "signingKey": {
+    "path": "./matrouh-cup.keystore",
+    "alias": "android"
+  },
+  "generatorApp": "bubblewrap"
+}
