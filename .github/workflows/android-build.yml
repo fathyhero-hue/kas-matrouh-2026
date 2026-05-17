@@ -1,4 +1,4 @@
-name: Build Android AAB (Matrouh Cup)
+name: Build Android AAB (Matrouh Cup) - Smart Upload
 
 on:
   push:
@@ -9,7 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # إجبار GitHub Actions على استخدام Node.js 24
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -36,7 +35,7 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Create Manifest and Build (100% Silent Fallback)
+      - name: Create Manifest and Build
         run: |
           mkdir -p ~/.bubblewrap
           echo "{\"jdkPath\":\"${JAVA_HOME}\",\"androidSdkPath\":\"${ANDROID_HOME}\"}" > ~/.bubblewrap/config.json
@@ -68,14 +67,23 @@ jobs:
           }
           EOF
 
-          # بناء التطبيق وإجبار الأداة على إخراج الحزمة كاملة
           echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build done."
 
-      - name: Upload Finished Android Artifact
+      - name: Find and Upload All Android Artifacts
+        run: |
+          # البحث عن أي ملفات .aab أو .apk في كل المشروع
+          ARTIFACTS=$(find . -type f \( -name "*.aab" -o -name "*.apk" \))
+          if [ -z "$ARTIFACTS" ]; then
+            echo "Warning: No Android artifacts found!"
+          else
+            echo "Found the following artifacts:"
+            echo "$ARTIFACTS"
+            # رفع الملفات كـ artifact
+            echo "$ARTIFACTS" > files-to-upload.txt
+          fi
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          path: |
-            **/*.aab
-            **/*.apk
+          path: files-to-upload.txt
           if-no-files-found: warn
