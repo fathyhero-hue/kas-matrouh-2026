@@ -1,4 +1,4 @@
-name: Build Android AAB (Matrouh Cup) - Smart Upload Pro
+name: Build & Upload Android AAB (Matrouh Cup)
 
 on:
   push:
@@ -12,29 +12,36 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
+      # 1. Checkout code
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 2. Setup Node.js 24
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
+      # 3. Setup Java
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
+      # 4. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # 5. Accept SDK licenses
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses
 
+      # 6. Install Bubblewrap CLI
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
+      # 7. Create manifest and build (full build)
       - name: Create Manifest and Build
         run: |
           mkdir -p ~/.bubblewrap
@@ -67,13 +74,15 @@ jobs:
           }
           EOF
 
-          echo "yes" | bubblewrap build --skipSigning --no-interactive || echo "Build done."
+          # Build كامل مع التوقيع
+          echo "yes" | bubblewrap build --signingKey ./matrouh-cup.keystore --alias android --no-interactive
 
-      - name: Upload All Android Artifacts
+      # 8. Upload artifact
+      - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
           name: matrouh-cup-app
-          # يرفع كل ملفات .aab و .apk الموجودة في المشروع تلقائيًا
+          # يرفع أي ملف .aab أو .apk موجود في المشروع بعد البناء
           path: |
             **/*.aab
             **/*.apk
