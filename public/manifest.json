@@ -9,7 +9,10 @@
   "description": "المنصة الرسمية لبطولة كأس مطروح لكرة القدم - جداول المباريات، الإحصائيات، والـ Fantasy أونلاين.",
   "id": "online.matrouhcup.twa.pwa",
   "orientation": "portrait",
-  "categories": ["sports", "utilities"],
+  "categories": [
+    "sports",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-512x512.png",
