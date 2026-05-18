@@ -524,7 +524,7 @@ export default function Page() {
                      {/* صف خط الهجوم (1) */}
                      <div className="flex justify-center relative z-10">
                         {(() => {
-                           const p = handleOriginalLineupData.starters.find(x => x.id === "fwd");
+                           const p = handleOriginalLineupData.starters.find((x: any) => x.id === "fwd");
                            return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="ST" />;
                         })()}
                      </div>
@@ -532,11 +532,11 @@ export default function Page() {
                      {/* صف خط أجنحة وسط الملعب الهجومي (2) */}
                      <div className="flex justify-around gap-1 sm:gap-2 relative z-10">
                         {(() => {
-                           const pLeft = handleOriginalLineupData.starters.find(x => x.id === "mid3");
+                           const pLeft = handleOriginalLineupData.starters.find((x: any) => x.id === "mid3");
                            return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="LM" />;
                         })()}
                         {(() => {
-                           const pRight = handleOriginalLineupData.starters.find(x => x.id === "mid2");
+                           const pRight = handleOriginalLineupData.starters.find((x: any) => x.id === "mid2");
                            return <MiniFutCard player={{ name: pRight?.name, team: pRight?.team, imageUrl: pRight?.imageUrl || (pRight as any).image }} position="RM" />;
                         })()}
                      </div>
@@ -544,7 +544,7 @@ export default function Page() {
                      {/* صف خط وسط الارتكاز الدفاعي (1) */}
                      <div className="flex justify-center relative z-10">
                         {(() => {
-                           const p = handleOriginalLineupData.starters.find(x => x.id === "mid1");
+                           const p = handleOriginalLineupData.starters.find((x: any) => x.id === "mid1");
                            return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="CM" />;
                         })()}
                      </div>
@@ -552,11 +552,11 @@ export default function Page() {
                      {/* صف خط الدفاع الصلب (2) */}
                      <div className="flex justify-center gap-6 sm:gap-24 relative z-10">
                         {(() => {
-                           const pLeft = handleOriginalLineupData.starters.find(x => x.id === "def1");
+                           const pLeft = handleOriginalLineupData.starters.find((x: any) => x.id === "def1");
                            return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="CB" />;
                         })()}
                         {(() => {
-                           const pRight = handleOriginalLineupData.starters.find(x => x.id === "def2");
+                           const pRight = handleOriginalLineupData.starters.find((x: any) => x.id === "def2");
                            return <MiniFutCard player={{ name: pRight?.name, team: pRight?.team, imageUrl: pRight?.imageUrl || (pRight as any).image }} position="CB" />;
                         })()}
                      </div>
@@ -564,7 +564,7 @@ export default function Page() {
                      {/* حارس المرمى (1) */}
                      <div className="flex justify-center relative z-10">
                         {(() => {
-                           const p = handleOriginalLineupData.starters.find(x => x.id === "gk");
+                           const p = handleOriginalLineupData.starters.find((x: any) => x.id === "gk");
                            return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="GK" />;
                         })()}
                      </div>
