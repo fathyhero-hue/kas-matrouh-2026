@@ -1,19 +1,24 @@
 {
+  "theme_color": "#0A1428",
+  "background_color": "#0A1428",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/?utm_source=pwa",
   "name": "منصة مطروح الرياضية",
   "short_name": "مطروح الرياضية",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0a1428",
-  "theme_color": "#0a1428",
+  "description": "المنصة الرسمية لبطولة كأس مطروح لكرة القدم - جداول المباريات، الإحصائيات، والـ Fantasy أونلاين.",
+  "id": "online.matrouhcup.twa.pwa",
+  "orientation": "portrait",
+  "categories": ["sports", "utilities"],
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "https://matrouhcup.online/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "https://matrouhcup.online/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
