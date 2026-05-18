@@ -47,7 +47,53 @@ const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?
 const getPenaltyScore = (match: any) => ({ home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length, away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length });
 const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
 const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => { const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive; return (<div className={`bg-[#1e2a4a] rounded-2xl flex flex-col items-center justify-center p-4 border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-yellow-400/30'} shadow-lg relative min-h-[95px] transition-transform hover:scale-105 shrink-0`}><Badge className="absolute -top-3 bg-yellow-400 text-black text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md">{label}</Badge><div className="w-full flex justify-between items-center gap-2 mt-2"><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t1}</div><div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-md text-cyan-400 shrink-0">{renderMatchScore(match)}</div><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t2}</div></div>{win && <div className="mt-3 text-[11px] bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1 rounded-full font-bold shadow-inner">صعد: {win}</div>}</div>); };
-const MiniFutCard = ({ player, position }: { player: any, position: string }) => { const baseSize = "w-[74px] sm:w-[88px] md:w-[104px] lg:w-[118px]"; if(!player || !player.name) return (<div className={`${baseSize} h-[112px] sm:h-[132px] md:h-[154px] lg:h-[172px] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/40 rounded-[1.4rem] flex flex-col items-center justify-center text-emerald-300/70 text-xs md:text-sm font-black shadow-inner backdrop-blur-sm transition-all hover:border-emerald-400/80`}><span className="text-2xl mb-1 opacity-60">＋</span>{position}</div>); return (<div className={`relative ${baseSize} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_12px_22px_rgba(0,0,0,0.65)]`}><div className="relative w-full rounded-[1.4rem] overflow-hidden border border-yellow-400/50 bg-gradient-to-b from-yellow-300/20 via-[#1e2a4a] to-[#07101f] shadow-[0_12px_28px_rgba(0,0,0,0.45)]"><div className="absolute inset-x-2 top-2 h-10 bg-gradient-to-r from-yellow-400/0 via-yellow-300/20 to-yellow-400/0 rounded-full blur-md"></div><div className="relative w-full aspect-[4/4.9] bg-gradient-to-b from-[#101b32] to-[#050a14] border-b border-white/10">{player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-contain object-center p-1.5 bg-[#050a14]" alt={player.name} loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">👤</div>}<div className="absolute top-1 left-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-300 to-yellow-600 min-w-[28px] md:min-w-[34px] px-1.5 py-1 rounded-xl shadow-md border border-yellow-700/50"><span className="text-[10px] md:text-sm font-black text-black leading-none">{player.rating || 99}</span><span className="text-[7px] md:text-[10px] font-black text-black leading-none uppercase mt-0.5">{position}</span></div></div><div className="relative p-1.5 md:p-2 flex flex-col items-center justify-center w-full bg-gradient-to-b from-[#101b32] to-[#07101f]"><span className="text-[9px] sm:text-[10px] md:text-[12px] font-black text-white w-full text-center truncate mb-1 leading-tight" title={player.name}>{player.name}</span><span className="bg-yellow-400/10 border border-yellow-400/25 text-yellow-300 text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-lg text-center w-full truncate" title={player.team}>{player.team}</span></div></div></div>); };
+
+// كارت مصغر تماماً ومتجاوب هندسياً يمنع التداخل في شاشات الموبايل
+const MiniFutCard = ({ player, position }: { player: any, position: string }) => { 
+  const baseSize = "w-[50px] xs:w-[65px] sm:w-[82px] md:w-[98px] lg:w-[114px]"; 
+  if(!player || !player.name) return (
+    <div className={`${baseSize} aspect-[4/5.5] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/30 rounded-xl flex flex-col items-center justify-center text-emerald-300/60 text-[8px] xs:text-[10px] font-black shadow-inner backdrop-blur-xs`}>
+      <span className="text-xs xs:text-lg mb-0.5 opacity-50">＋</span>{position}
+    </div>
+  ); 
+  return (
+    <div className={`relative ${baseSize} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_5px_10px_rgba(0,0,0,0.55)]`}>
+      <div className="relative w-full rounded-xl overflow-hidden border border-yellow-400/40 bg-gradient-to-b from-yellow-300/15 via-[#1e2a4a] to-[#07101f]">
+        <div className="relative w-full aspect-[4/4.8] bg-gradient-to-b from-[#101b32] to-[#050a14] border-b border-white/5">
+          {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-contain object-center p-1 bg-[#050a14]" alt={player.name} loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-lg opacity-25">👤</div>}
+          <div className="absolute top-0.5 right-0.5 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-300 to-yellow-600 min-w-[16px] xs:min-w-[24px] px-0.5 py-0.5 rounded shadow-sm border border-yellow-700/40">
+            <span className="text-[7px] xs:text-[9px] font-black text-black leading-none">{player.rating || 99}</span>
+            <span className="text-[5px] xs:text-[7px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
+          </div>
+        </div>
+        <div className="relative p-0.5 xs:p-1 flex flex-col items-center justify-center w-full bg-gradient-to-b from-[#101b32] to-[#07101f]">
+          <span className="text-[7px] xs:text-[9px] font-black text-white w-full text-center truncate leading-tight" title={player.name}>{player.name}</span>
+          <span className="bg-yellow-400/5 border border-yellow-400/25 text-yellow-300 text-[5px] xs:text-[7px] font-bold px-0.5 py-0.5 rounded text-center w-full truncate mt-0.5" title={player.team}>{player.team}</span>
+        </div>
+      </div>
+    </div>
+  ); 
+};
+
+const DEFAULT_TOURNAMENT_LINEUP = {
+  manager: { name: "عبدالله موسى", team: "وادي ماجد", imageUrl: "" },
+  starters: [
+    { id: "gk", name: "طاهر يحيى", team: "وادي ماجد", role: "حارس مرمى", posText: "GK", fallback: "طا" },
+    { id: "def1", name: "حامد علي", team: "17 فبراير", role: "مدافع", posText: "CB", fallback: "حا" },
+    { id: "def2", name: "أحمد سعيد", team: "أصدقاء سامي", role: "مدافع", posText: "CB", fallback: "أح" },
+    { id: "mid1", name: "عيسى العوامي", team: "وادي ماجد", role: "وسط", posText: "CM", fallback: "عي" },
+    { id: "mid2", name: "أسامة محمد", team: "القدس", role: "وسط", posText: "RM", fallback: "أس" },
+    { id: "mid3", name: "عبدالله خميس", team: "17 فبراير", role: "وسط", posText: "LM", fallback: "عب" },
+    { id: "fwd", name: "منعم بورسوة", team: "وادي ماجد", role: "مهاجم", posText: "ST", fallback: "من" }
+  ],
+  subs: [
+    { name: "عز معيوف", team: "أصدقاء سلامة بدر", role: "وسط", fallback: "عز" },
+    { name: "أيمن مصطفى", team: "القدس", role: "مدافع", fallback: "أي" },
+    { name: "مصطفى ناجي", team: "وادي ماجد", role: "وسط يمين", fallback: "من" },
+    { name: "محمد مبروك", team: "الفهود", role: "وسط", fallback: "مم" },
+    { name: "مصطفى أنور", team: "النسور", role: "مدافع", fallback: "مص" }
+  ]
+};
 
 export default function Page() {
   const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'shop' | 'settings'>('matrouh_cup');
@@ -74,6 +120,8 @@ export default function Page() {
   const [restrictedPlayers, setRestrictedPlayers] = useState<any[]>([]);
   const [regSettingsMatrouh, setRegSettingsMatrouh] = useState({ deadline: "", password: "", price: 500 });
   const [regSettingsElite, setRegSettingsElite] = useState({ deadline: "", password: "", price: 1000 });
+
+  const [customTournamentLineup, setCustomTournamentLineup] = useState<any>(null);
 
   const [search, setSearch] = useState("");
   const [searchScorers, setSearchScorers] = useState("");
@@ -131,19 +179,25 @@ export default function Page() {
     const unsubArchivedCards = onSnapshot(collection(db, `archived_cards${suffix}`), (snap) => setArchivedCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubMedia = onSnapshot(collection(db, `media${suffix}`), (snap) => setMediaItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubMotm = onSnapshot(collection(db, `motm${suffix}`), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, `team_rosters${suffix}`), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubProducts = onSnapshot(collection(db, "products"), (snap) => setProductsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((p:any) => p.isActive !== false).sort((a:any,b:any)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
+    
+    // تصحيح وتوحيد اسم دالة الحظر وتفادي الـ ReferenceError
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
+    const unsubTournamentLineup = onSnapshot(doc(db, `tournament_lineup${suffix}`, "current"), (snap) => {
+      if (snap.exists()) { setCustomTournamentLineup(snap.data()); } else { setCustomTournamentLineup(null); }
+    });
+
     const unsubRegMatrouh = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if(docSnap.exists()){ setRegSettingsMatrouh({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 500 }); } });
     const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegSettingsElite({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 1000 }); } });
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
   }, [activeTournament, cupEdition, mainAppTab]);
 
   useEffect(() => { setRosterForm(prev => ({ ...prev, players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null, idImagePreview: "", idImageFile: null })) })); }, [MAX_PLAYERS, mainAppTab]);
@@ -153,6 +207,10 @@ export default function Page() {
 
   const checkRegistrationOpen = () => { const settings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh; if(!settings.deadline) return true; const deadlineDate = new Date(settings.deadline).getTime(); return Date.now() < deadlineDate; };
   
+  const handleOriginalLineupData = useMemo(() => {
+     return customTournamentLineup || DEFAULT_TOURNAMENT_LINEUP;
+  }, [customTournamentLineup]);
+
   const handleInitiatePayment = async () => {
     if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫");
     if(!paymentForm.managerName || !paymentForm.email || !paymentForm.phone) return alert("يرجى إكمال جميع البيانات للدفع.");
@@ -178,7 +236,7 @@ export default function Page() {
     setIsInitiatingPay(false);
   };
 
-  const handleRosterLogin = () => { if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫"); if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري."); const correctPassword = mainAppTab === 'elite_cup' ? regSettingsElite.password : regSettingsMatrouh.password; if(rosterAccessPassword !== correctPassword) return alert("❌ الرقم السري غير صحيح!"); setUnlockedRoster("NEW_TEAM"); setRosterForm({ teamName: "", managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null, idImagePreview: "", idImageFile: null })) }); };
+  const handleRosterLogin = () => { if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫"); if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري."); const correctPassword = mainAppTab === 'elite_cup' ? regSettingsElite.password : regSettingsMatrouh.password; if(rosterAccessPassword !== correctPassword) return alert("❌ الرقم السري غير صحيح!"); setUnlockedRoster("NEW_TEAM"); setRosterForm({ teamName: "", managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null as File | null, idImagePreview: "", idImageFile: null as File | null })) }); };
   const handlePlayerImageUpload = (index: number, field: 'personalImage' | 'idImage', file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); if (file.size > 2 * 1024 * 1024) return alert("حجم الصورة كبير جداً (أقصى حد 2 ميجا)."); const previewUrl = URL.createObjectURL(file); setRosterForm(prev => { const newPlayers = [...prev.players]; newPlayers[index] = { ...newPlayers[index], [`${field}Preview`]: previewUrl, [`${field}File`]: file }; return { ...prev, players: newPlayers }; }); };
   const updateRosterPlayer = (index: number, field: string, value: string) => { setRosterForm(prev => { const newPlayers = [...prev.players]; newPlayers[index] = { ...newPlayers[index], [field]: value }; return { ...prev, players: newPlayers }; }); };
 
@@ -309,6 +367,7 @@ export default function Page() {
 
   const allHomeTabs = [
     { key: "champion", label: "البطل", icon: "👑", extraClass: "bg-gradient-to-r from-yellow-500 to-amber-600 text-black shadow-[0_0_15px_rgba(245,158,11,0.6)] border-none font-black" },
+    { key: "tournament_lineup", label: "تشكيل البطولة", icon: "📋", extraClass: "bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-none shadow-[0_0_15px_rgba(245,158,11,0.5)] font-black" },
     { key: "rosters", label: "قوائم الفرق", icon: "📋", extraClass: "bg-gradient-to-r from-blue-600 to-indigo-700 text-white border-none shadow-[0_0_15px_rgba(59,130,246,0.6)]" },
     { key: "totw", label: "تشكيلة الجولة", icon: "🏟️", extraClass: "bg-emerald-600 text-white border-none shadow-[0_0_15px_rgba(5,150,105,0.6)]" },
     { key: "fantasy", label: "توقع واكسب", icon: "🎁", extraClass: "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-none shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
@@ -429,6 +488,117 @@ export default function Page() {
               </div>
             )}
 
+            {/* TAB: TOURNAMENT LINEUP (محسن ومضغوط تماماً للشاشات والموبايل ليتناسب مع طول النظر الفعلي) */}
+            {activeTab === "tournament_lineup" && (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
+                {/* الحاوية الأساسية للملعب مع تحديد أطوال قصوى متجاوبة تمنع التمدد الخاطئ */}
+                <div className="lg:col-span-3 rounded-[2rem] border border-emerald-500/30 bg-[#13213a] p-3 sm:p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden">
+                  <div className="text-center mb-3 relative z-20">
+                     <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 sm:px-6 py-1.5 sm:py-2 font-black text-xs sm:text-base shadow-lg border border-emerald-400/20">
+                        التشكيلة الميدانية الأساسية الرسمية (طريقة 1-2-2-1)
+                     </Badge>
+                  </div>
+                  
+                  {/* تحديد الطول المناسب لكل شاشة لمنع تضخم الملعب في الموبايل */}
+                  <div className="relative w-full h-[440px] xs:h-[500px] sm:h-[620px] md:h-[680px] lg:h-[720px] max-w-3xl mx-auto bg-gradient-to-b from-emerald-800 via-emerald-900 to-green-950 border-4 border-white/10 rounded-[1.5rem] sm:rounded-[2rem] p-2 sm:p-4 flex flex-col justify-between shadow-inner">
+                     {/* خطوط التخطيط الرياضي للملعب */}
+                     <div className="absolute inset-0 border-2 border-white/5 m-2 sm:m-4 rounded-[1.2rem] sm:rounded-[1.5rem] pointer-events-none flex items-center justify-center">
+                        <div className="w-full h-[2px] bg-white/5 absolute top-1/2 left-0"></div>
+                        <div className="w-20 h-20 sm:w-28 sm:h-28 border-2 border-white/5 rounded-full absolute"></div>
+                        <div className="w-32 h-16 sm:w-48 sm:h-24 border-2 border-white/5 border-t-none rounded-b-xl absolute bottom-0"></div>
+                        <div className="w-32 h-16 sm:w-48 sm:h-24 border-2 border-white/5 border-b-none rounded-t-xl absolute top-0"></div>
+                     </div>
+
+                     {/* صف خط الهجوم (1) */}
+                     <div className="flex justify-center relative z-10">
+                        {(() => {
+                           const p = handleOriginalLineupData.starters.find(x => x.id === "fwd");
+                           return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="ST" />;
+                        })()}
+                     </div>
+
+                     {/* صف خط أجنحة وسط الملعب الهجومي (2) */}
+                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10">
+                        {(() => {
+                           const pLeft = handleOriginalLineupData.starters.find(x => x.id === "mid3");
+                           return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="LM" />;
+                        })()}
+                        {(() => {
+                           const pRight = handleOriginalLineupData.starters.find(x => x.id === "mid2");
+                           return <MiniFutCard player={{ name: pRight?.name, team: pRight?.team, imageUrl: pRight?.imageUrl || (pRight as any).image }} position="RM" />;
+                        })()}
+                     </div>
+
+                     {/* صف خط وسط الارتكاز الدفاعي (1) */}
+                     <div className="flex justify-center relative z-10">
+                        {(() => {
+                           const p = handleOriginalLineupData.starters.find(x => x.id === "mid1");
+                           return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="CM" />;
+                        })()}
+                     </div>
+
+                     {/* صف خط الدفاع الصلب (2) */}
+                     <div className="flex justify-center gap-6 sm:gap-24 relative z-10">
+                        {(() => {
+                           const pLeft = handleOriginalLineupData.starters.find(x => x.id === "def1");
+                           return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="CB" />;
+                        })()}
+                        {(() => {
+                           const pRight = handleOriginalLineupData.starters.find(x => x.id === "def2");
+                           return <MiniFutCard player={{ name: pRight?.name, team: pRight?.team, imageUrl: pRight?.imageUrl || (pRight as any).image }} position="CB" />;
+                        })()}
+                     </div>
+
+                     {/* حارس المرمى (1) */}
+                     <div className="flex justify-center relative z-10">
+                        {(() => {
+                           const p = handleOriginalLineupData.starters.find(x => x.id === "gk");
+                           return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="GK" />;
+                        })()}
+                     </div>
+                  </div>
+                </div>
+
+                {/* القائمة الجانبية: كارت المدير الفني + صندوق الـ 5 نجوم الاحتياط */}
+                <div className="space-y-4 flex flex-col justify-start">
+                  <Card className="bg-[#1e2a4a] border border-yellow-400/30 p-4 rounded-2xl shadow-xl">
+                     <h3 className="text-yellow-400 font-black text-sm mb-3 flex items-center gap-1">👔 المدير الفني للتشكيل</h3>
+                     <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 rounded-xl bg-[#0a1428] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                           {handleOriginalLineupData.manager?.imageUrl || (handleOriginalLineupData.manager as any).image ? (
+                             <img src={handleOriginalLineupData.manager?.imageUrl || (handleOriginalLineupData.manager as any).image} className="w-full h-full object-cover" alt="المدير الفني" />
+                           ) : <span className="text-2xl">👤</span>}
+                        </div>
+                        <div className="min-w-0">
+                           <h4 className="font-black text-white text-base leading-tight truncate">{handleOriginalLineupData.manager?.name}</h4>
+                           <span className="text-gray-400 text-xs font-bold truncate block mt-1">{handleOriginalLineupData.manager?.team}</span>
+                        </div>
+                     </div>
+                  </Card>
+
+                  <Card className="bg-[#1e2a4a] border border-white/5 p-4 rounded-2xl shadow-xl flex-1">
+                     <h3 className="text-cyan-400 font-black text-sm mb-4 flex items-center gap-1">👥 دكة النجوم الاحتياط (5)</h3>
+                     <div className="space-y-2.5">
+                        {handleOriginalLineupData.subs?.map((sub: any, idx: number) => (
+                           <div key={idx} className="flex justify-between items-center bg-[#0a1428] p-2.5 border border-white/5 rounded-xl transition-all hover:bg-white/5">
+                              <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-9 h-9 rounded-full bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center text-xs text-yellow-400 font-black shrink-0 shadow-inner">
+                                    {sub.fallback || sub.name?.substring(0, 2)}
+                                 </div>
+                                 <div className="min-w-0">
+                                    <span className="font-bold text-white text-sm block leading-tight truncate">{sub.name}</span>
+                                    <span className="text-gray-400 text-[11px] font-bold truncate block mt-0.5">{sub.team}</span>
+                                 </div>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] text-cyan-400 bg-cyan-500/5 border-cyan-500/20 shrink-0 font-bold">{sub.role || "بديل"}</Badge>
+                           </div>
+                        ))}
+                     </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
             {/* TAB: ROSTERS */}
             {activeTab === "rosters" && (
               <div className="space-y-8 animate-in fade-in duration-500">
@@ -490,7 +660,6 @@ export default function Page() {
                           <div className="space-y-4 animate-in fade-in">
                              <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
                              <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             {/* 👈 تم تحديث نص إدخال الموبايل ليصبح صريحاً لمحفظة الكاش المالي */}
                              <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                              <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "دفع الاشتراك فودافون كاش 💳"}</Button>
                              <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
@@ -546,22 +715,32 @@ export default function Page() {
               </div>
             )}
 
-            {/* TAB: TOTW */}
+            {/* TAB: TOTW (تشكيلة الجولة - مدمجة ومكيفة بأطوال حاسمة تمنع الامتداد الزائد) */}
             {activeTab === "totw" && (
-               <Card className="rounded-3xl border border-emerald-500/30 bg-[#13213a] p-6 animate-in zoom-in duration-500">
-                  <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+               <Card className="rounded-3xl border border-emerald-500/30 bg-[#13213a] p-4 sm:p-6 animate-in zoom-in duration-500">
+                  <div className="flex flex-col sm:flex-row justify-between items-center border-b border-white/10 pb-4 mb-6 gap-3">
                      <CardTitle className="text-emerald-400 font-black text-xl sm:text-2xl"> Stadium • تشكيلة الأسبوع المثالية</CardTitle>
-                     <select value={activeTotwRound} onChange={e => setActiveTotwRound(e.target.value)} className="bg-[#0a1428] border border-emerald-500/40 text-white p-2 rounded-xl font-bold"><option value="دور المجموعات">دور المجموعات</option><option value="الملحق">الملحق</option><option value="دور الستة عشر">دور الستة عشر</option><option value="دور الثمانية">دور الثمانية</option><option value="النهائي">النهائي</option></select>
+                     <select value={activeTotwRound} onChange={e => setActiveTotwRound(e.target.value)} className="bg-[#0a1428] border border-emerald-500/40 text-white p-2 rounded-xl font-bold w-full sm:w-auto text-sm"><option value="دور المجموعات">دور المجموعات</option><option value="الملحق">الملحق</option><option value="دور الستة عشر">دور الستة عشر</option><option value="دور الثمانية">دور الثمانية</option><option value="النهائي">النهائي</option></select>
                   </div>
-                  <div className="relative w-full aspect-[4/3] max-w-3xl mx-auto bg-gradient-to-b from-emerald-800 to-green-950 border-4 border-white/20 rounded-[2rem] p-4 flex flex-col justify-between shadow-inner overflow-hidden">
-                     <div className="absolute inset-0 border-2 border-white/10 m-4 rounded-[1.5rem] pointer-events-none flex items-center justify-center"><div className="w-32 h-32 border-2 border-white/10 rounded-full"></div></div>
+                  
+                  {/* إلغاء النسبة الثابتة ووضع قيم ارتفاعات ثابتة ومتجاوبة لتظهر متناسقة بدون سكرول طويل */}
+                  <div className="relative w-full h-[440px] xs:h-[500px] sm:h-[620px] md:h-[680px] lg:h-[720px] max-w-3xl mx-auto bg-gradient-to-b from-emerald-800 to-green-950 border-4 border-white/20 rounded-[1.5rem] sm:rounded-[2rem] p-2 sm:p-4 flex flex-col justify-between shadow-inner overflow-hidden">
+                     <div className="absolute inset-0 border-2 border-white/10 m-2 sm:m-4 rounded-[1.2rem] sm:rounded-[1.5rem] pointer-events-none flex items-center justify-center"><div className="w-20 h-20 sm:w-32 sm:h-32 border-2 border-white/10 rounded-full"></div></div>
+                     
+                     {/* الهجوم */}
                      <div className="flex justify-center gap-6 relative z-10"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
-                     <div className="flex justify-around gap-2 relative z-10"><MiniFutCard player={currentFormation.players[3]} position="LM" /><MiniFutCard player={currentFormation.players[4]} position="CM" /><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
-                     <div className="flex justify-center gap-12 relative z-10"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                     
+                     {/* خط الوسط الثلاثي */}
+                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10"><MiniFutCard player={currentFormation.players[3]} position="LM" /><MiniFutCard player={currentFormation.players[4]} position="CM" /><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
+                     
+                     {/* خط الدفاع الثنائي */}
+                     <div className="flex justify-center gap-6 sm:gap-12 relative z-10"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                     
+                     {/* حارس المرمى */}
                      <div className="flex justify-center relative z-10"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
                   </div>
                   {currentFormation.coach?.name && (
-                     <div className="mt-6 bg-[#0a1428] p-4 border border-white/5 rounded-2xl flex items-center gap-4 max-w-md mx-auto shadow-md"><Trophy className="text-yellow-400 w-8 h-8 shrink-0"/><div className="min-w-0"><span className="text-xs text-gray-400 block font-bold">أفضل مدير فني في الجولة:</span><h4 className="font-black text-white text-lg truncate">{currentFormation.coach.name}</h4><p className="text-cyan-300 text-xs font-bold truncate">{currentFormation.coach.team}</p></div><Badge className="bg-yellow-400 text-black font-black mr-auto" dir="ltr">{currentFormation.coach.rating || 99} RAT</Badge></div>
+                     <div className="mt-6 bg-[#0a1428] p-4 border border-white/5 rounded-2xl flex flex-col sm:flex-row items-center gap-4 max-w-md mx-auto shadow-md text-center sm:text-right"><Trophy className="text-yellow-400 w-8 h-8 shrink-0"/><div className="min-w-0"><span className="text-xs text-gray-400 block font-bold">أفضل مدير فني في الجولة:</span><h4 className="font-black text-white text-base sm:text-lg truncate">{currentFormation.coach.name}</h4><p className="text-cyan-300 text-xs font-bold truncate">{currentFormation.coach.team}</p></div><Badge className="bg-yellow-400 text-black font-black sm:mr-auto mt-2 sm:mt-0" dir="ltr">{currentFormation.coach.rating || 99} RAT</Badge></div>
                   )}
                </Card>
             )}
@@ -682,7 +861,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <Card className="rounded-3xl border border-yellow-400/30 bg-[#13213a] shadow-xl overflow-hidden">
-                     <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول التترتيب العام للشباب</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
+                     <CardHeader className="flex flex-row items-center justify-between border-b border-yellow-400/20 pb-4"><CardTitle className="text-yellow-300 flex items-center gap-3"><Trophy className="h-7 w-7" /> جدول الترتيب العام للشباب</CardTitle><Button size="sm" onClick={() => setIsTableExpanded(true)} className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold flex items-center gap-2"><Maximize className="h-4 w-4" /> عرض الشاشة بالعرض</Button></CardHeader>
                      <CardContent className="p-0">
                         <div className="overflow-auto w-full max-h-[60vh] touch-pan-x touch-pan-y relative" dir="rtl"><table className="w-full text-white text-right min-w-[800px]"><thead className="sticky top-0 bg-[#13213a] border-b border-yellow-400/30 z-20 shadow-md"><tr>{STANDINGS_HEADERS.map(h => (<th key={h} className="px-4 py-4 font-bold text-cyan-300 text-sm whitespace-nowrap">{h}</th>))}</tr></thead><tbody>{standingsYouth.map(row => (<tr key={row.team} className="border-b border-yellow-400/10 hover:bg-white/5 transition-colors"><td className="px-4 py-4"><Badge className={zoneColor(row.rank, activeTournament)}>{row.rank}</Badge></td><td className="px-4 py-4 font-bold text-white whitespace-nowrap">{row.team}</td><td className="px-4 py-4 text-center">{row.played}</td><td className="px-4 py-4 text-center text-yellow-300 font-black">{row.wins}</td><td className="px-4 py-4 text-center">{row.draws}</td><td className="px-4 py-4 text-center">{row.losses}</td><td className="px-4 py-4 text-center text-cyan-400">{row.gf}</td><td className="px-4 py-4 text-center text-white">{row.ga}</td><td className="px-4 py-4 text-center text-cyan-300">{row.gd}</td><td className="px-4 py-4 font-black text-yellow-300 text-center text-lg">{row.points}</td></tr>))}</tbody></table></div>
                      </CardContent>

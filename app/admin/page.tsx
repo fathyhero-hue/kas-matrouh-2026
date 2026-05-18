@@ -81,9 +81,29 @@ export default function AdminPage() {
   const [isPreparingPoster, setIsPreparingPoster] = useState(false);
   const [motmPopupMatch, setMotmPopupMatch] = useState<any | null>(null);
   
-  // 👈 تم تصليح السهم البرمي هنا لتجنب خطأ match is not defined
   const [quickMotmForm, setQuickMotmForm] = useState({ player: "", team: "", rating: 99 });
   const [time, setTime] = useState<Date | null>(null);
+
+  // الدولة الإدارية المخصصة للتحكم بتشكيلة البطولة الرسمية عبر السيرفر الفوري
+  const [adminLineup, setAdminLineup] = useState<any>({
+    manager: { name: "عبدالله موسى", team: "وادي ماجد", image: "" },
+    starters: [
+      { id: "gk", name: "طاهر يحيى", team: "وادي ماجد", role: "حارس مرمى", posText: "GK", fallback: "طا", image: "" },
+      { id: "def1", name: "حامد علي", team: "17 فبراير", role: "مدافع", posText: "CB", fallback: "حا", image: "" },
+      { id: "def2", name: "أحمد سعيد", team: "أصدقاء سامي", role: "مدافع", posText: "CB", fallback: "أح", image: "" },
+      { id: "mid1", name: "عيسى العوامي", team: "وادي ماجد", role: "وسط", posText: "CM", fallback: "عي", image: "" },
+      { id: "mid2", name: "أسامة محمد", team: "القدس", role: "وسط", posText: "RM", fallback: "أس", image: "" },
+      { id: "mid3", name: "عبدالله خميس", team: "17 فبراير", role: "وسط", posText: "LM", fallback: "عب", image: "" },
+      { id: "fwd", name: "منعم بورسوة", team: "وادي ماجد", role: "مهاجم", posText: "ST", fallback: "من", image: "" }
+    ],
+    subs: [
+      { name: "عز معيوف", team: "أصدقاء سلامة بدر", role: "وسط", fallback: "عز" },
+      { name: "أيمن مصطفى", team: "القدس", role: "مدافع", fallback: "أي" },
+      { name: "مصطفى ناجي", team: "وادي ماجد", role: "وسط يمين", fallback: "من" },
+      { name: "محمد مبروك", team: "الفهود", role: "وسط", fallback: "مم" },
+      { name: "مصطفى أنور", team: "النسور", role: "مدافع", fallback: "مص" }
+    ]
+  });
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
   const sortedJuniorsTeams = useMemo(() => [...JUNIORS_TEAMS].sort((a, b) => a.localeCompare(b, "ar")), []);
@@ -148,8 +168,13 @@ export default function AdminPage() {
     const unsubRegMat = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if(docSnap.exists()){ setRegDeadlineMatrouh(docSnap.data().deadline || ""); setRegPasswordMatrouh(docSnap.data().password || ""); setRegPriceMatrouh(docSnap.data().price || 500); } });
     const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegDeadlineElite(docSnap.data().deadline || ""); setRegPasswordElite(docSnap.data().password || ""); setRegPriceElite(docSnap.data().price || 1000); } });
 
+    // مراقبة سحابية حية لتشكيل البطولة المُحدث سحابياً
+    const unsubTourLineup = onSnapshot(doc(db, getColl("tournament_lineup"), "current"), (snap) => {
+      if (snap.exists()) { setAdminLineup(snap.data()); }
+    });
+
     const timerInterval = setInterval(() => { matchesRef.current.forEach(m => { if (m.isTimerRunning && m.status !== "انتهت" && m.status !== "استراحة" && m.status !== "ضربات جزاء" && m.status !== "ستبدأ بعد قليل") { const accurateMinute = getAccurateLiveMinute(m); if (accurateMinute !== Number(m.liveMinute || 0)) { updateDoc(doc(db, collName, m.id), { liveMinute: accurateMinute }); } } }); }, 5000); 
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); clearInterval(timerInterval); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); clearInterval(timerInterval); };
   }, [isAuth, activeTournament, cupEdition]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
@@ -232,6 +257,7 @@ export default function AdminPage() {
   const allAdminTabs = [
     { key: "champion", label: "👑 البطل", hideForEd4: true },
     { key: "registration_settings", label: "⚙️ إعدادات التسجيل والاشتراكات", hideForEd3: true },
+    { key: "tournament_lineup_admin", label: "📋 تشكيل البطولة", hideForEd4: false },
     { key: "knockout", label: "🏆 الإقصائيات", hideForEd4: false },
     { key: "matches", label: "⚽ المباريات واللايف", hideForEd3: true },
     { key: "goals", label: "🥇 الهدافين", hideForEd4: false },
@@ -445,7 +471,7 @@ export default function AdminPage() {
                    <div className="text-center py-20 bg-[#1e2a4a] border border-indigo-500/30 rounded-3xl shadow-xl max-w-3xl mx-auto">
                      <Activity className="w-20 h-20 mx-auto text-indigo-400 mb-6 animate-pulse" />
                      <h3 className="text-3xl font-black text-white mb-3">النظام قيد التطوير ⚙️</h3>
-                     <p className="text-indigo-300 font-bold text-lg">سيتم تفعيل this النظام قريباً لتنظيم جدول المباريات والإحصائيات الخاصة بالنخبة.</p>
+                     <p className="text-indigo-300 font-bold text-lg">سيتم تفعيل هذا النظام قريباً لتنظيم جدول المباريات والإحصائيات الخاصة بالنخبة.</p>
                    </div>
                  </TabsContent>
                ))}
@@ -488,7 +514,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* MATROUH CUP TAB */}
+        {/* MAIN TOURNAMENT CONTROL */}
         {mainAppTab === 'matrouh_cup' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
@@ -532,6 +558,106 @@ export default function AdminPage() {
                         <Badge className="mt-4 bg-yellow-400 text-black px-6 py-2 font-black text-lg">بطل النسخة الثالثة</Badge>
                      </CardContent>
                    </Card>
+                </TabsContent>
+              )}
+
+              {/* TAB CONTENT: TOURNAMENT LINEUP CONTROL (لوحة التحكم بـ 13 فرداً والمزامنة الفورية السحابية) */}
+              {activeTab === "tournament_lineup_admin" && (
+                <TabsContent value="tournament_lineup_admin" className="space-y-6 w-full mt-6 animate-in fade-in">
+                  <Card className="border-yellow-400 bg-[#13213a] w-full rounded-3xl overflow-hidden shadow-2xl">
+                    <CardHeader className="bg-[#1e2a4a] border-b border-yellow-400/30 p-6">
+                      <CardTitle className="text-yellow-300 text-2xl font-black flex items-center gap-2">📋 التحكم بلوحة تشكيل البطولة الرسمي</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 md:p-8 space-y-6">
+                      
+                      {/* واجهة المدير الفني */}
+                      <div className="bg-[#0a1428] p-5 rounded-2xl border border-white/5 space-y-4">
+                        <h3 className="text-yellow-400 font-black border-b border-white/5 pb-2 text-base">👔 بيانات المدير الفني للجهاز</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">اسم الكابتن</label>
+                            <Input value={adminLineup.manager?.name || ""} onChange={e => setAdminLineup({...adminLineup, manager: {...adminLineup.manager, name: e.target.value}})} className="bg-[#1e2a4a] text-white font-bold h-12 border-none" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">فريق التابع له</label>
+                            <Input value={adminLineup.manager?.team || ""} onChange={e => setAdminLineup({...adminLineup, manager: {...adminLineup.manager, team: e.target.value}})} className="bg-[#1e2a4a] text-white font-bold h-12 border-none" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">رابط الصورة الشخصية المباشر</label>
+                            <Input value={adminLineup.manager?.image || ""} onChange={e => setAdminLineup({...adminLineup, manager: {...adminLineup.manager, image: e.target.value, imageUrl: e.target.value}})} className="bg-[#1e2a4a] text-white h-12 border-none" dir="ltr" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* واجهة التشكيلة الأساسية */}
+                      <div className="bg-[#0a1428] p-5 rounded-2xl border border-white/5 space-y-4">
+                        <h3 className="text-cyan-400 font-black border-b border-white/5 pb-2 text-base">⚽ النجوم الأساسيون بالملعب (7 لاعبين)</h3>
+                        <div className="space-y-3">
+                          {adminLineup.starters?.map((player: any, idx: number) => (
+                            <div key={player.id || idx} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center bg-[#13213a] p-3 rounded-xl border border-white/5">
+                              <Badge className="bg-yellow-400 text-black font-black justify-center py-2 h-10 text-xs sm:text-sm">{player.role} ({player.posText})</Badge>
+                              <Input value={player.name || ""} onChange={e => {
+                                const newStarters = [...adminLineup.starters];
+                                newStarters[idx].name = e.target.value;
+                                newStarters[idx].fallback = e.target.value.substring(0, 2);
+                                setAdminLineup({...adminLineup, starters: newStarters});
+                              }} placeholder="اسم اللاعب الميداني" className="bg-[#0a1428] text-white font-bold border-none h-11" />
+                              <Input value={player.team || ""} onChange={e => {
+                                const newStarters = [...adminLineup.starters];
+                                newStarters[idx].team = e.target.value;
+                                setAdminLineup({...adminLineup, starters: newStarters});
+                              }} placeholder="اسم الفريق" className="bg-[#0a1428] text-white font-bold border-none h-11" />
+                              <Input value={player.image || player.imageUrl || ""} onChange={e => {
+                                const newStarters = [...adminLineup.starters];
+                                newStarters[idx].image = e.target.value;
+                                newStarters[idx].imageUrl = e.target.value;
+                                setAdminLineup({...adminLineup, starters: newStarters});
+                              }} placeholder="رابط صورة الـ URL" className="bg-[#0a1428] text-white border-none h-11" dir="ltr" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* واجهة دكة النجوم الاحتياط */}
+                      <div className="bg-[#0a1428] p-5 rounded-2xl border border-white/5 space-y-4">
+                        <h3 className="text-emerald-400 font-black border-b border-white/5 pb-2 text-base">👥 دكة النجوم الاحتياط (5 لاعبين)</h3>
+                        <div className="space-y-3">
+                          {adminLineup.subs?.map((player: any, idx: number) => (
+                            <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center bg-[#13213a] p-3 rounded-xl border border-white/5">
+                              <Badge className="bg-emerald-600 text-white font-black justify-center py-2 h-10 text-xs sm:text-sm">البديل {idx + 1}</Badge>
+                              <Input value={player.name || ""} onChange={e => {
+                                const newSubs = [...adminLineup.subs];
+                                newSubs[idx].name = e.target.value;
+                                newSubs[idx].fallback = e.target.value.substring(0, 2);
+                                setAdminLineup({...adminLineup, subs: newSubs});
+                              }} placeholder="اسم اللاعب البديل" className="bg-[#0a1428] text-white font-bold border-none h-11" />
+                              <Input value={player.team || ""} onChange={e => {
+                                const newSubs = [...adminLineup.subs];
+                                newSubs[idx].team = e.target.value;
+                                setAdminLineup({...adminLineup, subs: newSubs});
+                              }} placeholder="الفريق التابع له" className="bg-[#0a1428] text-white font-bold border-none h-11" />
+                              <Input value={player.role || ""} onChange={e => {
+                                const newSubs = [...adminLineup.subs];
+                                newSubs[idx].role = e.target.value;
+                                setAdminLineup({...adminLineup, subs: newSubs});
+                              }} placeholder="المركز الكروي (مثال: وسط)" className="bg-[#0a1428] text-white font-bold border-none h-11" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* زر الحفظ النهائي */}
+                      <Button onClick={async () => {
+                        try {
+                          await setDoc(doc(db, getColl("tournament_lineup"), "current"), adminLineup);
+                          alert("✅ تم تحديث ونشر تشكيل البطولة الرسمي السحابي على الموقع بنجاح!");
+                        } catch (e) { alert("❌ عذراً حدث خطأ بالاتصال بقاعدة البيانات."); }
+                      }} className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-black py-7 text-xl shadow-[0_0_20px_rgba(250,204,21,0.4)] rounded-2xl">
+                        حفظ ونشر التشكيل الرسمي على واجهة الجماهير الآن 💾
+                      </Button>
+
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               )}
 
@@ -801,7 +927,7 @@ export default function AdminPage() {
                 <Card className="border-cyan-500/30 bg-[#13213a] w-full rounded-3xl overflow-hidden">
                   <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4 p-6 border-b border-white/10"><CardTitle className="text-yellow-300 font-black">سجل الهدافين</CardTitle><div className="relative w-full sm:w-64"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={goalSearchTerm} onChange={e => setGoalSearchTerm(e.target.value)} placeholder="بحث..." className="pr-10 bg-[#1e2a4a] border-cyan-500/30 text-white" /></div></CardHeader>
                   <CardContent className="p-0">
-                    <div className="overflow-x-auto w-full custom-scrollbar"><table className="w-full text-right text-white"><thead className="bg-[#0a1428]"><tr><th className="p-4 text-cyan-300 border-b border-white/5">اللاعب</th><th className="p-4 text-cyan-300 border-b border-white/5">الفريق</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">الأهداف</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">إجراءات</th></tr></thead><tbody>{filteredGoals.sort((a,b) => b.goals - a.goals).map(g => (<tr key={g.id} className="border-b border-white/5 hover:bg-[#1e2a4a]"><td className="p-4 font-bold">{g.player}</td><td className="p-4 text-sm text-gray-300">{g.team}</td><td className="p-4 text-center font-black text-yellow-400 text-lg">{g.goals}</td><td className="p-4 text-center"><Button size="sm" onClick={() => startEditGoal(g)} className="bg-blue-600 text-white ml-2"><Edit className="w-4 h-4"/></Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(g.id)}><Trash2 className="w-4 h-4"/></Button></td></tr>))}</tbody></table></div>
+                    <div className="overflow-x-auto w-full custom-scrollbar"><table className="w-full text-right text-white min-w-[800px]"><thead><tr className="bg-[#0a1428]"><th className="p-4 text-cyan-300 border-b border-white/5">اللاعب</th><th className="p-4 text-cyan-300 border-b border-white/5">الفريق</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">الأهداف</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">إجراءات</th></tr></thead><tbody>{filteredGoals.sort((a,b) => b.goals - a.goals).map(g => (<tr key={g.id} className="border-b border-white/5 hover:bg-[#1e2a4a]"><td className="p-4 font-bold">{g.player}</td><td className="p-4 text-sm text-gray-300">{g.team}</td><td className="p-4 text-center font-black text-yellow-400 text-lg">{g.goals}</td><td className="p-4 text-center"><Button size="sm" onClick={() => startEditGoal(g)} className="bg-blue-600 text-white ml-2"><Edit className="w-4 h-4"/></Button><Button size="sm" variant="destructive" onClick={() => deleteGoal(g.id)}><Trash2 className="w-4 h-4"/></Button></td></tr>))}</tbody></table></div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -900,7 +1026,7 @@ export default function AdminPage() {
                 <Card className="border-emerald-500/50 bg-[#13213a] w-full rounded-3xl overflow-hidden">
                   <CardHeader className="bg-[#1e2a4a] border-b border-emerald-500/30 p-6 flex flex-col sm:flex-row justify-between items-center gap-4"><CardTitle className="text-emerald-400 text-2xl font-black">إدارة فانتزي التوقعات</CardTitle><Button onClick={deleteAllPredictions} variant="destructive" className="font-bold">مسح كل التوقعات</Button></CardHeader>
                   <CardContent className="p-0">
-                    <div className="overflow-x-auto w-full custom-scrollbar"><table className="w-full text-right text-white"><thead className="bg-[#0a1428]"><tr><th className="p-4 text-cyan-300 border-b border-white/5">المتوقع</th><th className="p-4 text-cyan-300 border-b border-white/5">المباراة</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">توقعه</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">إلغاء</th></tr></thead><tbody>{predictions.map((p, i) => (<tr key={i} className="border-b border-white/5 hover:bg-[#1e2a4a]"><td className="p-4 font-bold">{p.name} <span className="text-gray-400 text-sm block" dir="ltr">{p.phone}</span></td><td className="p-4 text-cyan-300 font-bold">{p.matchName}</td><td className="p-4 text-center font-black text-yellow-400 text-xl" dir="ltr">{p.homeScore} - {p.awayScore}</td><td className="p-4 text-center"><Button size="sm" variant="destructive" onClick={() => deletePrediction(p.id)}><Trash2 className="w-4 h-4"/></Button></td></tr>))}</tbody></table></div>
+                    <div className="overflow-x-auto w-full custom-scrollbar"><table className="w-full text-right text-white min-w-[800px]"><thead><tr className="bg-[#0a1428]"><th className="p-4 text-cyan-300 border-b border-white/5">المتوقع</th><th className="p-4 text-cyan-300 border-b border-white/5">المباراة</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">توقعه</th><th className="p-4 text-cyan-300 border-b border-white/5 text-center">إلغاء</th></tr></thead><tbody>{predictions.map((p, i) => (<tr key={i} className="border-b border-white/5 hover:bg-[#1e2a4a]"><td className="p-4 font-bold">{p.name} <span className="text-gray-400 text-sm block" dir="ltr">{p.phone}</span></td><td className="p-4 text-cyan-300 font-bold">{p.matchName}</td><td className="p-4 text-center font-black text-yellow-400 text-xl" dir="ltr">{p.homeScore} - {p.awayScore}</td><td className="p-4 text-center"><Button size="sm" variant="destructive" onClick={() => deletePrediction(p.id)}><Trash2 className="w-4 h-4"/></Button></td></tr>))}</tbody></table></div>
                   </CardContent>
                 </Card>
               </TabsContent>

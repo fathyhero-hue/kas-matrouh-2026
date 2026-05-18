@@ -1,17 +1,19 @@
 {
   "packageId": "online.matrouhcup.twa",
   "host": "matrouhcup.online",
+  "id": "online.matrouhcup.twa.pwa",
   "name": "منصة مطروح الرياضية",
   "shortName": "مطروح الرياضية",
+  "description": "المنصة الرسمية لبطولة كأس مطروح لكرة القدم - جداول المباريات، الإحصائيات، والـ Fantasy أونلاين.",
   "themeColor": "#0A1428",
   "backgroundColor": "#0A1428",
-  "startUrl": "/",
+  "startUrl": "/?utm_source=pwa",
   "iconUrl": "https://matrouhcup.online/icon-512x512.png",
   "maskableIconUrl": "https://matrouhcup.online/icon-512x512.png",
   "appVersionCode": 2,
   "appVersionName": "1.1.0",
   "display": "standalone",
-  "orientation": "default",
+  "orientation": "portrait",
   "scion": true,
   "fingerprints": [],
   "features": {},
@@ -20,5 +22,6 @@
     "path": "./matrouh-cup.keystore",
     "alias": "android"
   },
-  "generatorApp": "bubblewrap"
+  "generatorApp": "bubblewrap",
+  "categories": ["sports", "utilities"]
 }
