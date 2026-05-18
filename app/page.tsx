@@ -512,7 +512,7 @@ export default function Page() {
                      {/* صف خط الهجوم (1) */}
                      <div className="flex justify-center relative z-10">
                         {(() => {
-                           const p = handleOriginalLineupData.starters.find(x => x.id === "fwd");
+                          const p = handleOriginalLineupData.starters.find((x: any) => x.id === "fwd");
                            return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="ST" />;
                         })()}
                      </div>
