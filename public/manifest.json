@@ -12,13 +12,13 @@
   "categories": ["sports", "utilities"],
   "icons": [
     {
-      "src": "https://matrouhcup.online/icon-512x512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://matrouhcup.online/icon-512x512.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
