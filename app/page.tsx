@@ -48,27 +48,47 @@ const getPenaltyScore = (match: any) => ({ home: (match?.penaltiesHome || []).fi
 const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
 const TreeMatchBox = ({ label, t1, t2, data }: { label: string, t1: string, t2: string, data: any }) => { const { win, match } = data; const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive; return (<div className={`bg-[#1e2a4a] rounded-2xl flex flex-col items-center justify-center p-4 border ${isLive ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] animate-pulse' : 'border-yellow-400/30'} shadow-lg relative min-h-[95px] transition-transform hover:scale-105 shrink-0`}><Badge className="absolute -top-3 bg-yellow-400 text-black text-[11px] px-3 font-black border-2 border-[#0a1428] shadow-md">{label}</Badge><div className="w-full flex justify-between items-center gap-2 mt-2"><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t1 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t1}</div><div className="bg-[#0a1428] border border-cyan-500/40 px-2 py-1 rounded-md text-cyan-400 shrink-0">{renderMatchScore(match)}</div><div className={`flex-1 text-center font-bold text-[11px] sm:text-sm leading-tight ${win === t2 ? 'text-yellow-300 scale-105' : 'text-white'}`}>{t2}</div></div>{win && <div className="mt-3 text-[11px] bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-4 py-1 rounded-full font-bold shadow-inner">صعد: {win}</div>}</div>); };
 
-// كارت مصغر تماماً ومتجاوب هندسياً يمنع التداخل في شاشات الموبايل
+// مكون كارت اللاعب الاحترافي (FUT Style) - تم ضبط الأبعاد بدقة هندسية لتناسب الموبايل وتظهر بالكامل
 const MiniFutCard = ({ player, position }: { player: any, position: string }) => { 
-  const baseSize = "w-[50px] xs:w-[65px] sm:w-[82px] md:w-[98px] lg:w-[114px]"; 
+  // تحديد أحجام متجاوبة وذكية للكارت بناءً على حجم الشاشة لتجنب التضخم أو التداخل
+  const cardWidth = "w-[58px] xs:w-[75px] sm:w-[95px] md:w-[110px] lg:w-[130px]";
+  
   if(!player || !player.name) return (
-    <div className={`${baseSize} aspect-[4/5.5] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/30 rounded-xl flex flex-col items-center justify-center text-emerald-300/60 text-[8px] xs:text-[10px] font-black shadow-inner backdrop-blur-xs`}>
-      <span className="text-xs xs:text-lg mb-0.5 opacity-50">＋</span>{position}
+    <div className={`${cardWidth} aspect-[1/1.4] bg-[#0a1428]/70 border-2 border-dashed border-emerald-400/30 rounded-xl flex flex-col items-center justify-center text-emerald-300/60 text-[8px] xs:text-[10px] font-black shadow-inner backdrop-blur-xs`}>
+      <span className="text-xs xs:text-xl mb-1 opacity-50">＋</span>{position}
     </div>
   ); 
   return (
-    <div className={`relative ${baseSize} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_5px_10px_rgba(0,0,0,0.55)]`}>
-      <div className="relative w-full rounded-xl overflow-hidden border border-yellow-400/40 bg-gradient-to-b from-yellow-300/15 via-[#1e2a4a] to-[#07101f]">
-        <div className="relative w-full aspect-[4/4.8] bg-gradient-to-b from-[#101b32] to-[#050a14] border-b border-white/5">
-          {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-contain object-center p-1 bg-[#050a14]" alt={player.name} loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-lg opacity-25">👤</div>}
-          <div className="absolute top-0.5 right-0.5 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-300 to-yellow-600 min-w-[16px] xs:min-w-[24px] px-0.5 py-0.5 rounded shadow-sm border border-yellow-700/40">
-            <span className="text-[7px] xs:text-[9px] font-black text-black leading-none">{player.rating || 99}</span>
-            <span className="text-[5px] xs:text-[7px] font-black text-black leading-none uppercase mt-0.5">{position}</span>
+    <div className={`relative ${cardWidth} transition-transform duration-300 hover:scale-105 cursor-pointer z-10 hover:z-50 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]`}>
+      {/* جسم الكارت الرئيسي الخلفي بتأثير زجاجي وإطار متوهج */}
+      <div className="absolute inset-0 bg-[#1e2a4a] rounded-xl border border-yellow-400/50 backdrop-blur-sm shadow-inner opacity-90"></div>
+      
+      {/* محتوى الكارت الأمامي */}
+      <div className="relative p-1 xs:p-1.5 flex flex-col items-center h-full gap-0.5 xs:gap-1">
+        {/* الجزء العلوي: الصورة والشارة */}
+        <div className="relative w-full aspect-square bg-[#0a1428] rounded-lg overflow-hidden border border-white/5 shadow-md flex items-center justify-center">
+          {player.imageUrl ? (
+            <img src={player.imageUrl} className="w-full h-full object-cover" alt={player.name} loading="lazy" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-b from-[#101b32] to-[#050a14] flex items-center justify-center font-black text-yellow-400 opacity-70 text-[10px] xs:text-base">
+              {player.fallback || player.name?.substring(0,2)}
+            </div>
+          )}
+          {/* شارة التقييم والمركز المدمجة كجزء من التصميم الاحترافي */}
+          <div className="absolute top-0.5 right-0.5 bg-gradient-to-br from-yellow-300 to-yellow-600 px-1 py-0.5 rounded shadow-lg border border-black/10 flex flex-col items-center justify-center min-w-[14px] xs:min-w-[20px]">
+            <span className="text-[7px] xs:text-[10px] font-black text-black leading-none">{player.rating || 99}</span>
+            <span className="text-[5px] xs:text-[7px] font-bold text-black/80 leading-none uppercase tracking-tighter mt-0.5">{position}</span>
           </div>
         </div>
-        <div className="relative p-0.5 xs:p-1 flex flex-col items-center justify-center w-full bg-gradient-to-b from-[#101b32] to-[#07101f]">
-          <span className="text-[7px] xs:text-[9px] font-black text-white w-full text-center truncate leading-tight" title={player.name}>{player.name}</span>
-          <span className="bg-yellow-400/5 border border-yellow-400/25 text-yellow-300 text-[5px] xs:text-[7px] font-bold px-0.5 py-0.5 rounded text-center w-full truncate mt-0.5" title={player.team}>{player.team}</span>
+        
+        {/* الجزء السفلي: نصوص الاسم والفريق المظبوطة هندسياً */}
+        <div className="w-full flex flex-col items-center text-center mt-0.5 xs:mt-1 space-y-px">
+          <span className="text-[7px] xs:text-[10px] sm:text-xs font-black text-white w-full truncate leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" title={player.name}>
+            {player.name}
+          </span>
+          <span className="bg-yellow-400/5 border border-yellow-400/20 text-yellow-300 text-[5px] xs:text-[7px] font-bold px-1 py-0.5 rounded text-center w-full truncate mt-0.5" title={player.team}>
+            {player.team}
+          </span>
         </div>
       </div>
     </div>
@@ -185,7 +205,7 @@ export default function Page() {
     const unsubProducts = onSnapshot(collection(db, "products"), (snap) => setProductsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((p:any) => p.isActive !== false).sort((a:any,b:any)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
     
-    // تصحيح وتوحيد اسم دالة الحظر وتفادي الـ ReferenceError
+    // إصلاح اسم دالة الحظر المربوطة سحابياً وتفادي الـ ReferenceError
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
@@ -263,7 +283,7 @@ export default function Page() {
 
   const submitFinalRoster = async () => {
     const errorMsg = validateRoster(); if(errorMsg) return alert(errorMsg);
-    if(confirm("تنبيه هام: سيتم الآن رفع الصور وحفظ القائمة. قد تستغرق العملية دقيقة، يرجى عدم إغلاق الصفحة. هل أنت متأكد؟")) {
+    if(confirm("تنبيه هام: سيتم الآن رفع الصور وحفظ القائمة. قد تستغرق العملية دقيقة، يرجير عدم إغلاق الصفحة. هل أنت متأكد؟")) {
         setIsUploading(true);
         try {
             let suffix = "";
@@ -512,13 +532,13 @@ export default function Page() {
                      {/* صف خط الهجوم (1) */}
                      <div className="flex justify-center relative z-10">
                         {(() => {
-                          const p = handleOriginalLineupData.starters.find((x: any) => x.id === "fwd");
+                           const p = handleOriginalLineupData.starters.find(x => x.id === "fwd");
                            return <MiniFutCard player={{ name: p?.name, team: p?.team, imageUrl: p?.imageUrl || (p as any).image }} position="ST" />;
                         })()}
                      </div>
 
                      {/* صف خط أجنحة وسط الملعب الهجومي (2) */}
-                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10">
+                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10 gap-x-0 xs:gap-x-1 sm:gap-x-2">
                         {(() => {
                            const pLeft = handleOriginalLineupData.starters.find(x => x.id === "mid3");
                            return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="LM" />;
@@ -538,7 +558,7 @@ export default function Page() {
                      </div>
 
                      {/* صف خط الدفاع الصلب (2) */}
-                     <div className="flex justify-center gap-6 sm:gap-24 relative z-10">
+                     <div className="flex justify-center relative z-10 gap-x-6 xs:gap-x-8 sm:gap-x-24">
                         {(() => {
                            const pLeft = handleOriginalLineupData.starters.find(x => x.id === "def1");
                            return <MiniFutCard player={{ name: pLeft?.name, team: pLeft?.team, imageUrl: pLeft?.imageUrl || (pLeft as any).image }} position="CB" />;
@@ -723,7 +743,7 @@ export default function Page() {
                      <select value={activeTotwRound} onChange={e => setActiveTotwRound(e.target.value)} className="bg-[#0a1428] border border-emerald-500/40 text-white p-2 rounded-xl font-bold w-full sm:w-auto text-sm"><option value="دور المجموعات">دور المجموعات</option><option value="الملحق">الملحق</option><option value="دور الستة عشر">دور الستة عشر</option><option value="دور الثمانية">دور الثمانية</option><option value="النهائي">النهائي</option></select>
                   </div>
                   
-                  {/* إلغاء النسبة الثابتة ووضع قيم ارتفاعات ثابتة ومتجاوبة لتظهر متناسقة بدون سكرول طويل */}
+                  {/* تحديد قيم ارتفاعات ثابتة ومتجاوبة لتظهر متناسقة بدون سكرول طويل */}
                   <div className="relative w-full h-[440px] xs:h-[500px] sm:h-[620px] md:h-[680px] lg:h-[720px] max-w-3xl mx-auto bg-gradient-to-b from-emerald-800 to-green-950 border-4 border-white/20 rounded-[1.5rem] sm:rounded-[2rem] p-2 sm:p-4 flex flex-col justify-between shadow-inner overflow-hidden">
                      <div className="absolute inset-0 border-2 border-white/10 m-2 sm:m-4 rounded-[1.2rem] sm:rounded-[1.5rem] pointer-events-none flex items-center justify-center"><div className="w-20 h-20 sm:w-32 sm:h-32 border-2 border-white/10 rounded-full"></div></div>
                      
@@ -731,10 +751,10 @@ export default function Page() {
                      <div className="flex justify-center gap-6 relative z-10"><MiniFutCard player={currentFormation.players[6]} position="ST" /></div>
                      
                      {/* خط الوسط الثلاثي */}
-                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10"><MiniFutCard player={currentFormation.players[3]} position="LM" /><MiniFutCard player={currentFormation.players[4]} position="CM" /><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
+                     <div className="flex justify-around gap-1 sm:gap-2 relative z-10 gap-x-0 xs:gap-x-1 sm:gap-x-2"><MiniFutCard player={currentFormation.players[3]} position="LM" /><MiniFutCard player={currentFormation.players[4]} position="CM" /><MiniFutCard player={currentFormation.players[5]} position="RM" /></div>
                      
                      {/* خط الدفاع الثنائي */}
-                     <div className="flex justify-center gap-6 sm:gap-12 relative z-10"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
+                     <div className="flex justify-center relative z-10 gap-x-6 xs:gap-x-8 sm:gap-x-12"><MiniFutCard player={currentFormation.players[1]} position="CB" /><MiniFutCard player={currentFormation.players[2]} position="CB" /></div>
                      
                      {/* حارس المرمى */}
                      <div className="flex justify-center relative z-10"><MiniFutCard player={currentFormation.players[0]} position="GK" /></div>
