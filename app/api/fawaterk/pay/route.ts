@@ -7,24 +7,26 @@ export async function POST(request: Request) {
         
         const url = 'https://app.fawaterk.com/api/v2/create-invoice';
         
-        // 🔐 سحب المفتاح من البيئة المحمية لفيرسيل أو استخدامه مباشرة كبديل آمن
-        const apiKey = process.env.FAWATERK_API_KEY || 'c92a568379e61afe7dee0a13bb94b4e8badfa6675f6aca2c63'; 
+        // المفتاح الكامل والصحيح مع حرف الـ 3 في النهاية
+        const apiKey = 'c92a568379e61afe7dee0a13bb94b4e8badfa6675f6aca2c63'; 
 
-        // فصل الاسم الأول والأخير لتجنب مشاكل بوابات الدفع العربية
         const managerFullName = userData.managerName || "مشارك كأس مطروح";
         const nameParts = managerFullName.trim().split(" ");
         const firstName = nameParts[0] || "مشارك";
         const lastName = nameParts.slice(1).join(" ") || "جديد";
 
+        // 🔥 اختبار حاسم: إذا كان السعر المجلوب من الفيربيز به مشكلة، سنضع 500 كقيمة افتراضية صريحة
+        const finalAmount = Number(amount) > 0 ? Number(amount) : 500;
+
         const paymentData = {
-            payment_method_id: 1, // تفعيل إنستا باي والمحافظ الإلكترونية وكروت ميزة معاً
-            cartTotal: Number(amount),
+            payment_method_id: 1, 
+            cartTotal: finalAmount,
             currency: 'EGP',
             customer: {
                 first_name: firstName,
                 last_name: lastName,
                 email: userData.email || "info@matrouhcup.online",
-                phone: userData.phone,
+                phone: userData.phone || "01222264993",
             },
             redirectionUrls: {
                 successUrl: 'https://matrouhcup.online/?pay_status=success', 
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
             cartItems: [
                 {
                     name: `رسوم الاشتراك في ${tournament === "elite_cup" ? "بطولة كأس النخبة" : "كأس مطروح"}`,
-                    price: Number(amount),
+                    price: finalAmount,
                     quantity: 1
                 }
             ]
@@ -51,15 +53,16 @@ export async function POST(request: Request) {
         }
         
         return NextResponse.json({ 
-            error: 'فشل في تهيئة بوابة فواتيرك', 
+            error: 'fawaterk_rejected', 
             details: response.data.message || 'بيانات غير مطابقة' 
         }, { status: 400 });
 
     } catch (error: any) {
-        console.error('Fawaterk Error Details:', error.response?.data || error.message);
+        // 🔥 إرجاع تفاصيل الخطأ الحقيقية للواجهة لنراها في المتصفح فوراً
+        const errorDetails = error.response?.data?.message || error.response?.data || error.message;
         return NextResponse.json({ 
-            error: 'خطأ داخلي في سيرفر الدفع',
-            message: error.response?.data?.message || error.message 
+            error: 'server_crash',
+            details: errorDetails
         }, { status: 500 });
     }
 }

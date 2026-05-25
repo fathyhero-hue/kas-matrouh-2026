@@ -234,13 +234,13 @@ export default function Page() {
           body: JSON.stringify({ userData: paymentForm, tournament: mainAppTab, amount: priceInEgp })
        });
        
-       const data = await res.json();
-       if(data.url) {
-          // التوجيه الفوري لصفحة فواتيرك المؤمنة للدفع بالمحافظ أو انستا باي
-          window.location.href = data.url; 
-       } else {
-          alert("حدث خطأ في تجهيز صفحة الدفع عبر فواتيرك.");
-       }
+     const data = await response.json();
+if (data.url) {
+    window.location.href = data.url; 
+} else {
+    // سيطبع لك السبب القادم من سيرفر فواتيرك بالظبط (مثل: رقم الهاتف ناقص، أو السعر غير صحيح)
+    alert('خطأ السيرفر: ' + (data.details || 'فشل الاتصال'));
+}
     } catch (e) {
        alert("خطأ في الاتصال بسيرفر فواتيرك المحلي.");
     }
