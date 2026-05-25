@@ -227,22 +227,19 @@ export default function Page() {
        const currentSettings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh;
        const priceInEgp = (currentSettings as any).price || (mainAppTab === 'elite_cup' ? 1000 : 500);
 
-       // استدعاء ملف فواتيرك الجديد بدلاً من باي موب
-       const res = await fetch('/api/fawaterk/pay', {
+       const res = await fetch('/api/paymob/initiate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userData: paymentForm, tournament: mainAppTab, amount: priceInEgp })
+          body: JSON.stringify({ ...paymentForm, tournament: mainAppTab, price: priceInEgp })
        });
-       
-     const data = await response.json();
-if (data.url) {
-    window.location.href = data.url; 
-} else {
-    // سيطبع لك السبب القادم من سيرفر فواتيرك بالظبط (مثل: رقم الهاتف ناقص، أو السعر غير صحيح)
-    alert('خطأ السيرفر: ' + (data.details || 'فشل الاتصال'));
-}
+       const data = await res.json();
+       if(data.url) {
+          window.location.href = data.url; 
+       } else {
+          alert("حدث خطأ في تجهيز صفحة الدفع. " + (data.message || ""));
+       }
     } catch (e) {
-       alert("خطأ في الاتصال بسيرفر فواتيرك المحلي.");
+       alert("خطأ في الاتصال بالسيرفر.");
     }
     setIsInitiatingPay(false);
   };
