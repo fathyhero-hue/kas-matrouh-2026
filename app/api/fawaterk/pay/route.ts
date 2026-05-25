@@ -8,7 +8,7 @@ export async function POST(request: Request) {
         const url = 'https://app.fawaterk.com/api/v2/create-invoice';
         
         // 🔐 سحب المفتاح من البيئة المحمية لفيرسيل أو استخدامه مباشرة كبديل آمن
-        const apiKey = process.env.FAWATERK_API_KEY || 'c92a568379e61afe7dee0a13bb94b4e8badfa6675f6aca2c6'; 
+        const apiKey = process.env.FAWATERK_API_KEY || 'c92a568379e61afe7dee0a13bb94b4e8badfa6675f6aca2c63'; 
 
         // فصل الاسم الأول والأخير لتجنب مشاكل بوابات الدفع العربية
         const managerFullName = userData.managerName || "مشارك كأس مطروح";
