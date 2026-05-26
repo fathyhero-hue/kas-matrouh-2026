@@ -336,13 +336,22 @@ export default function AdminPage() {
   const addEliteTeam = async () => { if (!eliteTeamForm.name.trim()) return alert("أدخل اسم الفريق"); await addDoc(collection(db, "elite_teams"), eliteTeamForm); alert("تم إضافة الفريق للنخبة"); setEliteTeamForm({ name: "", logoUrl: "" }); };
   const deleteEliteTeam = async (id: string) => { if (confirm("حذف هذا الفريق؟")) await deleteDoc(doc(db, "elite_teams", id)); };
 
-  // === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ===
+ // === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ومشاكل Firebase ===
   const saveMathaniGroups = async () => {
     try {
-      await setDoc(doc(db, "settings", "mathani_groups"), { groups: mathaniGroups });
+      // تحويل المصفوفة المتداخلة إلى كائن (Object) لأن Firebase لا يدعم (Nested Arrays)
+      const groupsObject = {};
+      mathaniGroups.forEach((group, index) => {
+        groupsObject[`group${index}`] = group;
+      });
+
+      // حفظ الكائن الجديد في قاعدة البيانات
+      await setDoc(doc(db, "settings", "mathani_groups"), groupsObject);
       alert("تم حفظ مجموعات بطولة المثاني بنجاح! ✔️");
     } catch(e) {
-      alert("حدث خطأ أثناء الحفظ");
+      console.error(e);
+      // إضافة تفاصيل الخطأ في الرسالة لتسهيل التتبع مستقبلاً
+      alert("حدث خطأ أثناء الحفظ: " + e.message);
     }
   };
 
