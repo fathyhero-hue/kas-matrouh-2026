@@ -265,10 +265,22 @@ export default function AdminPage() {
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
-    // سحب بيانات مجموعات المثاني وتأكيد استقلال المصفوفات
+  // سحب بيانات مجموعات المثاني وتحويلها من كائن إلى مصفوفة لقراءتها بشكل صحيح وثابت داخل لوحة التحكم
     const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
-      if (docSnap.exists() && docSnap.data().groups) {
-        setMathaniGroups(docSnap.data().groups);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // إنشاء مصفوفة افتراضية فارغة للمجموعات الـ 8
+        const arr = Array.from({ length: 8 }, () => ["", "", "", ""]);
+        
+        // تعبئة المصفوفة بالبيانات القادمة من Firebase لكل مجموعة
+        for (let i = 0; i < 8; i++) {
+          if (data[`group${i}`] && Array.isArray(data[`group${i}`])) {
+            // نضمن قراءة الـ 4 حقول الخاصة بكل مجموعة بشكل مستقل لتجنب أي تداخل
+            const groupData = data[`group${i}`];
+            arr[i] = [groupData[0] || "", groupData[1] || "", groupData[2] || "", groupData[3] || ""];
+          }
+        }
+        setMathaniGroups(arr);
       } else {
         setMathaniGroups(Array.from({ length: 8 }, () => ["", "", "", ""]));
       }
