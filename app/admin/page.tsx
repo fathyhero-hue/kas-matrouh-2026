@@ -26,7 +26,6 @@ const SPONSORS = [{ name: "الفهد للديكور", src: "/alfahd.png" }, { n
 function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 function getArabicDay(dateString: string): string { if (!dateString) return ""; const d = new Date(dateString); if (isNaN(d.getTime())) return ""; const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]; return days[d.getDay()]; }
-const getLabelSuggestions = (round: string) => { if (round === "الملحق") return ["م 97", "م 98", "م 99", "م 100", "م 101", "م 102", "م 103", "م 104"]; if (round === "دور الستة عشر") return ["م 1", "م 2", "م 3", "م 4", "م 5", "م 6", "م 7", "م 8"]; if (round === "دور الثمانية") return ["مربع 1", "مربع 2", "مربع 3", "مربع 4"]; if (round === "نصف النهائي") return ["نصف 1", "نصف 2"]; if (round === "النهائي") return ["النهائي"]; return []; };
 const pushNotification = async (title: string, body: string) => { try { const res = await fetch("/api/push-service", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ title, body }) }); return res.ok; } catch(e) { return false; } };
 const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0; const startedAt = Number(match?.timerStartedAt || 0); const pausedTotal = Number(match?.timerPausedTotal || 0) || 0; if (!match?.isTimerRunning || !startedAt) return Number(match?.liveMinute ?? baseMinute) || 0; const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal); return baseMinute + Math.floor(elapsed / 60000); };
 
@@ -121,7 +120,6 @@ export default function AdminPage() {
   const [eliteTeams, setEliteTeams] = useState<any[]>([]);
   const [eliteTeamForm, setEliteTeamForm] = useState({ name: "", logoUrl: "" });
 
-  // تصحيح مشكلة المصفوفات المتطابقة
   const [mathaniGroups, setMathaniGroups] = useState<string[][]>(Array.from({ length: 8 }, () => ["", "", "", ""]));
 
   const [matches, setMatches] = useState<any[]>([]);
@@ -197,8 +195,7 @@ export default function AdminPage() {
   }, [cupEdition, activeTournament, sortedTeams, sortedJuniorsTeams, rostersList, mainAppTab, mathaniGroups]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [matchForm, setMatchForm] = useState({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
-  const [bracketForm, setBracketForm] = useState({ round: "الملحق", matchLabel: "م 97", teamA: "", teamB: "", date: new Date().toISOString().slice(0, 10), time: "15:30" });
+  const [matchForm, setMatchForm] = useState({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "دور المجموعات", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
   const defaultStats = { rating: 99, pac: 99, sho: 99, pas: 99, dri: 99, def: 99, phy: 99 };
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
   const [goalForm, setGoalForm] = useState({ player: "", team: currentTeamsList[0] || "", goalsCount: 1, imageUrl: "", ...defaultStats });
@@ -209,7 +206,6 @@ export default function AdminPage() {
   const defaultPlayer = { name: "", team: "", imageUrl: "", rating: 99 };
   const defaultCoach = { name: "", team: "", imageUrl: "", rating: 99 };
   const [formationForm, setFormationForm] = useState({ round: "دور المجموعات", players: Array(7).fill({ ...defaultPlayer }), coach: { ...defaultCoach } });
-  const [liveEventForms, setLiveEventForms] = useState<Record<string, { minute?: number, type: string, text: string }>>({});
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
   const [rosterFormAdmin, setRosterFormAdmin] = useState({ managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
 
@@ -230,7 +226,7 @@ export default function AdminPage() {
   }, [cupEdition, activeTab]);
 
   useEffect(() => {
-    setMatchForm(p => ({ ...p, teamA: "", teamALogo: "", teamB: "", teamBLogo: "", matchLabel: "" }));
+    setMatchForm(p => ({ ...p, teamA: "", teamALogo: "", teamB: "", teamBLogo: "", matchLabel: "", round: "دور المجموعات", homeGoals: 0, awayGoals: 0, status: "لم تبدأ" }));
     setGoalForm(p => ({ ...p, team: currentTeamsList[0] || "", player: "", goalsCount: 1, imageUrl: "" }));
     setCardForm(p => ({ ...p, team: currentTeamsList[0] || "", player: "" }));
     setMotmForm(p => ({ ...p, team: currentTeamsList[0] || "", player: "", imageUrl: "", matchName: "" }));
@@ -265,17 +261,12 @@ export default function AdminPage() {
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
-  // سحب بيانات مجموعات المثاني وتحويلها من كائن إلى مصفوفة لقراءتها بشكل صحيح وثابت داخل لوحة التحكم
     const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // إنشاء مصفوفة افتراضية فارغة للمجموعات الـ 8
         const arr = Array.from({ length: 8 }, () => ["", "", "", ""]);
-        
-        // تعبئة المصفوفة بالبيانات القادمة من Firebase لكل مجموعة
         for (let i = 0; i < 8; i++) {
           if (data[`group${i}`] && Array.isArray(data[`group${i}`])) {
-            // نضمن قراءة الـ 4 حقول الخاصة بكل مجموعة بشكل مستقل لتجنب أي تداخل
             const groupData = data[`group${i}`];
             arr[i] = [groupData[0] || "", groupData[1] || "", groupData[2] || "", groupData[3] || ""];
           }
@@ -302,14 +293,37 @@ export default function AdminPage() {
   }, [isAuth, activeTournament, cupEdition, mainAppTab]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
-  const handleAutoProgression = async (match: any) => { if (match.status !== "انتهت") return; const winner = match.homeGoals > match.awayGoals ? match.teamA : (match.awayGoals > match.homeGoals ? match.teamB : null); if (!winner) return; const prog = BRACKET_MAP[match.matchLabel]; if (prog) { const nextMatch = matches.find(m => m.matchLabel === prog.targetLabel && m.round === "دور الستة عشر"); if (nextMatch) { await updateDoc(doc(db, getColl("matches"), nextMatch.id), { [prog.targetSide]: winner }); } } };
-  const saveBracketMatch = async () => { if (!bracketForm.teamA.trim() && !bracketForm.teamB.trim()) return alert("يجب اختيار الفرق أولاً!"); const existingMatch = matches.find(m => m.round === bracketForm.round && m.matchLabel === bracketForm.matchLabel); const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(bracketForm.date).getDay()]; if (existingMatch) { await updateDoc(doc(db, getColl("matches"), existingMatch.id), { teamA: bracketForm.teamA || existingMatch.teamA, teamB: bracketForm.teamB || existingMatch.teamB, date: bracketForm.date, time: bracketForm.time, dayName }); alert("✅ تم التحديث"); } else { await addDoc(collection(db, getColl("matches")), { round: bracketForm.round, matchLabel: bracketForm.matchLabel, teamA: bracketForm.teamA, teamB: bracketForm.teamB, homeGoals: 0, awayGoals: 0, date: bracketForm.date, time: bracketForm.time, dayName, status: "لم تبدأ", isLive: false, streamClosed: false }); alert("✅ تم الإنشاء"); } };
-  const saveMatch = async () => { if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!"); const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()]; const data = { ...matchForm, dayName, isLive: false, streamClosed: false }; if (editingId) { await updateDoc(doc(db, getColl("matches"), editingId), data); setEditingId(null); alert("✅ تم التعديل"); } else { await addDoc(collection(db, getColl("matches")), data); alert("✅ تم الإضافة"); } setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" }); };
-  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamALogo: match.teamALogo || "", teamB: match.teamB, teamBLogo: match.teamBLogo || "", homeGoals: match.homeGoals, awayGoals: match.awayGoals, matchLabel: match.matchLabel || "", round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); setActiveTab(cupEdition === 'edition_3' && mainAppTab !== 'mathani_cup' ? "knockout" : "matches"); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
-  const updateMatchLive = async (id: string, updates: any) => { const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id); const nextUpdates = { ...updates }; if (Object.prototype.hasOwnProperty.call(nextUpdates, 'isTimerRunning')) { if (nextUpdates.isTimerRunning) { const baseMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = baseMinute; nextUpdates.liveMinuteBase = baseMinute; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } else if (currentMatch) { const pausedMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = pausedMinute; nextUpdates.liveMinuteBase = pausedMinute; nextUpdates.timerStartedAt = null; nextUpdates.timerPausedTotal = 0; } } if (Object.prototype.hasOwnProperty.call(nextUpdates, 'liveMinute') && currentMatch?.isTimerRunning && !Object.prototype.hasOwnProperty.call(updates, 'isTimerRunning')) { nextUpdates.liveMinuteBase = Number(nextUpdates.liveMinute) || 0; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } await updateDoc(doc(db, getColl("matches"), id), nextUpdates); if (nextUpdates.status === "انتهت" && currentMatch) handleAutoProgression({ ...currentMatch, ...nextUpdates }); };
-  const addLiveEvent = async (matchId: string, currentLiveMinute: number) => { const form = liveEventForms[matchId] || {}; if (!form.text || !form.text.trim()) return alert("يرجى كتابة تفاصيل الحدث!"); const minute = form.minute !== undefined ? form.minute : currentLiveMinute; const currentMatch = matches.find(m => m.id === matchId); if (!currentMatch) return; const newEvent = { minute, type: form.type || 'info', text: form.text.trim(), createdAt: new Date().toISOString() }; await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: [...(currentMatch.liveEvents || []), newEvent] }); setLiveEventForms(p => ({ ...p, [matchId]: { minute: currentLiveMinute, type: 'info', text: '' } })); };
-  const deleteLiveEvent = async (matchId: string, eventIndex: number) => { if (!confirm("هل تريد الحذف؟")) return; const currentMatch = matches.find(m => m.id === matchId); if (!currentMatch) return; const updatedEvents = [...(currentMatch.liveEvents || [])]; updatedEvents.splice(eventIndex, 1); await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: updatedEvents }); };
+  
+  const saveMatch = async () => { 
+    if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!"); 
+    const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()]; 
+    
+    const data = { 
+      ...matchForm, 
+      homeGoals: Number(matchForm.homeGoals) || 0,
+      awayGoals: Number(matchForm.awayGoals) || 0,
+      dayName, 
+      isLive: false, 
+      streamClosed: false 
+    }; 
+    
+    if (editingId) { 
+      await updateDoc(doc(db, getColl("matches"), editingId), data); 
+      setEditingId(null); 
+      alert("✅ تم تعديل بيانات ونتيجة المباراة بنجاح"); 
+    } else { 
+      await addDoc(collection(db, getColl("matches")), data); 
+      alert("✅ تم إضافة المباراة بنجاح"); 
+    } 
+    
+    setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "دور المجموعات", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" }); 
+  };
+
+  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamALogo: match.teamALogo || "", teamB: match.teamB, teamBLogo: match.teamBLogo || "", homeGoals: Number(match.homeGoals) || 0, awayGoals: Number(match.awayGoals) || 0, matchLabel: match.matchLabel || "", round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); setActiveTab("matches"); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const deleteMatch = async (id: string) => confirm("متأكد من حذف هذه المباراة نهائياً؟") && await deleteDoc(doc(db, getColl("matches"), id));
+  
+  const updateMatchLive = async (id: string, updates: any) => { const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id); const nextUpdates = { ...updates }; if (Object.prototype.hasOwnProperty.call(nextUpdates, 'isTimerRunning')) { if (nextUpdates.isTimerRunning) { const baseMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = baseMinute; nextUpdates.liveMinuteBase = baseMinute; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } else if (currentMatch) { const pausedMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = pausedMinute; nextUpdates.liveMinuteBase = pausedMinute; nextUpdates.timerStartedAt = null; nextUpdates.timerPausedTotal = 0; } } if (Object.prototype.hasOwnProperty.call(nextUpdates, 'liveMinute') && currentMatch?.isTimerRunning && !Object.prototype.hasOwnProperty.call(updates, 'isTimerRunning')) { nextUpdates.liveMinuteBase = Number(nextUpdates.liveMinute) || 0; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } await updateDoc(doc(db, getColl("matches"), id), nextUpdates); };
+  
   const startEditRoster = (teamName: string) => { const existing = rostersList.find(r => r.id === teamName); let loadedPlayers = Array.from({ length: 12 }, () => ({ name: "", number: "" })); if (existing && existing.players) { loadedPlayers = [...existing.players]; while (loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" }); } setRosterFormAdmin({ managerName: existing?.managerName || "", managerPhone: existing?.managerPhone || "", password: existing?.password || "", logoUrl: existing?.logoUrl || "", isSubmitted: existing?.isSubmitted || false, players: loadedPlayers.slice(0, 12) }); setEditingRosterId(teamName); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const updateAdminRosterPlayer = (index: number, field: string, value: string) => { setRosterFormAdmin(prev => { const newPlayers = [...prev.players]; newPlayers[index] = { ...newPlayers[index], [field]: value }; return { ...prev, players: newPlayers }; }); };
   const saveRosterAdmin = async () => { if (!editingRosterId) return; try { await setDoc(doc(db, getColl("team_rosters"), editingRosterId), { teamName: editingRosterId, managerName: rosterFormAdmin.managerName, managerPhone: rosterFormAdmin.managerPhone, password: rosterFormAdmin.password, logoUrl: rosterFormAdmin.logoUrl, isSubmitted: rosterFormAdmin.isSubmitted, players: rosterFormAdmin.players, updatedAt: new Date().toISOString() }, { merge: true }); alert("تم الحفظ بنجاح! ✔️"); setEditingRosterId(null); } catch (e) { alert("حدث خطأ."); } };
@@ -348,17 +362,12 @@ export default function AdminPage() {
   const addEliteTeam = async () => { if (!eliteTeamForm.name.trim()) return alert("أدخل اسم الفريق"); await addDoc(collection(db, "elite_teams"), eliteTeamForm); alert("تم إضافة الفريق للنخبة"); setEliteTeamForm({ name: "", logoUrl: "" }); };
   const deleteEliteTeam = async (id: string) => { if (confirm("حذف هذا الفريق؟")) await deleteDoc(doc(db, "elite_teams", id)); };
 
-// === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ومشاكل Firebase و TypeScript ===
   const saveMathaniGroups = async () => {
     try {
-      // تعريف نوع المتغير groupsObject ليقبل مفاتيح نصية ديناميكية لتجنب خطأ Type error
       const groupsObject: Record<string, any> = {};
-      
       mathaniGroups.forEach((group, index) => {
         groupsObject[`group${index}`] = group;
       });
-
-      // حفظ الكائن الجديد في قاعدة البيانات
       await setDoc(doc(db, "settings", "mathani_groups"), groupsObject);
       alert("تم حفظ مجموعات بطولة المثاني بنجاح! ✔️");
     } catch(e: any) {
@@ -366,31 +375,19 @@ export default function AdminPage() {
       alert("حدث خطأ أثناء الحفظ: " + e.message);
     }
   };
+
   const safeGoalSearch = goalSearchTerm.toLowerCase();
   const filteredGoals = goals.filter(g => normalizeTeamName(g.player).includes(safeGoalSearch) || normalizeTeamName(g.team).includes(safeGoalSearch));
   const safeCardSearch = cardSearchTerm.toLowerCase();
   const filteredCards = cardEvents.filter(c => normalizeTeamName(c.player).includes(safeCardSearch) || normalizeTeamName(c.team).includes(safeCardSearch));
-
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
-  const liveMatchesList = matches.filter(m => {
-    if (m.isLive || m.status === "live" || m.status === "مباشر" || m.status === "شغال الآن") return true;
-    if (m.date === todayStr && m.time) {
-      const now = time || new Date(); const [h, min] = m.time.split(':').map(Number);
-      const matchTime = new Date(); matchTime.setHours(h, min, 0, 0);
-      const diffMins = (now.getTime() - matchTime.getTime()) / 60000;
-      if (diffMins >= -30 && diffMins <= 180 && m.status !== "انتهت") return true;
-    }
-    return false;
-  });
-  const liveMatches = sortMatches(liveMatchesList);
 
   const allAdminTabs = [
     { key: "champion", label: "👑 البطل", app: ["matrouh_cup"], hideForEd4: true },
     { key: "registration_settings", label: "⚙️ التسجيل", app: ["matrouh_cup"], hideForEd3: true },
     { key: "tournament_lineup_admin", label: "📋 تشكيل البطولة", app: ["matrouh_cup"] },
     { key: "mathani_groups", label: "🛡️ إدارة المجموعات", app: ["mathani_cup"] },
-    { key: "knockout", label: "🏆 الإقصائيات", app: ["matrouh_cup", "mathani_cup"] },
-    { key: "matches", label: "⚽ المباريات", app: ["matrouh_cup", "mathani_cup"] },
+    // تبويب إضافة مباراة الشامل (بدلاً من الإقصائيات)
+    { key: "matches", label: "⚽ إضافة مباراة", app: ["matrouh_cup", "mathani_cup"] },
     { key: "goals", label: "🥇 الهدافين", app: ["matrouh_cup", "mathani_cup"] },
     { key: "cards", label: "🟨 الكروت", app: ["matrouh_cup", "mathani_cup"] },
     { key: "motm", label: "🌟 نجوم المباريات", app: ["matrouh_cup", "mathani_cup"] },
@@ -407,7 +404,6 @@ export default function AdminPage() {
     if (mainAppTab === 'matrouh_cup') {
        if (cupEdition === 'edition_3' && tab.hideForEd3) return false;
        if (cupEdition === 'edition_4' && tab.hideForEd4) return false;
-       if (activeTournament === 'juniors' && tab.key === 'knockout') return false;
     }
     return true;
   });
@@ -618,7 +614,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <SectionCard title="قائمة الحظر" icon="🚫" color="red">
                     <div className="flex gap-2 mb-4">
-                      <select value={bannedForm.type} onChange={e => setBannedForm({ ...bannedForm, type: e.target.value })} className={`${selectCls} w-32`}>
+                      <select value={bannedForm.type} onChange={e => setBannedForm({ ...bannedForm, type: e.target.value })} className={`${selectCls} w-28`}>
                         <option value="player">لاعب</option><option value="team">فريق</option>
                       </select>
                       <input value={bannedForm.name} onChange={e => setBannedForm({ ...bannedForm, name: e.target.value })} placeholder="الاسم..." className={`${inputCls} flex-1`} />
@@ -864,81 +860,81 @@ export default function AdminPage() {
               </SectionCard>
             )}
 
-            {/* ─── الإقصائيات ─── */}
-            {activeTab === "knockout" && (
-              <SectionCard title="إدارة مباريات الإقصائيات" icon="🏆" color="cyan">
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="الدور">
-                      <select value={bracketForm.round} onChange={e => { setBracketForm(p => ({ ...p, round: e.target.value, matchLabel: getLabelSuggestions(e.target.value)[0] || "" })); setMatchForm(p => ({ ...p, round: e.target.value })); }} className={selectCls}>
-                        {(mainAppTab === 'mathani_cup' ? ["دور الـ 16", "دور الـ 8", "دور الـ 4", "النهائي"] : ["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"]).map(r => <option key={r}>{r}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="رقم/اسم المباراة">
-                      {mainAppTab === 'mathani_cup' ? (
-                        <input value={bracketForm.matchLabel} onChange={e => { setBracketForm(p => ({ ...p, matchLabel: e.target.value })); setMatchForm(p => ({ ...p, matchLabel: e.target.value })); }} className={inputCls} placeholder="اكتب اسم المباراة (اختياري)" />
-                      ) : (
-                        <select value={bracketForm.matchLabel} onChange={e => { setBracketForm(p => ({ ...p, matchLabel: e.target.value })); setMatchForm(p => ({ ...p, matchLabel: e.target.value })); }} className={selectCls}>
-                          {getLabelSuggestions(bracketForm.round).map(l => <option key={l}>{l}</option>)}
-                        </select>
-                      )}
-                    </Field>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[#060e1e] p-4 rounded-xl border border-white/5">
-                    <Field label="الفريق الأول"><input list="teams-list" value={bracketForm.teamA} onChange={e => { setBracketForm(p => ({ ...p, teamA: e.target.value })); setMatchForm(p => ({ ...p, teamA: e.target.value })); }} className={inputCls} /></Field>
-                    <Field label="الفريق الثاني"><input list="teams-list" value={bracketForm.teamB} onChange={e => { setBracketForm(p => ({ ...p, teamB: e.target.value })); setMatchForm(p => ({ ...p, teamB: e.target.value })); }} className={inputCls} /></Field>
-                    <Field label="التاريخ"><input type="date" value={bracketForm.date} onChange={e => { setBracketForm(p => ({ ...p, date: e.target.value })); setMatchForm(p => ({ ...p, date: e.target.value })); }} className={inputCls} /></Field>
-                    <Field label="الوقت"><input type="time" value={bracketForm.time} onChange={e => { setBracketForm(p => ({ ...p, time: e.target.value })); setMatchForm(p => ({ ...p, time: e.target.value })); }} className={`${inputCls} text-center`} /></Field>
-                  </div>
-                  <Btn onClick={saveBracketMatch} variant="cyan" size="xl">إنشاء / تحديث مباراة الإقصائيات ⚡</Btn>
-                </div>
-              </SectionCard>
-            )}
-
-            {/* ─── المباريات واللايف ─── */}
+            {/* ─── إضافة مباراة واللايف والتعديل ─── */}
             {activeTab === "matches" && (
               <div className="space-y-6">
-                <SectionCard title={editingId ? "تعديل بيانات المباراة" : "إنشاء مباراة جديدة"} icon="⚽" color={mainAppTab === 'mathani_cup' ? 'emerald' : 'yellow'}>
+                <SectionCard title={editingId ? "تعديل بيانات ونتيجة المباراة" : "إنشاء مباراة جديدة"} icon="⚽" color={mainAppTab === 'mathani_cup' ? 'emerald' : 'yellow'}>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <Field label="الفريق الأول"><input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm({ ...matchForm, teamA: e.target.value })} className={inputCls} /></Field>
-                      <Field label="شعار 1"><input value={matchForm.teamALogo} onChange={e => setMatchForm({ ...matchForm, teamALogo: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
-                      <Field label="الفريق الثاني"><input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm({ ...matchForm, teamB: e.target.value })} className={inputCls} /></Field>
-                      <Field label="شعار 2"><input value={matchForm.teamBLogo} onChange={e => setMatchForm({ ...matchForm, teamBLogo: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
+                    
+                    {/* قسم النتيجة والفرق */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-[#0a1428] p-4 rounded-xl border border-white/5 shadow-inner">
+                      <Field label="صاحب الأرض (الفريق الأول)">
+                         <input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm({ ...matchForm, teamA: e.target.value })} className={inputCls} placeholder="اختر الفريق..." />
+                      </Field>
+                      <Field label="أهداف الفريق الأول">
+                         <input type="number" value={matchForm.homeGoals} onChange={e => setMatchForm({ ...matchForm, homeGoals: Number(e.target.value) })} className={`${inputCls} text-center font-black text-2xl text-yellow-400`} />
+                      </Field>
+                      <Field label="أهداف الفريق الثاني">
+                         <input type="number" value={matchForm.awayGoals} onChange={e => setMatchForm({ ...matchForm, awayGoals: Number(e.target.value) })} className={`${inputCls} text-center font-black text-2xl text-yellow-400`} />
+                      </Field>
+                      <Field label="الضيف (الفريق الثاني)">
+                         <input list="teams-list" value={matchForm.teamB} onChange={e => setMatchForm({ ...matchForm, teamB: e.target.value })} className={inputCls} placeholder="اختر الفريق..." />
+                      </Field>
                     </div>
+
+                    {/* قسم الشعارات (اختياري) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Field label="رابط شعار الفريق الأول (اختياري)"><input value={matchForm.teamALogo} onChange={e => setMatchForm({ ...matchForm, teamALogo: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
+                      <Field label="رابط شعار الفريق الثاني (اختياري)"><input value={matchForm.teamBLogo} onChange={e => setMatchForm({ ...matchForm, teamBLogo: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
+                    </div>
+
+                    {/* قسم التوقيت والدور */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <Field label="التاريخ"><input type="date" value={matchForm.date} onChange={e => setMatchForm({ ...matchForm, date: e.target.value })} className={inputCls} /></Field>
                       <Field label="الوقت"><input type="time" value={matchForm.time} onChange={e => setMatchForm({ ...matchForm, time: e.target.value })} className={`${inputCls} text-center`} /></Field>
-                      <Field label="الجولة / الدور">
-                        {mainAppTab === 'mathani_cup' ? (
-                          <select value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={selectCls}>
-                            {["دور المجموعات", "دور الـ 16", "دور الـ 8", "دور الـ 4", "النهائي"].map(r => <option key={r}>{r}</option>)}
-                          </select>
-                        ) : activeTournament === 'youth' ? (
-                          <input value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={inputCls} />
-                        ) : (
-                          <select value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={selectCls}>
-                            {["الجولة الأولى", "الجولة الثانية", "الجولة الثالثة", "دور الثمانية", "نصف النهائي", "النهائي"].map(r => <option key={r}>{r}</option>)}
-                          </select>
-                        )}
+                      
+                      {/* كنترول شامل لكل الأدوار الممكنة */}
+                      <Field label="الدور / الجولة">
+                         <select value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={selectCls}>
+                            <option value="دور المجموعات">دور المجموعات</option>
+                            <option value="دور الـ 16">دور الـ 16</option>
+                            <option value="دور الثمانية">دور الثمانية</option>
+                            <option value="دور الـ 4">دور الـ 4</option>
+                            <option value="النهائي">النهائي</option>
+                         </select>
                       </Field>
-                      <Field label="الحالة">
+
+                      <Field label="حالة المباراة">
                         <select value={matchForm.status} onChange={e => setMatchForm({ ...matchForm, status: e.target.value })} className={selectCls}>
-                          {["لم تبدأ", "مباشر", "انتهت", "تأجلت", "ملغاة"].map(s => <option key={s}>{s}</option>)}
+                          <option value="انتهت">انتهت (تُضاف للترتيب)</option>
+                          <option value="لم تبدأ">لم تبدأ (مستقبلية)</option>
+                          <option value="مباشر">مباشر (لايف)</option>
+                          <option value="ضربات جزاء">ضربات جزاء</option>
+                          <option value="تأجلت">تأجلت</option>
+                          <option value="ملغاة">ملغاة</option>
                         </select>
                       </Field>
                     </div>
-                    <div className="flex gap-3">
-                      <Btn onClick={saveMatch} variant={mainAppTab === 'mathani_cup' ? "emerald" : "primary"} size="lg">{editingId ? "تأكيد التعديل ✔️" : "حفظ المباراة 💾"}</Btn>
-                      {editingId && <Btn onClick={() => setEditingId(null)} variant="danger" size="lg">إلغاء التعديل ❌</Btn>}
+
+                    <div className="flex gap-3 pt-4">
+                      <Btn onClick={saveMatch} variant={mainAppTab === 'mathani_cup' ? "emerald" : "primary"} size="lg" className="flex-1">
+                        {editingId ? "تأكيد وتحديث المباراة ✔️" : "حفظ وإضافة المباراة 💾"}
+                      </Btn>
+                      {editingId && (
+                        <Btn onClick={() => {
+                          setEditingId(null);
+                          setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "دور المجموعات", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
+                        }} variant="danger" size="lg">إلغاء التعديل ❌</Btn>
+                      )}
                     </div>
                   </div>
                 </SectionCard>
 
+                {/* قائمة المباريات المضافة سابقاً مع إمكانية التعديل السريع والحذف */}
                 <div className="space-y-4">
                   <div className="relative max-w-sm">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <input value={koSearchTerm} onChange={e => setKoSearchTerm(e.target.value)} placeholder="بحث في المباريات..." className={`${inputCls} pr-10`} />
+                    <input value={koSearchTerm} onChange={e => setKoSearchTerm(e.target.value)} placeholder="بحث في المباريات (بالاسم)..." className={`${inputCls} pr-10`} />
                   </div>
                   {matches.filter(m => !koSearchTerm || m.teamA.includes(koSearchTerm) || m.teamB.includes(koSearchTerm)).map(match => (
                     <div key={match.id} className={`rounded-2xl border overflow-hidden transition-all ${match.isLive ? 'border-red-500/60 bg-red-900/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : match.status === 'انتهت' ? 'border-white/5 bg-[#0a1228] opacity-75' : 'border-white/8 bg-[#0f1c35]'}`}>
@@ -946,34 +942,35 @@ export default function AdminPage() {
                         <span className="text-gray-300">{getArabicDay(match.date)} • {match.date} • {match.time}</span>
                         <div className="flex items-center gap-2">
                           {match.isLive && <span className="animate-pulse text-white font-black">🔴 مباشر</span>}
-                          <span className="text-gray-400">{match.round} {match.matchLabel ? `(${match.matchLabel})` : ""}</span>
+                          <span className="text-gray-400 font-black px-2">{match.round}</span>
                         </div>
                       </div>
                       <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="bg-[#060e1e] rounded-xl p-4 border border-white/5">
+                        <div className="bg-[#060e1e] rounded-xl p-4 border border-white/5 flex flex-col justify-between">
                           <div className="flex items-center justify-between mb-4">
                             <div className="text-center flex-1">
-                              <div className="text-xs text-gray-500 mb-1">الطرف الأول</div>
                               <div className="font-black text-white text-base">{match.teamA}</div>
                             </div>
                             <div className="bg-[#0f1c35] border border-yellow-400/20 rounded-xl px-5 py-2 font-black text-2xl text-yellow-400 mx-3">{match.homeGoals || 0} - {match.awayGoals || 0}</div>
                             <div className="text-center flex-1">
-                              <div className="text-xs text-gray-500 mb-1">الطرف الثاني</div>
                               <div className="font-black text-white text-base">{match.teamB}</div>
                             </div>
                           </div>
+                          
+                          {/* أزرار التحكم في المباراة الموجودة بالأسفل */}
                           <div className="flex flex-wrap gap-2 justify-center">
-                            <Btn size="sm" onClick={() => startEdit(match)} variant="blue"><Edit className="h-3 w-3" /> تعديل</Btn>
+                            <Btn size="sm" onClick={() => startEdit(match)} variant="blue"><Edit className="h-3 w-3" /> تعديل المباراة</Btn>
                             <Btn size="sm" onClick={() => updateMatchLive(match.id, { isLive: !match.isLive })} variant={match.isLive ? "red" : "ghost"}>{match.isLive ? "⏹ إيقاف اللايف" : "▶ تشغيل اللايف"}</Btn>
                             <Btn size="sm" onClick={() => updateMatchLive(match.id, { status: "انتهت", isLive: false, streamClosed: true, isTimerRunning: false })} variant="emerald">إنهاء</Btn>
                             <Btn size="sm" onClick={() => openPoster(match)} variant="ghost"><Camera className="h-3 w-3" /> بوستر</Btn>
-                            <Btn size="sm" onClick={() => openMotmPopup(match)} variant="primary"><Star className="h-3 w-3" /> نجم</Btn>
-                            <Btn size="sm" onClick={() => deleteMatch(match.id)} variant="danger"><Trash2 className="h-3 w-3" /></Btn>
+                            <Btn size="sm" onClick={() => deleteMatch(match.id)} variant="danger"><Trash2 className="h-3 w-3" /> حذف</Btn>
                           </div>
                         </div>
+                        
+                        {/* العداد والتعديل اللحظي (اللايف) */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
-                            <div className="text-xs text-gray-400 font-bold">الأهداف</div>
+                            <div className="text-xs text-gray-400 font-bold">تعديل سريع للأهداف (مباشر)</div>
                             {[{ label: match.teamA, key: 'homeGoals', val: match.homeGoals }, { label: match.teamB, key: 'awayGoals', val: match.awayGoals }].map(g => (
                               <div key={g.key} className="flex items-center justify-between gap-2">
                                 <span className="text-xs text-gray-400 truncate flex-1">{g.label}</span>
