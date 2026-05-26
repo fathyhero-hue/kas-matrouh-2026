@@ -336,11 +336,12 @@ export default function AdminPage() {
   const addEliteTeam = async () => { if (!eliteTeamForm.name.trim()) return alert("أدخل اسم الفريق"); await addDoc(collection(db, "elite_teams"), eliteTeamForm); alert("تم إضافة الفريق للنخبة"); setEliteTeamForm({ name: "", logoUrl: "" }); };
   const deleteEliteTeam = async (id: string) => { if (confirm("حذف هذا الفريق؟")) await deleteDoc(doc(db, "elite_teams", id)); };
 
- // === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ومشاكل Firebase ===
+// === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ومشاكل Firebase و TypeScript ===
   const saveMathaniGroups = async () => {
     try {
-      // تحويل المصفوفة المتداخلة إلى كائن (Object) لأن Firebase لا يدعم (Nested Arrays)
-      const groupsObject = {};
+      // تعريف نوع المتغير groupsObject ليقبل مفاتيح نصية ديناميكية لتجنب خطأ Type error
+      const groupsObject: Record<string, any> = {};
+      
       mathaniGroups.forEach((group, index) => {
         groupsObject[`group${index}`] = group;
       });
@@ -348,13 +349,11 @@ export default function AdminPage() {
       // حفظ الكائن الجديد في قاعدة البيانات
       await setDoc(doc(db, "settings", "mathani_groups"), groupsObject);
       alert("تم حفظ مجموعات بطولة المثاني بنجاح! ✔️");
-    } catch(e) {
+    } catch(e: any) {
       console.error(e);
-      // إضافة تفاصيل الخطأ في الرسالة لتسهيل التتبع مستقبلاً
       alert("حدث خطأ أثناء الحفظ: " + e.message);
     }
   };
-
   const safeGoalSearch = goalSearchTerm.toLowerCase();
   const filteredGoals = goals.filter(g => normalizeTeamName(g.player).includes(safeGoalSearch) || normalizeTeamName(g.team).includes(safeGoalSearch));
   const safeCardSearch = cardSearchTerm.toLowerCase();
