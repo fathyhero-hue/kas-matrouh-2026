@@ -12,7 +12,7 @@ import { db, storage } from "@/lib/firebase";
 
 const JUNIORS_GROUP_A = ["سيف الوادي", "ميلانو", "النجيلة", "كابتن تيكا", "اصدقاء عز بوالمجدوبة"];
 const JUNIORS_GROUP_B = ["الاولمبي", "ابناء اكرامي", "غوط رباح", "اصدقاء مهدي", "وادي الرمل"];
-const KNOCKOUT_ROUNDS = ["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"];
+const KNOCKOUT_ROUNDS = ["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي", "دور الـ 16", "دور الـ 8", "دور الـ 4"];
 function formatTime12(time24: string): string { if (!time24) return "—"; const [hours, minutes] = time24.split(":").map(Number); const period = hours >= 12 ? "م" : "ص"; return `${hours % 12 || 12}:${minutes.toString().padStart(2, "0")} ${period}`; }
 function getArabicDay(dateString: string): string { if (!dateString) return ""; const d = new Date(dateString); if (isNaN(d.getTime())) return ""; const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]; return days[d.getDay()]; }
 const getYoutubeId = (url: string) => { const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/; const match = url?.match(regExp); return (match && match[2].length === 11) ? match[2] : null; };
@@ -105,7 +105,8 @@ const DEFAULT_TOURNAMENT_LINEUP = {
 };
 
 export default function Page() {
-  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'shop' | 'settings'>('matrouh_cup');
+  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop' | 'settings'>('matrouh_cup');
+  const [activeMathaniTab, setActiveMathaniTab] = useState<'standings' | 'results' | 'stats' | 'scorers' | 'banned'>('standings');
   const [cupEdition, setCupEdition] = useState<'edition_3' | 'edition_4'>('edition_3');
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
   const [activeTab, setActiveTab] = useState<string>("champion");
@@ -129,6 +130,7 @@ export default function Page() {
   const [restrictedPlayers, setRestrictedPlayers] = useState<any[]>([]);
   const [regSettingsMatrouh, setRegSettingsMatrouh] = useState({ deadline: "", password: "", price: 500 });
   const [regSettingsElite, setRegSettingsElite] = useState({ deadline: "", password: "", price: 1000 });
+  const [mathaniGroups, setMathaniGroups] = useState<string[][]>(Array(8).fill([]));
 
   const [customTournamentLineup, setCustomTournamentLineup] = useState<any>(null);
 
@@ -181,6 +183,7 @@ export default function Page() {
     let suffix = "";
     if(mainAppTab === 'matrouh_cup') { const edSuffix = cupEdition === "edition_4" ? "_ed4" : ""; const tourSuffix = activeTournament === "juniors" ? "_juniors" : ""; suffix = edSuffix + tourSuffix; } 
     else if (mainAppTab === 'elite_cup') { suffix = "_elite"; }
+    else if (mainAppTab === 'mathani_cup') { suffix = "_mathani"; }
 
     const unsubMatches = onSnapshot(collection(db, `matches${suffix}`), (snap) => { setMatches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); setLoading(false); });
     const unsubGoals = onSnapshot(collection(db, `goals${suffix}`), (snap) => setGoalEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -197,6 +200,25 @@ export default function Page() {
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
+    // التعديل الأول: سحب مجموعات المثاني بمرونة وذكاء لمعالجة كافة أشكال الحفظ الهيكلية
+    const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.groups && Array.isArray(data.groups)) {
+                setMathaniGroups(data.groups);
+            } else {
+                const arr = Array(8).fill([]);
+                for (let i = 0; i < 8; i++) {
+                    if (data[`group${i}`]) arr[i] = data[`group${i}`];
+                    else if (data[`group${i + 1}`]) arr[i] = data[`group${i + 1}`];
+                }
+                setMathaniGroups(arr);
+            }
+        } else {
+            setMathaniGroups(Array(8).fill([]));
+        }
+    });
+
     const unsubTournamentLineup = onSnapshot(doc(db, `tournament_lineup${suffix}`, "current"), (snap) => {
       if (snap.exists()) { setCustomTournamentLineup(snap.data()); } else { setCustomTournamentLineup(null); }
     });
@@ -205,7 +227,7 @@ export default function Page() {
     const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegSettingsElite({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 1000 }); } });
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubMathaniGroups(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
   }, [activeTournament, cupEdition, mainAppTab]);
 
   useEffect(() => { setRosterForm(prev => ({ ...prev, players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null, idImagePreview: "", idImageFile: null })) })); }, [MAX_PLAYERS, mainAppTab]);
@@ -312,6 +334,8 @@ export default function Page() {
   const standingsJunA = useMemo(() => buildStandings(finishedMatches, JUNIORS_GROUP_A), [finishedMatches]);
   const standingsJunB = useMemo(() => buildStandings(finishedMatches, JUNIORS_GROUP_B), [finishedMatches]);
   const activeTeamsList = useMemo(() => { if (cupEdition === 'edition_3') return activeTournament === 'youth' ? CLEANED_TEAM_NAMES : [...JUNIORS_GROUP_A, ...JUNIORS_GROUP_B]; return Array.from(new Set(rostersList.map(r => r.id))); }, [cupEdition, activeTournament, rostersList]);
+
+  const MATHANI_GROUP_NAMES = ["المجموعة الأولى", "المجموعة الثانية", "المجموعة الثالثة", "المجموعة الرابعة", "المجموعة الخامسة", "المجموعة السادسة", "المجموعة السابعة", "المجموعة الثامنة"];
 
   const youthTree = useMemo(() => {
     const getT = (rank: number) => standingsYouth.length >= rank ? standingsYouth[rank - 1].team : `المركز ${rank}`;
@@ -449,10 +473,178 @@ export default function Page() {
           <div className="bg-[#13213a] p-2 rounded-2xl border border-yellow-400/30 inline-flex shadow-xl gap-2 w-max min-w-full sm:min-w-0 sm:w-auto">
             <button onClick={() => setMainAppTab('matrouh_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'matrouh_cup' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 كأس مطروح</button>
             <button onClick={() => setMainAppTab('elite_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'elite_cup' ? 'bg-indigo-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏅 بطولة كأس النخبة</button>
+            <button onClick={() => setMainAppTab('mathani_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'mathani_cup' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>⚽ بطولة المثاني 2026</button>
             <button onClick={() => setMainAppTab('shop')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'shop' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🛒 المتجر</button>
             <button onClick={() => setMainAppTab('settings')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'settings' ? 'bg-gray-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>⚙️ الإعدادات</button>
           </div>
         </div>
+
+        {/* ================= MATHANI CUP SECTION ================= */}
+        {mainAppTab === 'mathani_cup' && (
+          <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
+            <h2 className="text-3xl font-black text-center text-emerald-400 mb-8">⚽ بطولة المثاني 2026</h2>
+            <div className="flex justify-center gap-2 mb-6 flex-wrap">
+              {[ {id: 'standings', name: 'جدول الترتيب'}, {id: 'results', name: 'نتائج المباريات'}, {id: 'stats', name: 'الإحصائيات'}, {id: 'scorers', name: 'الهدافون'}, {id: 'banned', name: 'الموقوفون'} ].map(t => (
+                <Button key={t.id} onClick={() => setActiveMathaniTab(t.id as any)} className={`font-bold ${activeMathaniTab === t.id ? 'bg-emerald-500' : 'bg-[#13213a] border border-emerald-500/30'}`}>{t.name}</Button>
+              ))}
+            </div>
+
+            {/* TAB: STANDINGS (MATHANI) */}
+            {activeMathaniTab === 'standings' && (
+               <div className="grid md:grid-cols-2 gap-8">
+                  {MATHANI_GROUP_NAMES.map((groupName, i) => {
+                     // التعديل الثاني: التحقق من نوعية الفرق المدخلة وتحويلها لنصوص لتمريرها بنجاح إلى دالة الترتيب
+                     let rawGroupTeams = mathaniGroups[i] && Array.isArray(mathaniGroups[i]) ? mathaniGroups[i] : [];
+                     const groupTeams = rawGroupTeams.length > 0 
+                        ? rawGroupTeams.map((t: any) => typeof t === 'object' ? (t.name || t.teamName || t.team || "فريق غير معروف") : t)
+                        : ["في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق..."];
+                     
+                     const groupStandings = buildStandings(finishedMatches, groupTeams);
+                     return (
+                        <Card key={i} className="bg-[#13213a] border-emerald-500/30 overflow-hidden shadow-xl">
+                           <CardHeader className="border-b border-emerald-500/20 pb-4">
+                              <CardTitle className="text-emerald-400 flex items-center gap-3"><Trophy className="w-5 h-5"/> {groupName}</CardTitle>
+                           </CardHeader>
+                           <CardContent className="p-0 overflow-x-auto custom-scrollbar" dir="rtl">
+                              <table className="w-full text-sm text-right min-w-[550px]">
+                                 <thead className="bg-[#0a1428] border-b border-emerald-500/30">
+                                    <tr>{STANDINGS_HEADERS.map(h => <th key={h} className="p-3 text-cyan-300 font-bold whitespace-nowrap">{h}</th>)}</tr>
+                                 </thead>
+                                 <tbody>
+                                    {groupStandings.map((row, idx) => (
+                                       <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                          <td className="p-3"><Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">{row.rank}</Badge></td>
+                                          <td className="p-3 font-black text-white whitespace-nowrap text-base drop-shadow-md">{row.team}</td>
+                                          <td className="p-3 text-center text-gray-300">{row.played}</td>
+                                          <td className="p-3 text-center text-emerald-400 font-black">{row.wins}</td>
+                                          <td className="p-3 text-center text-gray-400">{row.draws}</td>
+                                          <td className="p-3 text-center text-red-400 font-bold">{row.losses}</td>
+                                          <td className="p-3 text-center text-cyan-400">{row.gf}</td>
+                                          <td className="p-3 text-center text-white">{row.ga}</td>
+                                          <td className="p-3 text-center text-cyan-300">{row.gd}</td>
+                                          <td className="p-3 text-center font-black text-yellow-400 text-lg drop-shadow-md">{row.points}</td>
+                                       </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                           </CardContent>
+                        </Card>
+                     );
+                  })}
+               </div>
+            )}
+
+            {/* TAB: RESULTS (MATHANI) */}
+            {activeMathaniTab === 'results' && (
+               <div className="space-y-8">
+                  {["دور المجموعات", "دور الـ 16", "دور الـ 8", "دور الـ 4", "النهائي"].map(roundName => {
+                     const roundMatches = finishedMatches.filter(m => m.round === roundName || (roundName === "دور الـ 16" && m.round === "دور الستة عشر") || (roundName === "دور الـ 8" && m.round === "دور الثمانية") || (roundName === "دور الـ 4" && m.round === "نصف النهائي"));
+                     if (roundMatches.length === 0) return null;
+                     return (
+                       <Card key={roundName} className="bg-[#13213a] border border-emerald-500/30 shadow-lg">
+                         <CardHeader className="bg-emerald-500/10 border-b border-emerald-500/20 py-3"><CardTitle className="text-emerald-400 text-lg">{roundName}</CardTitle></CardHeader>
+                         <CardContent className="p-4 grid gap-4 md:grid-cols-2">
+                            {roundMatches.map(match => (
+                               <div key={match.id} className="bg-[#0a1428] border border-white/5 rounded-2xl p-4 flex justify-between items-center hover:border-emerald-500/50 transition-all">
+                                  <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                                  <div className="bg-[#13213a] px-4 py-2 rounded-xl text-yellow-400 font-black text-xl border border-white/10 shrink-0 shadow-inner">{renderMatchScore(match)}</div>
+                                  <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                               </div>
+                            ))}
+                         </CardContent>
+                       </Card>
+                     );
+                  })}
+                  {finishedMatches.length === 0 && <div className="text-center text-gray-400 font-bold py-10 bg-[#13213a] rounded-3xl border border-white/5">لا توجد نتائج مباريات مسجلة حالياً في قاعدة البيانات لهذه البطولة.</div>}
+               </div>
+            )}
+
+            {/* TAB: STATS (MATHANI) */}
+            {activeMathaniTab === 'stats' && (
+               <div className="space-y-6">
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {[ 
+                       {label: "المباريات التي لُعبت", value: statsData.totalMatches, icon: "⏱️", color: "text-cyan-400"}, 
+                       {label: "عدد مرات الفوز", value: statsData.totalMatches - (statsData.draws00 + statsData.drawsPositive), icon: "✅", color: "text-emerald-400"}, 
+                       {label: "عدد التعادلات", value: statsData.draws00 + statsData.drawsPositive, icon: "🤝", color: "text-gray-300"}, 
+                       {label: "إجمالي الأهداف", value: statsData.totalGoals, icon: "⚽", color: "text-yellow-400"},
+                       {label: "الإنذارات (صفراء)", value: statsData.totalYellow, icon: "🟨", color: "text-yellow-500"},
+                       {label: "حالات الطرد (حمراء)", value: statsData.totalRed, icon: "🟥", color: "text-red-500"}
+                    ].map((s, i) => (
+                      <div key={i} className="bg-[#13213a] p-5 rounded-2xl border border-white/5 text-center flex flex-col items-center justify-center shadow-lg transition-transform hover:scale-[1.02]">
+                         <span className="text-4xl mb-3 drop-shadow-md">{s.icon}</span>
+                         <p className="text-gray-400 text-sm font-bold mb-1">{s.label}</p>
+                         <p className={`text-3xl font-black drop-shadow-sm ${s.color}`}>{s.value}</p>
+                      </div>
+                    ))}
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-[#13213a] border border-emerald-500/20 p-5 rounded-2xl flex justify-between items-center shadow-lg">
+                       <div className="flex flex-col">
+                          <span className="text-gray-400 text-xs font-bold mb-1">أقوى خط هجوم بالبطولة</span>
+                          <span className="text-xl font-black text-emerald-400">{statsData.bestAttack?.team || "—"}</span>
+                       </div>
+                       <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-black text-lg py-1.5 px-4">{statsData.bestAttack?.gf || 0} أهداف</Badge>
+                    </Card>
+                    <Card className="bg-[#13213a] border border-emerald-500/20 p-5 rounded-2xl flex justify-between items-center shadow-lg">
+                       <div className="flex flex-col">
+                          <span className="text-gray-400 text-xs font-bold mb-1">أقوى خط دفاع (الأقل استقبالاً)</span>
+                          <span className="text-xl font-black text-cyan-400">{statsData.bestDefense?.team || "—"}</span>
+                       </div>
+                       <Badge className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-black text-lg py-1.5 px-4">{statsData.bestDefense?.ga || 0} أهداف</Badge>
+                    </Card>
+                 </div>
+               </div>
+            )}
+
+            {/* TAB: SCORERS (MATHANI) */}
+            {activeMathaniTab === 'scorers' && (
+               <Card className="bg-[#13213a] border border-emerald-500/30 p-4 sm:p-6 shadow-xl">
+                  <CardHeader className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-4 border-b border-white/10 mb-4">
+                     <CardTitle className="text-yellow-300 font-black">قائمة هدافي بطولة المثاني</CardTitle>
+                     <div className="relative w-full sm:w-64"><Search className="absolute right-3 top-3 h-4 w-4 text-cyan-300" /><Input value={searchScorers} onChange={e => setSearchScorers(e.target.value)} placeholder="بحث عن لاعب..." className="pr-10 bg-[#1e2a4a] border-emerald-500/40 text-white rounded-xl" /></div>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-0">
+                     {filteredScorers.map((s, i) => (
+                        <div key={i} className="bg-[#1e2a4a] p-4 rounded-2xl border border-white/5 flex items-center justify-between shadow-md hover:border-emerald-500/50 transition-all">
+                           <div className="flex items-center gap-3">
+                              <Badge className={i===0?"bg-yellow-400 text-black":i===1?"bg-gray-300 text-black shadow-md":"bg-gray-800"}>{i+1}</Badge>
+                              <div><h4 className="font-black text-white text-base leading-tight">{s.player}</h4><span className="text-gray-400 text-xs font-bold mt-1 inline-block">{s.team}</span></div>
+                           </div>
+                           <Badge className="bg-emerald-500/20 text-emerald-400 text-lg font-black border border-emerald-500/30 px-3.5 py-1" dir="ltr">{s.goals} ⚽</Badge>
+                        </div>
+                     ))}
+                     {filteredScorers.length === 0 && <div className="col-span-full text-center text-gray-400 font-bold py-6">لا يوجد هدافين مسجلين بعد في هذه البطولة.</div>}
+                  </CardContent>
+               </Card>
+            )}
+
+            {/* TAB: BANNED (MATHANI) */}
+            {activeMathaniTab === 'banned' && (
+               <Card className="bg-[#13213a] border border-red-500/30 shadow-xl">
+                  <CardHeader className="p-4 border-b border-white/5"><CardTitle className="text-red-400 text-lg">⚠️ قائمة الموقوفين والعقوبات</CardTitle></CardHeader>
+                  <CardContent className="p-0 overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-right text-sm min-w-[500px]">
+                      <thead className="bg-[#0a1428]">
+                         <tr><th className="p-4 text-cyan-300 font-bold">اللاعب</th><th className="p-4 text-cyan-300 font-bold">الفريق</th><th className="p-4 text-center text-cyan-300 font-bold">البطاقات</th><th className="p-4 text-center text-cyan-300 font-bold">العقوبة</th></tr>
+                      </thead>
+                      <tbody>
+                        {cardsList.filter(p => p.yellow >= 3 || p.red >= 1).map((p, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                             <td className="p-4 font-black text-white text-base">{p.player}</td>
+                             <td className="p-4 text-gray-300 font-bold">{p.team}</td>
+                             <td className="p-4 text-center flex justify-center gap-4 font-black"><span className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 px-2.5 py-0.5 rounded-md">🟨 {p.yellow}</span><span className="bg-red-500/10 text-red-500 border border-red-500/30 px-2.5 py-0.5 rounded-md">🟥 {p.red}</span></td>
+                             <td className="p-4 text-center"><Badge className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-1 font-bold shadow-sm">{p.status}</Badge></td>
+                          </tr>
+                        ))}
+                        {cardsList.filter(p => p.yellow >= 3 || p.red >= 1).length === 0 && <tr><td colSpan={4} className="p-8 text-center text-emerald-400 font-bold">لا يوجد لاعبين موقوفين حالياً.</td></tr>}
+                      </tbody>
+                    </table>
+                  </CardContent>
+               </Card>
+            )}
+          </div>
+        )}
 
         {/* MATROUH CUP SECTION */}
         {mainAppTab === 'matrouh_cup' && (
@@ -796,26 +988,32 @@ export default function Page() {
                           <TreeMatchBox label="م 98" t1="السلوم" t2="اصدقاء عيسي المغواري" data={youthTree.p98} />
                           <TreeMatchBox label="م 100" t1="اصدقاء قسم الله" t2="اصدقاء سلامة بدر" data={youthTree.p100} />
                           <TreeMatchBox label="م 101" t1="ايس كريم الملكة" t2="غوط رباح" data={youthTree.p101} />
+                          <TreeMatchBox label="م 102" t1="محاربي الصحراء" t2="اصدقاء خالد" data={youthTree.p102} />
                        </div>
                      </div>
 
                      <div className="flex justify-between gap-4 items-start pt-6">
                         <div className="flex flex-col gap-6 w-1/4">
                            <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">دور الستة عشر</div>
-                           <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2="الفائز م 104" data={youthTree.r1} />
-                           <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز م 97"} data={youthTree.r2} />
+                           <TreeMatchBox label="م 1" t1={youthTree.getT(1)} t2="الفائز من م 104" data={youthTree.r1} />
+                           <TreeMatchBox label="م 2" t1={youthTree.getT(8)} t2={youthTree.p97.win || "الفائز من م 97"} data={youthTree.r2} />
                            <TreeMatchBox label="م 3" t1="غوط رباح" t2="القدس" data={youthTree.r3} />
-                           <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز م 100"} data={youthTree.r4} />
+                           <TreeMatchBox label="م 4" t1={youthTree.getT(5)} t2={youthTree.p100.win || "الفائز من م 100"} data={youthTree.r4} />
+                           <TreeMatchBox label="م 5" t1="سامي سعيد" t2="شباب القناشات" data={youthTree.r5} />
+                           <TreeMatchBox label="م 6" t1={youthTree.getT(7)} t2={youthTree.p98.win || "الفائز من م 98"} data={youthTree.r6} />
+                           <TreeMatchBox label="م 7" t1="اصدقاء خالد" t2="براني" data={youthTree.r7} />
                         </div>
                         <div className="flex flex-col gap-24 w-1/4 pt-16">
                            <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">دور الثمانية</div>
-                           <TreeMatchBox label="مربع 1" t1="الفائز م 1" t2="الفائز م 2" data={youthTree.q1} />
-                           <TreeMatchBox label="مربع 2" t1="الفائز م 3" t2="الفائز م 4" data={youthTree.q2} />
+                           <TreeMatchBox label="مربع 1" t1={youthTree.r1.win || "الفائز (م 1)"} t2={youthTree.r2.win || "الفائز (م 2)"} data={youthTree.q1} />
+                           <TreeMatchBox label="مربع 2" t1={youthTree.r3.win || "الفائز (م 3)"} t2={youthTree.r4.win || "الفائز (م 4)"} data={youthTree.q2} />
+                           <TreeMatchBox label="مربع 3" t1={youthTree.r5.win || "الفائز (م 5)"} t2={youthTree.r6.win || "الفائز (م 6)"} data={youthTree.q3} />
                         </div>
                         <div className="flex flex-col gap-40 w-1/4 pt-32">
                            <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">نصف النهائي والنهائي الكبير</div>
-                           <TreeMatchBox label="نصف 1" t1="الفائز مربع 1" t2="الفائز مربع 2" data={youthTree.s1} />
-                           <div className="mt-12"><TreeMatchBox label="النهائي الكبير 👑" t1="الطرف الأول" t2="الطرف الثاني" data={youthTree.f1} /></div>
+                           <TreeMatchBox label="نصف 1" t1={youthTree.q1.win || "الفائز مربع 1"} t2={youthTree.q2.win || "الفائز مربع 2"} data={youthTree.s1} />
+                           <TreeMatchBox label="نصف 2" t1={youthTree.q3.win || "الفائز مربع 3"} t2="الفائز مربع 4" data={youthTree.s2} />
+                           <div className="mt-12"><TreeMatchBox label="النهائي الكبير 👑" t1={youthTree.s1.win || "الطرف الأول"} t2={youthTree.s2.win || "الطرف الثاني"} data={youthTree.f1} /></div>
                         </div>
                      </div>
                   </div>
@@ -832,12 +1030,12 @@ export default function Page() {
                         </div>
                         <div className="flex flex-col gap-28 w-1/3 pt-14">
                            <div className="text-center text-cyan-300 font-bold text-xs border-b border-white/5 pb-2">نصف النهائي</div>
-                           <TreeMatchBox label="نصف 1" t1="الفائز مربع 1" t2="الفائز مربع 2" data={juniorsTree.s1} />
-                           <TreeMatchBox label="نصف 2" t1="الفائز مربع 3" t2="الفائز مربع 4" data={juniorsTree.s2} />
+                           <TreeMatchBox label="نصف 1" t1={juniorsTree.q1.win || "الفائز (مربع 1)"} t2={juniorsTree.q2.win || "الفائز (مربع 2)"} data={juniorsTree.s1} />
+                           <TreeMatchBox label="نصف 2" t1={juniorsTree.q3.win || "الفائز (مربع 3)"} t2={juniorsTree.q4.win || "الفائز (مربع 4)"} data={juniorsTree.s2} />
                         </div>
                         <div className="flex flex-col gap-6 w-1/3 pt-36">
                            <div className="text-center text-yellow-400 font-black text-xs border-b border-white/5 pb-2">المباراة النهائية للناشئين</div>
-                           <TreeMatchBox label="النهائي الكبير 👑" t1="الطرف الأول" t2="الطرف الثاني" data={juniorsTree.f1} />
+                           <TreeMatchBox label="النهائي الكبير 👑" t1={juniorsTree.s1.win || "الطرف الأول"} t2={juniorsTree.s2.win || "الطرف الثاني"} data={juniorsTree.f1} />
                         </div>
                      </div>
                   </div>
@@ -845,7 +1043,7 @@ export default function Page() {
               </div>
             )}
 
-            {/* TAB: STANDINGS (تم إصلاح خطأ الـ Popover غير المعرف هنا برمجياً وعادت الواجهة للعمل مباشرة) */}
+            {/* TAB: STANDINGS */}
             {activeTab === "standings" && (
               <div className="space-y-8 animate-in fade-in duration-500">
                 {activeTournament === 'juniors' ? (

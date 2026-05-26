@@ -9,17 +9,20 @@ interface ShopSectionProps {
   addToCart: (product: any) => void;
 }
 
-export default function ShopSection({ productsList, addToCart }: ShopSectionProps) {
+export const ShopSection = ({ productsList, addToCart }: ShopSectionProps) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 mt-4">
+      {/* هيدر المتجر بنفس الألوان والتصميم بالظبط */}
       <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 shadow-xl text-center md:text-right">
         <h2 className="text-3xl font-black text-yellow-400 mb-2">🛒 متجر هيرو سبورت الرياضي</h2>
         <p className="text-cyan-300 font-bold">اختر التيشرتات والجوائز المخصصة لفريقك مع الدفع السريع والآمن.</p>
       </div>
+
+      {/* شبكة عرض المنتجات */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {productsList.length > 0 ? (
-            productsList.map(product => (
+            productsList.map((product) => (
               <Card key={product.id} className="bg-[#13213a] border-yellow-400/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-400 transition-colors">
                 <div className="aspect-square bg-[#0a1428] overflow-hidden">
                   {product.imageUrl ? (
@@ -50,4 +53,4 @@ export default function ShopSection({ productsList, addToCart }: ShopSectionProp
       </div>
     </div>
   );
-}
+};

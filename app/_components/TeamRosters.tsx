@@ -4,61 +4,82 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ClipboardList, Lock, Loader2, Upload, Camera } from "lucide-react";
+import { ClipboardList, Lock, Loader2, Users, Unlock, Upload, Camera } from "lucide-react";
 
-interface RostersSectionProps {
+interface TeamRostersProps {
   rosterViewMode: 'list' | 'register';
   setRosterViewMode: (mode: 'list' | 'register') => void;
   selectedRosterToView: any;
   setSelectedRosterToView: (roster: any) => void;
   activeTeamsList: string[];
   rostersList: any[];
+  normalizeTeamName: (name: string) => string;
   cupEdition: string;
-  unlockedRoster: string | null;
   showPaymentForm: boolean;
   setShowPaymentForm: (show: boolean) => void;
   paymentForm: any;
   setPaymentForm: React.Dispatch<React.SetStateAction<any>>;
+  handleInitiatePayment: () => void;
+  isInitiatingPay: boolean;
   rosterAccessPassword: string;
   setRosterAccessPassword: (pass: string) => void;
+  handleRosterLogin: () => void;
+  unlockedRoster: string | null;
   rosterForm: any;
   setRosterForm: React.Dispatch<React.SetStateAction<any>>;
-  isInitiatingPay: boolean;
-  isUploading: boolean;
-  handleInitiatePayment: () => void;
-  handleRosterLogin: () => void;
   updateRosterPlayer: (index: number, field: string, value: string) => void;
   handlePlayerImageUpload: (index: number, field: 'personalImage' | 'idImage', file?: File) => void;
   submitFinalRoster: () => void;
-  normalizeTeamName: (name: string) => string;
+  isUploading: boolean;
 }
 
-export default function RostersSection({
-  rosterViewMode, setRosterViewMode, selectedRosterToView, setSelectedRosterToView,
-  activeTeamsList, rostersList, cupEdition, unlockedRoster, showPaymentForm, setShowPaymentForm,
-  paymentForm, setPaymentForm, rosterAccessPassword, setRosterAccessPassword,
-  rosterForm, setRosterForm, isInitiatingPay, isUploading, handleInitiatePayment,
-  handleRosterLogin, updateRosterPlayer, handlePlayerImageUpload, submitFinalRoster, normalizeTeamName
-}: RostersSectionProps) {
+export const TeamRosters = ({
+  rosterViewMode,
+  setRosterViewMode,
+  selectedRosterToView,
+  setSelectedRosterToView,
+  activeTeamsList,
+  rostersList,
+  normalizeTeamName,
+  cupEdition,
+  showPaymentForm,
+  setShowPaymentForm,
+  paymentForm,
+  setPaymentForm,
+  handleInitiatePayment,
+  isInitiatingPay,
+  rosterAccessPassword,
+  setRosterAccessPassword,
+  handleRosterLogin,
+  unlockedRoster,
+  rosterForm,
+  setRosterForm,
+  updateRosterPlayer,
+  handlePlayerImageUpload,
+  submitFinalRoster,
+  isUploading
+}: TeamRostersProps) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* الأزرار العلوية للتبديل بين العرض والتسجيل */}
       <div className="flex justify-center mb-6">
          <div className="bg-[#13213a] p-1.5 rounded-2xl border border-white/10 inline-flex shadow-lg gap-1 w-full max-w-md">
            <button onClick={() => { setRosterViewMode('list'); setSelectedRosterToView(null); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'list' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}><ClipboardList className="inline-block mr-1 h-5 w-5" /> عرض القوائم المشاركة</button>
            {cupEdition === 'edition_4' && (
-              <button onClick={() => { setRosterViewMode('register'); setShowPaymentForm(true); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}><Lock className="inline-block mr-1 h-5 w-5" /> تسجيل فريق جديد</button>
+              <button onClick={() => { setRosterViewMode('register'); }} className={`flex-1 py-3 rounded-xl text-base font-bold transition-all ${rosterViewMode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}><Lock className="inline-block mr-1 h-5 w-5" /> تسجيل فريق جديد</button>
            )}
          </div>
       </div>
 
+      {/* 1. عرض بطاقات المجموعات والفرق المعتمدة */}
       {rosterViewMode === 'list' && !selectedRosterToView && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {activeTeamsList.map(teamName => {
-                 const rosterData = rostersList.find(r => r.id === teamName); const isSubmitted = rosterData && rosterData.isSubmitted;
+                 const rosterData = rostersList.find(r => r.id === normalizeTeamName(teamName)); const isSubmitted = rosterData && rosterData.isSubmitted;
                  return (
                    <Card key={teamName} onClick={() => isSubmitted && setSelectedRosterToView(rosterData)} className={`border transition-all cursor-pointer overflow-hidden ${isSubmitted ? 'bg-[#1e2a4a] border-blue-500/50 hover:scale-105' : 'bg-[#13213a] border-white/5 opacity-55'}`}>
                       <CardContent className="p-6 flex flex-col items-center justify-center text-center gap-3">
-                         <span className="text-blue-400 text-3xl">🛡️</span>
+                         <Users className="h-8 w-8 text-blue-400" />
                          <span className="font-black text-white text-lg">{teamName}</span>
                          <Badge className={isSubmitted ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" : "bg-gray-800 text-gray-400"}>{isSubmitted ? "قائمة معتمدة" : "لم تسجل بعد"}</Badge>
                       </CardContent>
@@ -68,6 +89,7 @@ export default function RostersSection({
         </div>
       )}
 
+      {/* 2. عرض تفاصيل قائمة فريق معين عند الضغط عليه */}
       {rosterViewMode === 'list' && selectedRosterToView && (
          <div className="max-w-4xl mx-auto">
            <Button onClick={() => setSelectedRosterToView(null)} variant="outline" className="mb-4 text-white font-bold">العودة للقوائم ↩</Button>
@@ -92,15 +114,16 @@ export default function RostersSection({
          </div>
       )}
 
+      {/* 3. شاشة الدفع المالي فودافون كاش والتحقق من كلمة السر */}
       {rosterViewMode === 'register' && !unlockedRoster && (
          <Card className="max-w-xl mx-auto bg-[#13213a] border border-emerald-500/30 rounded-3xl shadow-2xl">
-           <CardHeader className="text-center pb-6 border-b border-white/5"><span className="text-emerald-400 text-4xl block">🔒</span><CardTitle className="text-2xl font-black text-white mt-4">تسجيل وبوابة الدفع الإلكتروني</CardTitle></CardHeader>
+           <CardHeader className="text-center pb-6 border-b border-white/5"><Lock className="mx-auto h-12 w-12 text-emerald-400" /><CardTitle className="text-2xl font-black text-white mt-4">تسجيل وبوابة الدفع الإلكتروني</CardTitle></CardHeader>
            <CardContent className="p-8 space-y-6">
               {showPaymentForm ? (
                 <div className="space-y-4 animate-in fade-in">
-                   <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm((p: any)=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
-                   <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm((p: any)=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                   <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm((p: any)=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                   <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm((p:any)=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
+                   <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm((p:any)=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                   <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm((p:any)=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                    <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "دفع الاشتراك فودافون كاش 💳"}</Button>
                    <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                 </div>
@@ -115,15 +138,16 @@ export default function RostersSection({
          </Card>
       )}
 
+      {/* 4. استمارة ملء بيانات فريق وجلب صور بطاقات اللاعبين */}
       {rosterViewMode === 'register' && unlockedRoster && (
          <div className="max-w-5xl mx-auto animate-in fade-in duration-500">
             <Card className="bg-[#13213a] border border-blue-500/30 rounded-3xl overflow-hidden shadow-2xl">
-               <CardHeader className="bg-[#1e2a4a] border-b border-blue-500/20 py-6"><CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-2">📋 استمارة تسجيل وتسكين الفريق السحابية</CardTitle></CardHeader>
+               <CardHeader className="bg-[#1e2a4a] border-b border-blue-500/20 py-6"><CardTitle className="text-3xl font-black text-white text-center flex items-center justify-center gap-2"><ClipboardList/> استمارة تسجيل وتسكين الفريق السحابية</CardTitle></CardHeader>
                <CardContent className="p-4 md:p-8 space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0a1428] p-6 rounded-2xl border border-white/5">
-                     <div className="md:col-span-2"><label className="block text-yellow-300 font-bold mb-2 text-lg">اسم الفريق</label><Input placeholder="اكتب اسم فريقك بدقة..." value={rosterForm.teamName} onChange={e => setRosterForm((p: any) => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-black text-xl h-14" /></div>
-                     <div><label className="block text-cyan-300 font-bold mb-2">اسم مسئول ومفوض الفريق</label><Input placeholder="الاسم ثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm((p: any) => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" /></div>
-                     <div><label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (الكاش)</label><Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm((p: any) => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" /></div>
+                     <div className="md:col-span-2"><label className="block text-yellow-300 font-bold mb-2 text-lg">اسم الفريق</label><Input placeholder="اكتب اسم فريقك بدقة..." value={rosterForm.teamName} onChange={e => setRosterForm((p:any) => ({...p, teamName: e.target.value}))} className="bg-[#1e2a4a] border-yellow-400/50 text-white font-black text-xl h-14" /></div>
+                     <div><label className="block text-cyan-300 font-bold mb-2">اسم مسئول ومفوض الفريق</label><Input placeholder="الاسم ثلاثي" value={rosterForm.managerName} onChange={e => setRosterForm((p:any) => ({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12" /></div>
+                     <div><label className="block text-cyan-300 font-bold mb-2">رقم هاتف المسئول (الكاش)</label><Input type="tel" dir="ltr" placeholder="01xxxxxxxxx" value={rosterForm.managerPhone} onChange={e => setRosterForm((p:any) => ({...p, managerPhone: e.target.value}))} className="bg-[#1e2a4a] border-blue-500/40 text-white font-bold h-12 text-right" /></div>
                   </div>
                   <div className="space-y-4">
                         {rosterForm.players.map((player: any, index: number) => (
@@ -154,4 +178,4 @@ export default function RostersSection({
       )}
     </div>
   );
-}
+};

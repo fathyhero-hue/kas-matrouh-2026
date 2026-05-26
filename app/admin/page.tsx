@@ -34,7 +34,6 @@ const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?
    مكوّنات التصميم الجديد
 ═══════════════════════════════════════════════════════ */
 
-// بطاقة قسم موحّدة
 const SectionCard = ({ title, icon, color = "yellow", children, action }: any) => {
   const colors: Record<string, string> = {
     yellow: "border-yellow-400/40 from-yellow-500/8",
@@ -64,7 +63,6 @@ const SectionCard = ({ title, icon, color = "yellow", children, action }: any) =
   );
 };
 
-// زر احترافي
 const Btn = ({ onClick, disabled, variant = "primary", size = "md", children, className = "" }: any) => {
   const variants: Record<string, string> = {
     primary: "bg-yellow-400 hover:bg-yellow-300 text-black font-black shadow-[0_2px_12px_rgba(250,204,21,0.35)]",
@@ -90,7 +88,6 @@ const Btn = ({ onClick, disabled, variant = "primary", size = "md", children, cl
   );
 };
 
-// حقل إدخال موحّد
 const Field = ({ label, labelColor = "text-gray-400", children }: any) => (
   <div className="space-y-1.5">
     {label && <label className={`text-xs font-bold uppercase tracking-wide ${labelColor}`}>{label}</label>}
@@ -101,7 +98,6 @@ const Field = ({ label, labelColor = "text-gray-400", children }: any) => (
 const inputCls = "w-full bg-[#0a1428] border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-sm outline-none focus:border-yellow-400/50 transition-colors h-11";
 const selectCls = `${inputCls} cursor-pointer appearance-none`;
 
-// شريط التبديل (Toggle Pill)
 const TogglePill = ({ options, value, onChange, activeColor = "bg-yellow-400 text-black" }: any) => (
   <div className="bg-[#0a1428] border border-white/10 p-1 rounded-full flex gap-1">
     {options.map((opt: any) => (
@@ -116,7 +112,7 @@ const TogglePill = ({ options, value, onChange, activeColor = "bg-yellow-400 tex
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'shop'>('matrouh_cup');
+  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop'>('matrouh_cup');
   const [cupEdition, setCupEdition] = useState<'edition_3' | 'edition_4'>('edition_3');
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth');
   const [activeTab, setActiveTab] = useState("champion");
@@ -124,6 +120,9 @@ export default function AdminPage() {
 
   const [eliteTeams, setEliteTeams] = useState<any[]>([]);
   const [eliteTeamForm, setEliteTeamForm] = useState({ name: "", logoUrl: "" });
+
+  // تصحيح مشكلة المصفوفات المتطابقة
+  const [mathaniGroups, setMathaniGroups] = useState<string[][]>(Array.from({ length: 8 }, () => ["", "", "", ""]));
 
   const [matches, setMatches] = useState<any[]>([]);
   const matchesRef = useRef<any[]>([]);
@@ -186,10 +185,16 @@ export default function AdminPage() {
 
   const sortedTeams = useMemo(() => Array.from(new Set([...CLEANED_TEAM_NAMES, ...PLAYOFF_TEAMS])).sort((a, b) => a.localeCompare(b, "ar")), []);
   const sortedJuniorsTeams = useMemo(() => [...JUNIORS_TEAMS].sort((a, b) => a.localeCompare(b, "ar")), []);
+  
   const currentTeamsList = useMemo(() => {
+    if (mainAppTab === 'mathani_cup') {
+       const t = new Set<string>();
+       mathaniGroups.forEach(g => g.forEach(team => { if (team.trim()) t.add(team.trim()); }));
+       return Array.from(t).sort((a,b) => a.localeCompare(b, "ar"));
+    }
     if (cupEdition === 'edition_3') return activeTournament === 'youth' ? sortedTeams : sortedJuniorsTeams;
     return Array.from(new Set(rostersList.map(r => r.id)));
-  }, [cupEdition, activeTournament, sortedTeams, sortedJuniorsTeams, rostersList]);
+  }, [cupEdition, activeTournament, sortedTeams, sortedJuniorsTeams, rostersList, mainAppTab, mathaniGroups]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [matchForm, setMatchForm] = useState({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" });
@@ -208,7 +213,15 @@ export default function AdminPage() {
   const [editingRosterId, setEditingRosterId] = useState<string | null>(null);
   const [rosterFormAdmin, setRosterFormAdmin] = useState({ managerName: "", managerPhone: "", password: "", isSubmitted: false, logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "" })) });
 
-  const getColl = (base: string) => { let coll = base; if (cupEdition === 'edition_4') coll += '_ed4'; if (activeTournament === 'juniors') coll += '_juniors'; return coll; };
+  const getColl = (base: string) => { 
+     if (mainAppTab === 'mathani_cup') return `${base}_mathani`;
+     if (mainAppTab === 'elite_cup') return `${base}_elite`;
+     let coll = base; 
+     if (cupEdition === 'edition_4') coll += '_ed4'; 
+     if (activeTournament === 'juniors') coll += '_juniors'; 
+     return coll; 
+  };
+
   useEffect(() => { const clockTimer = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(clockTimer); }, []);
 
   useEffect(() => {
@@ -222,7 +235,7 @@ export default function AdminPage() {
     setCardForm(p => ({ ...p, team: currentTeamsList[0] || "", player: "" }));
     setMotmForm(p => ({ ...p, team: currentTeamsList[0] || "", player: "", imageUrl: "", matchName: "" }));
     setEditingId(null); setEditingGoalId(null); setEditingMotmId(null); setEditingRosterId(null);
-  }, [activeTournament, currentTeamsList, cupEdition]);
+  }, [activeTournament, currentTeamsList, cupEdition, mainAppTab]);
 
   useEffect(() => {
     const existing = formationsList.find(f => f.round === formationForm.round);
@@ -251,9 +264,20 @@ export default function AdminPage() {
     const unsubEliteTeams = onSnapshot(collection(db, "elite_teams"), (snap) => setEliteTeams(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    
+    // سحب بيانات مجموعات المثاني وتأكيد استقلال المصفوفات
+    const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().groups) {
+        setMathaniGroups(docSnap.data().groups);
+      } else {
+        setMathaniGroups(Array.from({ length: 8 }, () => ["", "", "", ""]));
+      }
+    });
+
     const unsubRegMat = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if (docSnap.exists()) { setRegDeadlineMatrouh(docSnap.data().deadline || ""); setRegPasswordMatrouh(docSnap.data().password || ""); setRegPriceMatrouh(docSnap.data().price || 500); } });
     const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if (docSnap.exists()) { setRegDeadlineElite(docSnap.data().deadline || ""); setRegPasswordElite(docSnap.data().password || ""); setRegPriceElite(docSnap.data().price || 1000); } });
     const unsubTourLineup = onSnapshot(doc(db, getColl("tournament_lineup"), "current"), (snap) => { if (snap.exists()) { setAdminLineup(snap.data()); } });
+    
     const timerInterval = setInterval(() => {
       matchesRef.current.forEach(m => {
         if (m.isTimerRunning && m.status !== "انتهت" && m.status !== "استراحة" && m.status !== "ضربات جزاء" && m.status !== "ستبدأ بعد قليل") {
@@ -262,14 +286,14 @@ export default function AdminPage() {
         }
       });
     }, 5000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); clearInterval(timerInterval); };
-  }, [isAuth, activeTournament, cupEdition]);
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); unsubMathaniGroups(); clearInterval(timerInterval); };
+  }, [isAuth, activeTournament, cupEdition, mainAppTab]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
   const handleAutoProgression = async (match: any) => { if (match.status !== "انتهت") return; const winner = match.homeGoals > match.awayGoals ? match.teamA : (match.awayGoals > match.homeGoals ? match.teamB : null); if (!winner) return; const prog = BRACKET_MAP[match.matchLabel]; if (prog) { const nextMatch = matches.find(m => m.matchLabel === prog.targetLabel && m.round === "دور الستة عشر"); if (nextMatch) { await updateDoc(doc(db, getColl("matches"), nextMatch.id), { [prog.targetSide]: winner }); } } };
   const saveBracketMatch = async () => { if (!bracketForm.teamA.trim() && !bracketForm.teamB.trim()) return alert("يجب اختيار الفرق أولاً!"); const existingMatch = matches.find(m => m.round === bracketForm.round && m.matchLabel === bracketForm.matchLabel); const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(bracketForm.date).getDay()]; if (existingMatch) { await updateDoc(doc(db, getColl("matches"), existingMatch.id), { teamA: bracketForm.teamA || existingMatch.teamA, teamB: bracketForm.teamB || existingMatch.teamB, date: bracketForm.date, time: bracketForm.time, dayName }); alert("✅ تم التحديث"); } else { await addDoc(collection(db, getColl("matches")), { round: bracketForm.round, matchLabel: bracketForm.matchLabel, teamA: bracketForm.teamA, teamB: bracketForm.teamB, homeGoals: 0, awayGoals: 0, date: bracketForm.date, time: bracketForm.time, dayName, status: "لم تبدأ", isLive: false, streamClosed: false }); alert("✅ تم الإنشاء"); } };
   const saveMatch = async () => { if (!matchForm.teamA.trim() || !matchForm.teamB.trim()) return alert("يجب إدخال أسماء الفرق!"); const dayName = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(matchForm.date).getDay()]; const data = { ...matchForm, dayName, isLive: false, streamClosed: false }; if (editingId) { await updateDoc(doc(db, getColl("matches"), editingId), data); setEditingId(null); alert("✅ تم التعديل"); } else { await addDoc(collection(db, getColl("matches")), data); alert("✅ تم الإضافة"); } setMatchForm({ teamA: "", teamALogo: "", teamB: "", teamBLogo: "", homeGoals: 0, awayGoals: 0, matchLabel: "", round: "الجولة الأولى", date: new Date().toISOString().slice(0, 10), time: "15:30", status: "لم تبدأ" }); };
-  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamALogo: match.teamALogo || "", teamB: match.teamB, teamBLogo: match.teamBLogo || "", homeGoals: match.homeGoals, awayGoals: match.awayGoals, matchLabel: match.matchLabel || "", round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); setActiveTab(cupEdition === 'edition_3' ? "knockout" : "matches"); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = (match: any) => { setEditingId(match.id); setMatchForm({ teamA: match.teamA, teamALogo: match.teamALogo || "", teamB: match.teamB, teamBLogo: match.teamBLogo || "", homeGoals: match.homeGoals, awayGoals: match.awayGoals, matchLabel: match.matchLabel || "", round: match.round, date: match.date, time: match.time, status: match.status || "لم تبدأ" }); setActiveTab(cupEdition === 'edition_3' && mainAppTab !== 'mathani_cup' ? "knockout" : "matches"); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const deleteMatch = async (id: string) => confirm("متأكد من الحذف؟") && await deleteDoc(doc(db, getColl("matches"), id));
   const updateMatchLive = async (id: string, updates: any) => { const currentMatch = matchesRef.current.find(m => m.id === id) || matches.find(m => m.id === id); const nextUpdates = { ...updates }; if (Object.prototype.hasOwnProperty.call(nextUpdates, 'isTimerRunning')) { if (nextUpdates.isTimerRunning) { const baseMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = baseMinute; nextUpdates.liveMinuteBase = baseMinute; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } else if (currentMatch) { const pausedMinute = getAccurateLiveMinute(currentMatch); nextUpdates.liveMinute = pausedMinute; nextUpdates.liveMinuteBase = pausedMinute; nextUpdates.timerStartedAt = null; nextUpdates.timerPausedTotal = 0; } } if (Object.prototype.hasOwnProperty.call(nextUpdates, 'liveMinute') && currentMatch?.isTimerRunning && !Object.prototype.hasOwnProperty.call(updates, 'isTimerRunning')) { nextUpdates.liveMinuteBase = Number(nextUpdates.liveMinute) || 0; nextUpdates.timerStartedAt = Date.now(); nextUpdates.timerPausedTotal = 0; } await updateDoc(doc(db, getColl("matches"), id), nextUpdates); if (nextUpdates.status === "انتهت" && currentMatch) handleAutoProgression({ ...currentMatch, ...nextUpdates }); };
   const addLiveEvent = async (matchId: string, currentLiveMinute: number) => { const form = liveEventForms[matchId] || {}; if (!form.text || !form.text.trim()) return alert("يرجى كتابة تفاصيل الحدث!"); const minute = form.minute !== undefined ? form.minute : currentLiveMinute; const currentMatch = matches.find(m => m.id === matchId); if (!currentMatch) return; const newEvent = { minute, type: form.type || 'info', text: form.text.trim(), createdAt: new Date().toISOString() }; await updateDoc(doc(db, getColl("matches"), matchId), { liveEvents: [...(currentMatch.liveEvents || []), newEvent] }); setLiveEventForms(p => ({ ...p, [matchId]: { minute: currentLiveMinute, type: 'info', text: '' } })); };
@@ -312,6 +336,16 @@ export default function AdminPage() {
   const addEliteTeam = async () => { if (!eliteTeamForm.name.trim()) return alert("أدخل اسم الفريق"); await addDoc(collection(db, "elite_teams"), eliteTeamForm); alert("تم إضافة الفريق للنخبة"); setEliteTeamForm({ name: "", logoUrl: "" }); };
   const deleteEliteTeam = async (id: string) => { if (confirm("حذف هذا الفريق؟")) await deleteDoc(doc(db, "elite_teams", id)); };
 
+  // === تصحيح دالة حفظ مجموعات المثاني لتجنب التشابك ===
+  const saveMathaniGroups = async () => {
+    try {
+      await setDoc(doc(db, "settings", "mathani_groups"), { groups: mathaniGroups });
+      alert("تم حفظ مجموعات بطولة المثاني بنجاح! ✔️");
+    } catch(e) {
+      alert("حدث خطأ أثناء الحفظ");
+    }
+  };
+
   const safeGoalSearch = goalSearchTerm.toLowerCase();
   const filteredGoals = goals.filter(g => normalizeTeamName(g.player).includes(safeGoalSearch) || normalizeTeamName(g.team).includes(safeGoalSearch));
   const safeCardSearch = cardSearchTerm.toLowerCase();
@@ -331,27 +365,36 @@ export default function AdminPage() {
   const liveMatches = sortMatches(liveMatchesList);
 
   const allAdminTabs = [
-    { key: "champion", label: "👑 البطل", hideForEd4: true },
-    { key: "registration_settings", label: "⚙️ التسجيل", hideForEd3: true },
-    { key: "tournament_lineup_admin", label: "📋 تشكيل البطولة" },
-    { key: "knockout", label: "🏆 الإقصائيات" },
-    { key: "matches", label: "⚽ المباريات", hideForEd3: true },
-    { key: "goals", label: "🥇 الهدافين" },
-    { key: "cards", label: "🟨 الكروت" },
-    { key: "motm", label: "🌟 نجوم المباريات" },
-    { key: "rosters", label: "📋 القوائم" },
-    { key: "totw", label: "🏟️ تشكيلة الجولة" },
-    { key: "fantasy", label: "🎁 فانتزي" },
-    { key: "media", label: "📰 الأخبار" },
-    { key: "notifications", label: "🔔 إشعارات" },
-    { key: "ticker", label: "✍️ شريط الأخبار" },
+    { key: "champion", label: "👑 البطل", app: ["matrouh_cup"], hideForEd4: true },
+    { key: "registration_settings", label: "⚙️ التسجيل", app: ["matrouh_cup"], hideForEd3: true },
+    { key: "tournament_lineup_admin", label: "📋 تشكيل البطولة", app: ["matrouh_cup"] },
+    { key: "mathani_groups", label: "🛡️ إدارة المجموعات", app: ["mathani_cup"] },
+    { key: "knockout", label: "🏆 الإقصائيات", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "matches", label: "⚽ المباريات", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "goals", label: "🥇 الهدافين", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "cards", label: "🟨 الكروت", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "motm", label: "🌟 نجوم المباريات", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "rosters", label: "📋 القوائم", app: ["matrouh_cup"] },
+    { key: "totw", label: "🏟️ تشكيلة الجولة", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "fantasy", label: "🎁 فانتزي", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "media", label: "📰 الأخبار", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "notifications", label: "🔔 إشعارات", app: ["matrouh_cup", "mathani_cup"] },
+    { key: "ticker", label: "✍️ شريط الأخبار", app: ["matrouh_cup", "mathani_cup"] },
   ];
 
-  // ── صفحة تسجيل الدخول ─────────────────────────────────
+  const visibleTabs = allAdminTabs.filter(tab => {
+    if (!tab.app.includes(mainAppTab)) return false;
+    if (mainAppTab === 'matrouh_cup') {
+       if (cupEdition === 'edition_3' && tab.hideForEd3) return false;
+       if (cupEdition === 'edition_4' && tab.hideForEd4) return false;
+       if (activeTournament === 'juniors' && tab.key === 'knockout') return false;
+    }
+    return true;
+  });
+
   if (!isAuth) return (
     <div dir="rtl" className="min-h-screen bg-[#060e1e] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* شعار */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl bg-yellow-400 flex items-center justify-center mx-auto mb-4 shadow-[0_0_40px_rgba(250,204,21,0.4)]">
             <Trophy className="w-10 h-10 text-black" />
@@ -359,18 +402,10 @@ export default function AdminPage() {
           <h1 className="text-2xl font-black text-white">لوحة إدارة</h1>
           <p className="text-gray-500 text-sm mt-1">منصة مطروح الرياضية</p>
         </div>
-        {/* بطاقة الدخول */}
         <div className="bg-[#0f1c35] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-4">
           <div>
             <label className="text-xs text-gray-400 font-bold block mb-2">كلمة السر</label>
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              placeholder="••••••••"
-              className="w-full bg-[#060e1e] border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-center text-xl outline-none focus:border-yellow-400/50 transition-colors tracking-widest"
-            />
+            <input type="password" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} placeholder="••••••••" className="w-full bg-[#060e1e] border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-center text-xl outline-none focus:border-yellow-400/50 transition-colors tracking-widest" />
           </div>
           <Btn onClick={handleLogin} variant="primary" size="xl">دخول</Btn>
         </div>
@@ -382,7 +417,7 @@ export default function AdminPage() {
     <div dir="rtl" className="min-h-screen bg-[#060e1e] text-white pb-24 font-sans w-full overflow-x-hidden">
       <datalist id="teams-list">{currentTeamsList.map(t => <option key={t} value={t} />)}</datalist>
 
-      {/* ── POPUP: نجم المباراة السريع ── */}
+      {/* POPUP: نجم المباراة */}
       {motmPopupMatch && (
         <div className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-[#0f1c35] border border-yellow-400/30 rounded-2xl shadow-2xl overflow-hidden">
@@ -408,7 +443,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── POPUP: البوستر ── */}
+      {/* POPUP: البوستر */}
       {posterMatch && (
         <div className="fixed inset-0 bg-black/95 z-[9998] flex flex-col items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-full overflow-x-auto flex justify-center items-center pb-4">
@@ -416,8 +451,8 @@ export default function AdminPage() {
               <div className="absolute inset-0 opacity-10 bg-[url('/pattern.png')] bg-repeat"></div>
               <div className="mt-8 z-10 flex flex-col items-center">
                 <img src="/logo.png" className="w-48 h-auto object-contain drop-shadow-[0_0_15px_rgba(250,204,21,0.5)] mb-2" alt="مطروح الرياضية" />
-                <h1 className="text-3xl font-black text-yellow-400 mt-2 tracking-wide">كأس مطروح</h1>
-                <p className="text-cyan-300 font-bold text-sm tracking-widest">النسخة الثالثة 2026</p>
+                <h1 className="text-3xl font-black text-yellow-400 mt-2 tracking-wide">{mainAppTab === 'mathani_cup' ? 'بطولة المثاني' : 'كأس مطروح'}</h1>
+                <p className="text-cyan-300 font-bold text-sm tracking-widest">{mainAppTab === 'mathani_cup' ? '2026' : 'النسخة الثالثة 2026'}</p>
                 <Badge className="mt-4 bg-yellow-400 text-black font-black px-6 py-1.5 text-sm">{posterMatch.round}</Badge>
               </div>
               <div className="w-full mt-12 flex justify-between items-center px-6 z-10">
@@ -459,9 +494,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════
-          الهيدر العلوي
-      ══════════════════════════════════════ */}
+      {/* الهيدر العلوي */}
       <header className="sticky top-0 z-50 bg-[#060e1e]/95 backdrop-blur border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -473,31 +506,29 @@ export default function AdminPage() {
               <div className="text-gray-500 text-xs mt-0.5">لوحة الإدارة</div>
             </div>
           </div>
-          {/* التبويبات الرئيسية */}
           <div className="hidden sm:flex items-center gap-1 bg-[#0f1c35] border border-white/8 rounded-xl p-1">
             {[
               { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
               { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
+              { key: 'mathani_cup', label: '⚽ بطولة المثاني', active: 'bg-emerald-500 text-white' },
               { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
             ].map(tab => (
-              <button key={tab.key} onClick={() => setMainAppTab(tab.key as any)}
+              <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mainAppTab === tab.key ? tab.active + " shadow-md" : "text-gray-400 hover:text-white"}`}>
                 {tab.label}
               </button>
             ))}
           </div>
-          <Btn onClick={() => { setIsAuth(false); setPasswordInput(""); }} variant="danger" size="sm">
-            <LogOut className="h-4 w-4" /> خروج
-          </Btn>
+          <Btn onClick={() => { setIsAuth(false); setPasswordInput(""); }} variant="danger" size="sm"><LogOut className="h-4 w-4" /> خروج</Btn>
         </div>
-        {/* تبويبات الموبايل */}
         <div className="sm:hidden flex items-center gap-1 bg-[#0f1c35] border-t border-white/5 px-3 py-2 overflow-x-auto">
           {[
             { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
             { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
+            { key: 'mathani_cup', label: '⚽ بطولة المثاني', active: 'bg-emerald-500 text-white' },
             { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
           ].map(tab => (
-            <button key={tab.key} onClick={() => setMainAppTab(tab.key as any)}
+            <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${mainAppTab === tab.key ? tab.active : "text-gray-400"}`}>
               {tab.label}
             </button>
@@ -507,17 +538,13 @@ export default function AdminPage() {
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 pt-6 w-full">
 
-        {/* ══════════════════════════════════════
-            قسم: المتجر والطلبات
-        ══════════════════════════════════════ */}
+        {/* المتجر */}
         {mainAppTab === 'shop' && (
           <SectionCard title="طلبات المتجر" icon="🛒" color="orange">
             <div className="overflow-x-auto rounded-xl border border-white/5">
               <table className="w-full text-right text-white text-sm min-w-[900px]">
                 <thead className="bg-[#060e1e]">
-                  <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "الدفع", "الإيصال", "الحالة"].map(h => (
-                    <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>
-                  ))}</tr>
+                  <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "الدفع", "الإيصال", "الحالة"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {ordersList.map(order => (
@@ -541,9 +568,7 @@ export default function AdminPage() {
           </SectionCard>
         )}
 
-        {/* ══════════════════════════════════════
-            قسم: النخبة
-        ══════════════════════════════════════ */}
+        {/* النخبة */}
         {mainAppTab === 'elite_cup' && (
           <div className="space-y-6">
             <div className="flex flex-wrap gap-2">
@@ -646,67 +671,61 @@ export default function AdminPage() {
         )}
 
         {/* ══════════════════════════════════════
-            قسم: كأس مطروح
+            قسم: كأس مطروح وبطولة المثاني
         ══════════════════════════════════════ */}
-        {mainAppTab === 'matrouh_cup' && (
+        {(mainAppTab === 'matrouh_cup' || mainAppTab === 'mathani_cup') && (
           <div className="space-y-5">
-            {/* محدد النسخة والفئة */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <TogglePill
-                options={[{ value: 'edition_3', label: 'النسخة الثالثة' }, { value: 'edition_4', label: 'النسخة الرابعة' }]}
-                value={cupEdition}
-                onChange={setCupEdition}
-                activeColor="bg-cyan-600 text-white"
-              />
-              <TogglePill
-                options={[{ value: 'youth', label: '⚽ شباب' }, { value: 'juniors', label: '🌱 ناشئين' }]}
-                value={activeTournament}
-                onChange={(v: any) => { setActiveTournament(v); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'registration_settings'); }}
-              />
-            </div>
-
-            {cupEdition === 'edition_3' && (
-              <div className="flex items-center gap-3 bg-yellow-400/8 border border-yellow-400/20 text-yellow-300 px-4 py-3 rounded-xl text-sm font-bold">
-                <Archive className="w-5 h-5 shrink-0" />
-                <span>هذه النسخة مؤرشفة — جميع الإعدادات نهائية</span>
+            {/* محدد النسخة والفئة لمطروح فقط */}
+            {mainAppTab === 'matrouh_cup' && (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <TogglePill options={[{ value: 'edition_3', label: 'النسخة الثالثة' }, { value: 'edition_4', label: 'النسخة الرابعة' }]} value={cupEdition} onChange={setCupEdition} activeColor="bg-cyan-600 text-white" />
+                <TogglePill options={[{ value: 'youth', label: '⚽ شباب' }, { value: 'juniors', label: '🌱 ناشئين' }]} value={activeTournament} onChange={(v: any) => { setActiveTournament(v); setActiveTab(cupEdition === 'edition_3' ? 'champion' : 'registration_settings'); }} />
               </div>
             )}
 
-            {/* شريط التبويبات */}
+            {mainAppTab === 'matrouh_cup' && cupEdition === 'edition_3' && (
+              <div className="flex items-center gap-3 bg-yellow-400/8 border border-yellow-400/20 text-yellow-300 px-4 py-3 rounded-xl text-sm font-bold">
+                <Archive className="w-5 h-5 shrink-0" /><span>هذه النسخة مؤرشفة — جميع الإعدادات نهائية</span>
+              </div>
+            )}
+
+            {mainAppTab === 'mathani_cup' && (
+              <div className="flex items-center justify-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-4 rounded-2xl shadow-lg">
+                <Trophy className="w-8 h-8 shrink-0" />
+                <div className="text-center">
+                   <h2 className="text-2xl font-black">بطولة المثاني 2026</h2>
+                   <p className="text-xs text-emerald-200 mt-1">إدارة كاملة للفرق، المجموعات، النتائج، والإحصائيات الخاصة بالمثاني</p>
+                </div>
+              </div>
+            )}
+
+            {/* شريط التبويبات المدمج */}
             <div className="overflow-x-auto pb-1">
               <div className="flex gap-1.5 min-w-max bg-[#0f1c35] border border-white/8 p-1.5 rounded-2xl">
-                {allAdminTabs.filter(tab => {
-                  if (cupEdition === 'edition_3' && (tab as any).hideForEd3) return false;
-                  if (cupEdition === 'edition_4' && (tab as any).hideForEd4) return false;
-                  if (activeTournament === 'juniors' && tab.key === 'knockout') return false;
-                  return true;
-                }).map(tab => (
+                {visibleTabs.map(tab => (
                   <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab.key ? "bg-yellow-400 text-black shadow-md" : "text-gray-400 hover:text-white hover:bg-white/5"}`}>
+                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab.key ? (mainAppTab === 'mathani_cup' ? "bg-emerald-500 text-white shadow-md" : "bg-yellow-400 text-black shadow-md") : "text-gray-400 hover:text-white hover:bg-white/5"}`}>
                     {tab.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* ─── البطل ─── */}
-            {activeTab === "champion" && cupEdition === 'edition_3' && (
+            {/* ─── البطل (مطروح فقط) ─── */}
+            {activeTab === "champion" && mainAppTab === 'matrouh_cup' && cupEdition === 'edition_3' && (
               <SectionCard title="البطل المتوج" icon="👑" color="yellow">
                 <div className="text-center py-8">
-                  <div className="w-32 h-32 mx-auto bg-[#060e1e] rounded-full border-4 border-yellow-400 flex items-center justify-center shadow-[0_0_30px_rgba(250,204,21,0.2)] mb-6">
-                    <Trophy className="w-16 h-16 text-yellow-400" />
-                  </div>
+                  <div className="w-32 h-32 mx-auto bg-[#060e1e] rounded-full border-4 border-yellow-400 flex items-center justify-center shadow-[0_0_30px_rgba(250,204,21,0.2)] mb-6"><Trophy className="w-16 h-16 text-yellow-400" /></div>
                   <h2 className="text-4xl font-black text-white">{activeTournament === 'youth' ? 'وادي ماجد' : 'وادي الرمل'}</h2>
                   <span className="mt-3 inline-block bg-yellow-400 text-black px-6 py-2 rounded-full font-black">بطل النسخة الثالثة</span>
                 </div>
               </SectionCard>
             )}
 
-            {/* ─── تشكيل البطولة ─── */}
-            {activeTab === "tournament_lineup_admin" && (
+            {/* ─── تشكيل البطولة (مطروح فقط) ─── */}
+            {activeTab === "tournament_lineup_admin" && mainAppTab === 'matrouh_cup' && (
               <SectionCard title="تشكيل البطولة الرسمي" icon="📋" color="yellow">
                 <div className="space-y-6">
-                  {/* المدير الفني */}
                   <div className="bg-[#060e1e] rounded-xl border border-white/5 p-4 space-y-3">
                     <h3 className="text-yellow-400 font-black text-sm border-b border-white/5 pb-2">👔 المدير الفني</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -715,7 +734,6 @@ export default function AdminPage() {
                       <Field label="رابط الصورة"><input value={adminLineup.manager?.image || ""} onChange={e => setAdminLineup({ ...adminLineup, manager: { ...adminLineup.manager, image: e.target.value, imageUrl: e.target.value } })} className={inputCls} dir="ltr" /></Field>
                     </div>
                   </div>
-                  {/* الأساسيون */}
                   <div className="bg-[#060e1e] rounded-xl border border-white/5 p-4 space-y-3">
                     <h3 className="text-cyan-400 font-black text-sm border-b border-white/5 pb-2">⚽ الأساسيون (7 لاعبين)</h3>
                     {adminLineup.starters?.map((player: any, idx: number) => (
@@ -727,7 +745,6 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
-                  {/* الاحتياطيون */}
                   <div className="bg-[#060e1e] rounded-xl border border-white/5 p-4 space-y-3">
                     <h3 className="text-emerald-400 font-black text-sm border-b border-white/5 pb-2">👥 الاحتياطيون (5 لاعبين)</h3>
                     {adminLineup.subs?.map((player: any, idx: number) => (
@@ -739,15 +756,13 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
-                  <Btn onClick={async () => { try { await setDoc(doc(db, getColl("tournament_lineup"), "current"), adminLineup); alert("✅ تم نشر تشكيل البطولة!"); } catch (e) { alert("❌ خطأ في الاتصال."); } }} variant="primary" size="xl">
-                    حفظ ونشر التشكيل الرسمي 💾
-                  </Btn>
+                  <Btn onClick={async () => { try { await setDoc(doc(db, getColl("tournament_lineup"), "current"), adminLineup); alert("✅ تم نشر تشكيل البطولة!"); } catch (e) { alert("❌ خطأ في الاتصال."); } }} variant="primary" size="xl">حفظ ونشر التشكيل الرسمي 💾</Btn>
                 </div>
               </SectionCard>
             )}
 
-            {/* ─── إعدادات التسجيل (النسخة الرابعة) ─── */}
-            {activeTab === "registration_settings" && cupEdition === 'edition_4' && (
+            {/* ─── إعدادات التسجيل (مطروح فقط) ─── */}
+            {activeTab === "registration_settings" && mainAppTab === 'matrouh_cup' && cupEdition === 'edition_4' && (
               <div className="space-y-6">
                 <SectionCard title="إعدادات التسجيل والاشتراكات (كأس مطروح)" icon="⚙️" color="red">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -796,6 +811,39 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* ─── إدارة مجموعات المثاني ─── */}
+            {activeTab === "mathani_groups" && mainAppTab === 'mathani_cup' && (
+              <SectionCard title="إدارة المجموعات (8 مجموعات)" icon="🛡️" color="emerald" action={
+                 <Btn onClick={saveMathaniGroups} variant="emerald" size="sm">حفظ التغييرات 💾</Btn>
+              }>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {mathaniGroups.map((group, gIdx) => (
+                       <div key={gIdx} className="bg-[#060e1e] p-4 rounded-xl border border-emerald-500/20 shadow-md space-y-3">
+                          <h3 className="text-emerald-400 font-black text-center border-b border-white/5 pb-2">المجموعة {gIdx + 1}</h3>
+                          {[0, 1, 2, 3].map(tIdx => (
+                             <input
+                                key={tIdx}
+                                value={group[tIdx] || ""}
+                                onChange={e => {
+                                   const newGroups = [...mathaniGroups];
+                                   const currentGroup = newGroups[gIdx] ? [...newGroups[gIdx]] : ["", "", "", ""];
+                                   currentGroup[tIdx] = e.target.value;
+                                   newGroups[gIdx] = currentGroup;
+                                   setMathaniGroups(newGroups);
+                                }}
+                                placeholder={`الفريق ${tIdx + 1}`}
+                                className={inputCls}
+                             />
+                          ))}
+                       </div>
+                    ))}
+                 </div>
+                 <div className="mt-6">
+                    <Btn onClick={saveMathaniGroups} variant="emerald" size="xl">حفظ واعتماد المجموعات 💾</Btn>
+                 </div>
+              </SectionCard>
+            )}
+
             {/* ─── الإقصائيات ─── */}
             {activeTab === "knockout" && (
               <SectionCard title="إدارة مباريات الإقصائيات" icon="🏆" color="cyan">
@@ -803,13 +851,17 @@ export default function AdminPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="الدور">
                       <select value={bracketForm.round} onChange={e => { setBracketForm(p => ({ ...p, round: e.target.value, matchLabel: getLabelSuggestions(e.target.value)[0] || "" })); setMatchForm(p => ({ ...p, round: e.target.value })); }} className={selectCls}>
-                        {["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"].map(r => <option key={r}>{r}</option>)}
+                        {(mainAppTab === 'mathani_cup' ? ["دور الـ 16", "دور الـ 8", "دور الـ 4", "النهائي"] : ["الملحق", "دور الستة عشر", "دور الثمانية", "نصف النهائي", "النهائي"]).map(r => <option key={r}>{r}</option>)}
                       </select>
                     </Field>
-                    <Field label="رقم المباراة">
-                      <select value={bracketForm.matchLabel} onChange={e => { setBracketForm(p => ({ ...p, matchLabel: e.target.value })); setMatchForm(p => ({ ...p, matchLabel: e.target.value })); }} className={selectCls}>
-                        {getLabelSuggestions(bracketForm.round).map(l => <option key={l}>{l}</option>)}
-                      </select>
+                    <Field label="رقم/اسم المباراة">
+                      {mainAppTab === 'mathani_cup' ? (
+                        <input value={bracketForm.matchLabel} onChange={e => { setBracketForm(p => ({ ...p, matchLabel: e.target.value })); setMatchForm(p => ({ ...p, matchLabel: e.target.value })); }} className={inputCls} placeholder="اكتب اسم المباراة (اختياري)" />
+                      ) : (
+                        <select value={bracketForm.matchLabel} onChange={e => { setBracketForm(p => ({ ...p, matchLabel: e.target.value })); setMatchForm(p => ({ ...p, matchLabel: e.target.value })); }} className={selectCls}>
+                          {getLabelSuggestions(bracketForm.round).map(l => <option key={l}>{l}</option>)}
+                        </select>
+                      )}
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[#060e1e] p-4 rounded-xl border border-white/5">
@@ -826,7 +878,7 @@ export default function AdminPage() {
             {/* ─── المباريات واللايف ─── */}
             {activeTab === "matches" && (
               <div className="space-y-6">
-                <SectionCard title={editingId ? "تعديل بيانات المباراة" : "إنشاء مباراة جديدة"} icon="⚽" color="yellow">
+                <SectionCard title={editingId ? "تعديل بيانات المباراة" : "إنشاء مباراة جديدة"} icon="⚽" color={mainAppTab === 'mathani_cup' ? 'emerald' : 'yellow'}>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <Field label="الفريق الأول"><input list="teams-list" value={matchForm.teamA} onChange={e => setMatchForm({ ...matchForm, teamA: e.target.value })} className={inputCls} /></Field>
@@ -838,7 +890,11 @@ export default function AdminPage() {
                       <Field label="التاريخ"><input type="date" value={matchForm.date} onChange={e => setMatchForm({ ...matchForm, date: e.target.value })} className={inputCls} /></Field>
                       <Field label="الوقت"><input type="time" value={matchForm.time} onChange={e => setMatchForm({ ...matchForm, time: e.target.value })} className={`${inputCls} text-center`} /></Field>
                       <Field label="الجولة / الدور">
-                        {activeTournament === 'youth' ? (
+                        {mainAppTab === 'mathani_cup' ? (
+                          <select value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={selectCls}>
+                            {["دور المجموعات", "دور الـ 16", "دور الـ 8", "دور الـ 4", "النهائي"].map(r => <option key={r}>{r}</option>)}
+                          </select>
+                        ) : activeTournament === 'youth' ? (
                           <input value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={inputCls} />
                         ) : (
                           <select value={matchForm.round} onChange={e => setMatchForm({ ...matchForm, round: e.target.value })} className={selectCls}>
@@ -853,13 +909,12 @@ export default function AdminPage() {
                       </Field>
                     </div>
                     <div className="flex gap-3">
-                      <Btn onClick={saveMatch} variant="primary" size="lg">{editingId ? "تأكيد التعديل ✔️" : "حفظ المباراة 💾"}</Btn>
+                      <Btn onClick={saveMatch} variant={mainAppTab === 'mathani_cup' ? "emerald" : "primary"} size="lg">{editingId ? "تأكيد التعديل ✔️" : "حفظ المباراة 💾"}</Btn>
                       {editingId && <Btn onClick={() => setEditingId(null)} variant="danger" size="lg">إلغاء التعديل ❌</Btn>}
                     </div>
                   </div>
                 </SectionCard>
 
-                {/* قائمة المباريات */}
                 <div className="space-y-4">
                   <div className="relative max-w-sm">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -867,7 +922,6 @@ export default function AdminPage() {
                   </div>
                   {matches.filter(m => !koSearchTerm || m.teamA.includes(koSearchTerm) || m.teamB.includes(koSearchTerm)).map(match => (
                     <div key={match.id} className={`rounded-2xl border overflow-hidden transition-all ${match.isLive ? 'border-red-500/60 bg-red-900/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : match.status === 'انتهت' ? 'border-white/5 bg-[#0a1228] opacity-75' : 'border-white/8 bg-[#0f1c35]'}`}>
-                      {/* رأس بطاقة المباراة */}
                       <div className={`px-4 py-2 text-xs font-bold flex items-center justify-between ${match.isLive ? 'bg-red-600' : 'bg-[#060e1e]'}`}>
                         <span className="text-gray-300">{getArabicDay(match.date)} • {match.date} • {match.time}</span>
                         <div className="flex items-center gap-2">
@@ -876,7 +930,6 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        {/* النتيجة والأزرار */}
                         <div className="bg-[#060e1e] rounded-xl p-4 border border-white/5">
                           <div className="flex items-center justify-between mb-4">
                             <div className="text-center flex-1">
@@ -898,9 +951,7 @@ export default function AdminPage() {
                             <Btn size="sm" onClick={() => deleteMatch(match.id)} variant="danger"><Trash2 className="h-3 w-3" /></Btn>
                           </div>
                         </div>
-                        {/* التحكم المباشر */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {/* الأهداف */}
                           <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
                             <div className="text-xs text-gray-400 font-bold">الأهداف</div>
                             {[{ label: match.teamA, key: 'homeGoals', val: match.homeGoals }, { label: match.teamB, key: 'awayGoals', val: match.awayGoals }].map(g => (
@@ -917,7 +968,6 @@ export default function AdminPage() {
                               {["لم تبدأ", "ستبدأ بعد قليل", "الشوط الأول", "استراحة", "الشوط الثاني", "ضربات جزاء", "انتهت"].map(s => <option key={s}>{s}</option>)}
                             </select>
                           </div>
-                          {/* العداد */}
                           <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-xs text-gray-400 font-bold">العداد</span>
@@ -939,7 +989,7 @@ export default function AdminPage() {
             )}
 
             {/* ─── القوائم ─── */}
-            {activeTab === "rosters" && (
+            {activeTab === "rosters" && mainAppTab === 'matrouh_cup' && (
               <SectionCard title="إدارة قوائم الفرق" icon="📋" color="blue">
                 <div className="overflow-x-auto rounded-xl border border-white/5 mb-6">
                   <table className="w-full text-right text-white text-sm min-w-[900px]">
@@ -1016,12 +1066,12 @@ export default function AdminPage() {
             {/* ─── الهدافين ─── */}
             {activeTab === "goals" && (
               <div className="space-y-5">
-                <SectionCard title={editingGoalId ? "تعديل هداف" : "إضافة هداف"} icon="🥇" color="yellow">
+                <SectionCard title={editingGoalId ? "تعديل هداف" : "إضافة هداف"} icon="🥇" color={mainAppTab === 'mathani_cup' ? 'emerald' : 'yellow'}>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <Field label="الفريق"><input list="teams-list" value={goalForm.team} onChange={e => setGoalForm({ ...goalForm, team: e.target.value })} className={inputCls} /></Field>
-                      <Field label="اسم اللاعب" labelColor="text-yellow-400"><input value={goalForm.player} onChange={e => setGoalForm({ ...goalForm, player: e.target.value })} className={inputCls} /></Field>
-                      <Field label="عدد الأهداف"><input type="number" value={goalForm.goalsCount} onChange={e => setGoalForm({ ...goalForm, goalsCount: Number(e.target.value) })} className={`${inputCls} text-center font-black text-yellow-400`} /></Field>
+                      <Field label="اسم اللاعب" labelColor={mainAppTab === 'mathani_cup' ? 'text-emerald-400' : 'text-yellow-400'}><input value={goalForm.player} onChange={e => setGoalForm({ ...goalForm, player: e.target.value })} className={inputCls} /></Field>
+                      <Field label="عدد الأهداف"><input type="number" value={goalForm.goalsCount} onChange={e => setGoalForm({ ...goalForm, goalsCount: Number(e.target.value) })} className={`${inputCls} text-center font-black ${mainAppTab === 'mathani_cup' ? 'text-emerald-400' : 'text-yellow-400'}`} /></Field>
                     </div>
                     <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 bg-[#060e1e] p-3 rounded-xl border border-white/5">
                       {['rating', 'pac', 'sho', 'pas', 'dri', 'def', 'phy'].map(stat => (
@@ -1031,7 +1081,7 @@ export default function AdminPage() {
                       ))}
                     </div>
                     <Field label="رابط الصورة"><input value={goalForm.imageUrl} onChange={e => setGoalForm({ ...goalForm, imageUrl: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
-                    <Btn onClick={addOrUpdateGoal} variant="primary" size="xl">{editingGoalId ? "تأكيد التعديل ✔️" : "إضافة الهداف ➕"}</Btn>
+                    <Btn onClick={addOrUpdateGoal} variant={mainAppTab === 'mathani_cup' ? 'emerald' : 'primary'} size="xl">{editingGoalId ? "تأكيد التعديل ✔️" : "إضافة الهداف ➕"}</Btn>
                   </div>
                 </SectionCard>
                 <SectionCard title="سجل الهدافين" icon="📊" color="cyan" action={
