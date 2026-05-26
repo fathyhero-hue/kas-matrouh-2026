@@ -220,10 +220,13 @@ export default function AdminPage() {
 
   useEffect(() => { const clockTimer = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(clockTimer); }, []);
 
-  useEffect(() => {
-    if (cupEdition === 'edition_3' && activeTab === 'matches') setActiveTab('champion');
-    if (cupEdition === 'edition_4' && activeTab === 'champion') setActiveTab('registration_settings');
-  }, [cupEdition, activeTab]);
+ useEffect(() => {
+    // تطبيق قفل التبويبات على كأس مطروح فقط حتى لا يؤثر على بطولة المثاني
+    if (mainAppTab === 'matrouh_cup') {
+      if (cupEdition === 'edition_3' && activeTab === 'matches') setActiveTab('champion');
+      if (cupEdition === 'edition_4' && activeTab === 'champion') setActiveTab('registration_settings');
+    }
+  }, [cupEdition, activeTab, mainAppTab]);
 
   useEffect(() => {
     setMatchForm(p => ({ ...p, teamA: "", teamALogo: "", teamB: "", teamBLogo: "", matchLabel: "", round: "دور المجموعات", homeGoals: 0, awayGoals: 0, status: "لم تبدأ" }));
