@@ -490,46 +490,81 @@ export default function Page() {
 
             {/* TAB: STANDINGS (MATHANI) */}
             {activeMathaniTab === 'standings' && (
-               <div className="grid md:grid-cols-2 gap-8">
-                  {MATHANI_GROUP_NAMES.map((groupName, i) => {
-                     // التعديل الثاني: التحقق من نوعية الفرق المدخلة وتحويلها لنصوص لتمريرها بنجاح إلى دالة الترتيب
-                     let rawGroupTeams = mathaniGroups[i] && Array.isArray(mathaniGroups[i]) ? mathaniGroups[i] : [];
-                     const groupTeams = rawGroupTeams.length > 0 
-                        ? rawGroupTeams.map((t: any) => typeof t === 'object' ? (t.name || t.teamName || t.team || "فريق غير معروف") : t)
-                        : ["في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق..."];
-                     
-                     const groupStandings = buildStandings(finishedMatches, groupTeams);
-                     return (
-                        <Card key={i} className="bg-[#13213a] border-emerald-500/30 overflow-hidden shadow-xl">
-                           <CardHeader className="border-b border-emerald-500/20 pb-4">
-                              <CardTitle className="text-emerald-400 flex items-center gap-3"><Trophy className="w-5 h-5"/> {groupName}</CardTitle>
-                           </CardHeader>
-                           <CardContent className="p-0 overflow-x-auto custom-scrollbar" dir="rtl">
-                              <table className="w-full text-sm text-right min-w-[550px]">
-                                 <thead className="bg-[#0a1428] border-b border-emerald-500/30">
-                                    <tr>{STANDINGS_HEADERS.map(h => <th key={h} className="p-3 text-cyan-300 font-bold whitespace-nowrap">{h}</th>)}</tr>
-                                 </thead>
-                                 <tbody>
-                                    {groupStandings.map((row, idx) => (
-                                       <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                          <td className="p-3"><Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">{row.rank}</Badge></td>
-                                          <td className="p-3 font-black text-white whitespace-nowrap text-base drop-shadow-md">{row.team}</td>
-                                          <td className="p-3 text-center text-gray-300">{row.played}</td>
-                                          <td className="p-3 text-center text-emerald-400 font-black">{row.wins}</td>
-                                          <td className="p-3 text-center text-gray-400">{row.draws}</td>
-                                          <td className="p-3 text-center text-red-400 font-bold">{row.losses}</td>
-                                          <td className="p-3 text-center text-cyan-400">{row.gf}</td>
-                                          <td className="p-3 text-center text-white">{row.ga}</td>
-                                          <td className="p-3 text-center text-cyan-300">{row.gd}</td>
-                                          <td className="p-3 text-center font-black text-yellow-400 text-lg drop-shadow-md">{row.points}</td>
-                                       </tr>
-                                    ))}
-                                 </tbody>
-                              </table>
-                           </CardContent>
-                        </Card>
-                     );
-                  })}
+               <div className={isTableExpanded ? "fixed inset-0 z-[100] bg-[#0a1428] overflow-y-auto p-4 sm:p-8 animate-in zoom-in duration-300" : "animate-in fade-in duration-500"}>
+                  
+                  {/* زر تكبير/تصغير الشاشة */}
+                  <div className="flex justify-between items-center mb-6">
+                     {isTableExpanded && <h2 className="text-xl sm:text-2xl font-black text-emerald-400 flex items-center gap-2"><Trophy className="w-6 h-6"/> جدول الترتيب - المثاني</h2>}
+                     <Button 
+                        onClick={() => setIsTableExpanded(!isTableExpanded)} 
+                        className={`font-bold flex items-center gap-2 shadow-xl mr-auto transition-all ${isTableExpanded ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-[#13213a] border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500 hover:text-white'}`}
+                     >
+                        {isTableExpanded ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                        {isTableExpanded ? "إغلاق العرض المكبر" : "تكبير الجداول (ملء الشاشة)"}
+                     </Button>
+                  </div>
+
+                  {/* شبكة الجداول */}
+                  <div className={`grid gap-8 ${isTableExpanded ? 'grid-cols-1 lg:grid-cols-2' : 'md:grid-cols-2'}`}>
+                     {MATHANI_GROUP_NAMES.map((groupName, i) => {
+                        let rawGroupTeams = mathaniGroups[i] && Array.isArray(mathaniGroups[i]) ? mathaniGroups[i] : [];
+                        const groupTeams = rawGroupTeams.length > 0 
+                           ? rawGroupTeams.map((t: any) => typeof t === 'object' ? (t.name || t.teamName || t.team || "فريق غير معروف") : t)
+                           : ["في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق...", "في انتظار فريق..."];
+                        
+                        const groupStandings = buildStandings(finishedMatches, groupTeams);
+                        return (
+                           <Card key={i} className="bg-[#13213a] border-emerald-500/30 overflow-hidden shadow-xl flex flex-col">
+                              <CardHeader className="border-b border-emerald-500/20 pb-4 shrink-0">
+                                 <CardTitle className="text-emerald-400 flex items-center gap-3"><Trophy className="w-5 h-5"/> {groupName}</CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-0 overflow-x-auto custom-scrollbar flex-1" dir="rtl">
+                                 <table className={`w-full text-sm text-right ${isTableExpanded ? 'min-w-[800px]' : 'min-w-[550px]'}`}>
+                                    <thead className="bg-[#0a1428] border-b border-emerald-500/30">
+                                       <tr>{STANDINGS_HEADERS.map(h => <th key={h} className="p-3 text-cyan-300 font-bold whitespace-nowrap">{h}</th>)}</tr>
+                                    </thead>
+                                    <tbody>
+                                       {groupStandings.map((row, idx) => {
+                                          const isQualified = row.rank <= 2;
+                                          const rowBgClass = isQualified 
+                                             ? "bg-emerald-900/20 hover:bg-emerald-900/40 border-r-4 border-emerald-500" 
+                                             : "bg-red-900/20 hover:bg-red-900/40 border-r-4 border-red-500";
+                                          const badgeClass = isQualified 
+                                             ? "bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)]" 
+                                             : "bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]";
+
+                                          return (
+                                             <tr key={idx} className={`border-b border-white/5 transition-colors ${rowBgClass}`}>
+                                                <td className="p-3"><Badge className={`border-none font-black ${badgeClass}`}>{row.rank}</Badge></td>
+                                                <td className="p-3 font-black text-white whitespace-nowrap text-base drop-shadow-md">{row.team}</td>
+                                                <td className="p-3 text-center text-gray-300">{row.played}</td>
+                                                <td className="p-3 text-center text-emerald-400 font-black">{row.wins}</td>
+                                                <td className="p-3 text-center text-gray-400">{row.draws}</td>
+                                                <td className="p-3 text-center text-red-400 font-bold">{row.losses}</td>
+                                                <td className="p-3 text-center text-cyan-400">{row.gf}</td>
+                                                <td className="p-3 text-center text-white">{row.ga}</td>
+                                                <td className="p-3 text-center text-cyan-300">{row.gd}</td>
+                                                <td className="p-3 text-center font-black text-yellow-400 text-lg drop-shadow-md">{row.points}</td>
+                                             </tr>
+                                          );
+                                       })}
+                                    </tbody>
+                                 </table>
+                              </CardContent>
+                              <div className="flex gap-6 p-3 bg-[#0a1428] border-t border-emerald-500/20 text-xs font-bold text-gray-300 shrink-0">
+                                 <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span> 
+                                    صعود للدور التالي
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span> 
+                                    هبوط / خروج
+                                 </div>
+                              </div>
+                           </Card>
+                        );
+                     })}
+                  </div>
                </div>
             )}
 
@@ -537,10 +572,8 @@ export default function Page() {
             {activeMathaniTab === 'upcoming' && (
                <div className="space-y-10 animate-in fade-in duration-500">
                   {(() => {
-                     // جلب المباريات التي لم تنتهِ وليست جارية الآن
                      const upcomingMatches = matches.filter(m => m.status !== "انتهت" && !m.isLive && m.status !== "live" && m.status !== "مباشر" && m.status !== "شغال الآن");
                      
-                     // تجميع المباريات حسب التاريخ
                      const groupedByDate = upcomingMatches.reduce((acc, match) => {
                         const dateStr = match.date || "غير محدد";
                         if (!acc[dateStr]) acc[dateStr] = [];
@@ -548,7 +581,6 @@ export default function Page() {
                         return acc;
                      }, {} as Record<string, any[]>);
 
-                     // ترتيب التواريخ تصاعدياً (من الأقرب للأبعد)
                      const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
                         if (a === "غير محدد") return 1;
                         if (b === "غير محدد") return -1;
@@ -571,7 +603,6 @@ export default function Page() {
 
                         return (
                            <div key={dateStr} className="space-y-6">
-                              {/* فاصل التاريخ الاحترافي */}
                               <div className="flex items-center gap-4">
                                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
                                  <Badge className="bg-[#13213a] text-emerald-400 border border-emerald-500/50 px-6 py-2 text-base sm:text-lg font-black shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -580,12 +611,10 @@ export default function Page() {
                                  <div className="h-px flex-1 bg-gradient-to-l from-transparent via-emerald-500/50 to-transparent"></div>
                               </div>
 
-                              {/* شبكة مباريات اليوم */}
                               <div className="grid gap-4 md:grid-cols-2">
                                  {dayMatches.map((match: any) => (
                                     <div key={match.id} className="bg-gradient-to-b from-[#13213a] to-[#0a1428] border border-white/5 rounded-3xl p-5 sm:p-6 flex flex-col items-center hover:border-emerald-500/50 transition-all shadow-lg group relative overflow-hidden">
                                        
-                                       {/* تأثير إضاءة خفيف عند التمرير */}
                                        <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors pointer-events-none"></div>
                                        
                                        <div className="text-emerald-400/90 text-xs font-black mb-4 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20 tracking-wider">
