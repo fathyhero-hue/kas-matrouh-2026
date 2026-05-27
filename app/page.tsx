@@ -106,7 +106,7 @@ const DEFAULT_TOURNAMENT_LINEUP = {
 
 export default function Page() {
   const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop' | 'settings'>('matrouh_cup');
-  const [activeMathaniTab, setActiveMathaniTab] = useState<'standings' | 'results' | 'stats' | 'scorers' | 'banned'>('standings');
+  const [activeMathaniTab, setActiveMathaniTab] = useState<'standings' | 'upcoming' | 'results' | 'stats' | 'scorers' | 'banned'>('standings');
   const [cupEdition, setCupEdition] = useState<'edition_3' | 'edition_4'>('edition_3');
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
   const [activeTab, setActiveTab] = useState<string>("champion");
@@ -200,7 +200,6 @@ export default function Page() {
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
-    // التعديل الأول: سحب مجموعات المثاني بمرونة وذكاء لمعالجة كافة أشكال الحفظ الهيكلية
     const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
@@ -484,7 +483,7 @@ export default function Page() {
           <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
             <h2 className="text-3xl font-black text-center text-emerald-400 mb-8">⚽ بطولة المثاني 2026</h2>
             <div className="flex justify-center gap-2 mb-6 flex-wrap">
-              {[ {id: 'standings', name: 'جدول الترتيب'}, {id: 'results', name: 'نتائج المباريات'}, {id: 'stats', name: 'الإحصائيات'}, {id: 'scorers', name: 'الهدافون'}, {id: 'banned', name: 'الموقوفون'} ].map(t => (
+              {[ {id: 'standings', name: 'جدول الترتيب'}, {id: 'upcoming', name: 'المباريات القادمة'}, {id: 'results', name: 'نتائج المباريات'}, {id: 'stats', name: 'الإحصائيات'}, {id: 'scorers', name: 'الهدافون'}, {id: 'banned', name: 'الموقوفون'} ].map(t => (
                 <Button key={t.id} onClick={() => setActiveMathaniTab(t.id as any)} className={`font-bold ${activeMathaniTab === t.id ? 'bg-emerald-500' : 'bg-[#13213a] border border-emerald-500/30'}`}>{t.name}</Button>
               ))}
             </div>
@@ -531,6 +530,90 @@ export default function Page() {
                         </Card>
                      );
                   })}
+               </div>
+            )}
+
+            {/* TAB: UPCOMING MATCHES (MATHANI) */}
+            {activeMathaniTab === 'upcoming' && (
+               <div className="space-y-10 animate-in fade-in duration-500">
+                  {(() => {
+                     // جلب المباريات التي لم تنتهِ وليست جارية الآن
+                     const upcomingMatches = matches.filter(m => m.status !== "انتهت" && !m.isLive && m.status !== "live" && m.status !== "مباشر" && m.status !== "شغال الآن");
+                     
+                     // تجميع المباريات حسب التاريخ
+                     const groupedByDate = upcomingMatches.reduce((acc, match) => {
+                        const dateStr = match.date || "غير محدد";
+                        if (!acc[dateStr]) acc[dateStr] = [];
+                        acc[dateStr].push(match);
+                        return acc;
+                     }, {} as Record<string, any[]>);
+
+                     // ترتيب التواريخ تصاعدياً (من الأقرب للأبعد)
+                     const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
+                        if (a === "غير محدد") return 1;
+                        if (b === "غير محدد") return -1;
+                        return a.localeCompare(b);
+                     });
+
+                     if (sortedDates.length === 0) {
+                        return (
+                           <div className="text-center text-emerald-400/70 font-bold py-16 bg-[#13213a] rounded-3xl border border-emerald-500/20 shadow-inner flex flex-col items-center justify-center gap-4">
+                              <Calendar className="w-16 h-16 opacity-50" />
+                              <p className="text-xl">لا توجد مباريات قادمة مجدولة حالياً.</p>
+                           </div>
+                        );
+                     }
+
+                     return sortedDates.map(dateStr => {
+                        const dayMatches = sortMatchesAsc(groupedByDate[dateStr]);
+                        const dayName = dateStr !== "غير محدد" ? getArabicDay(dateStr) : "";
+                        const displayDate = dateStr !== "غير محدد" ? `${dayName} • ${dateStr}` : "مباريات غير محددة الموعد";
+
+                        return (
+                           <div key={dateStr} className="space-y-6">
+                              {/* فاصل التاريخ الاحترافي */}
+                              <div className="flex items-center gap-4">
+                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+                                 <Badge className="bg-[#13213a] text-emerald-400 border border-emerald-500/50 px-6 py-2 text-base sm:text-lg font-black shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                                    📅 {displayDate}
+                                 </Badge>
+                                 <div className="h-px flex-1 bg-gradient-to-l from-transparent via-emerald-500/50 to-transparent"></div>
+                              </div>
+
+                              {/* شبكة مباريات اليوم */}
+                              <div className="grid gap-4 md:grid-cols-2">
+                                 {dayMatches.map((match: any) => (
+                                    <div key={match.id} className="bg-gradient-to-b from-[#13213a] to-[#0a1428] border border-white/5 rounded-3xl p-5 sm:p-6 flex flex-col items-center hover:border-emerald-500/50 transition-all shadow-lg group relative overflow-hidden">
+                                       
+                                       {/* تأثير إضاءة خفيف عند التمرير */}
+                                       <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors pointer-events-none"></div>
+                                       
+                                       <div className="text-emerald-400/90 text-xs font-black mb-4 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20 tracking-wider">
+                                          {match.round || "دور المجموعات"}
+                                       </div>
+                                       
+                                       <div className="w-full flex justify-between items-center gap-2 sm:gap-4 relative z-10">
+                                          <TeamMatchDisplay teamName={match.teamA} logoUrl={match.teamALogo} />
+                                          
+                                          <div className="flex flex-col items-center justify-center shrink-0">
+                                             <div className="bg-[#0a1428] px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-white/10 flex flex-col items-center shadow-inner group-hover:border-emerald-500/40 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all">
+                                                <Clock className="w-4 h-4 text-emerald-400 mb-1 opacity-70" />
+                                                <span className="text-yellow-400 font-black text-xl sm:text-3xl drop-shadow-md tracking-widest" dir="ltr">
+                                                   {match.time ? formatTime12(match.time) : "—"}
+                                                </span>
+                                                <span className="text-gray-500 text-[10px] sm:text-xs font-bold mt-1">بتوقيت القاهرة</span>
+                                             </div>
+                                          </div>
+                                          
+                                          <TeamMatchDisplay teamName={match.teamB} logoUrl={match.teamBLogo} />
+                                       </div>
+                                    </div>
+                                 ))}
+                              </div>
+                           </div>
+                        );
+                     });
+                  })()}
                </div>
             )}
 
