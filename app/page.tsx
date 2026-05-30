@@ -483,7 +483,7 @@ export default function Page() {
           <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
             <h2 className="text-3xl font-black text-center text-emerald-400 mb-8">⚽ بطولة المثاني 2026</h2>
             <div className="flex justify-center gap-2 mb-6 flex-wrap">
-              {[ {id: 'standings', name: 'جدول الترتيب'}, {id: 'upcoming', name: 'المباريات القادمة'}, {id: 'results', name: 'نتائج المباريات'}, {id: 'stats', name: 'الإحصائيات'}, {id: 'scorers', name: 'الهدافون'}, {id: 'banned', name: 'الموقوفون'} ].map(t => (
+              {[ {id: 'standings', name: 'جدول الترتيب'}, {id: 'upcoming', name: 'المباريات القادمة'}, {id: 'results', name: 'نتائج المباريات'}, {id: 'stats', name: 'الإحصائيات'}, {id: 'scorers', name: 'الهدافون'}, {id: 'banned', name: 'الإنذارات والموقوفين'} ].map(t => (
                 <Button key={t.id} onClick={() => setActiveMathaniTab(t.id as any)} className={`font-bold ${activeMathaniTab === t.id ? 'bg-emerald-500' : 'bg-[#13213a] border border-emerald-500/30'}`}>{t.name}</Button>
               ))}
             </div>
@@ -734,22 +734,29 @@ export default function Page() {
             {/* TAB: BANNED (MATHANI) */}
             {activeMathaniTab === 'banned' && (
                <Card className="bg-[#13213a] border border-red-500/30 shadow-xl">
-                  <CardHeader className="p-4 border-b border-white/5"><CardTitle className="text-red-400 text-lg">⚠️ قائمة الموقوفين والعقوبات</CardTitle></CardHeader>
+                  <CardHeader className="p-4 border-b border-white/5"><CardTitle className="text-red-400 text-lg">⚠️ سجل الإنذارات والموقوفين</CardTitle></CardHeader>
                   <CardContent className="p-0 overflow-x-auto custom-scrollbar">
                     <table className="w-full text-right text-sm min-w-[500px]">
                       <thead className="bg-[#0a1428]">
-                         <tr><th className="p-4 text-cyan-300 font-bold">اللاعب</th><th className="p-4 text-cyan-300 font-bold">الفريق</th><th className="p-4 text-center text-cyan-300 font-bold">البطاقات</th><th className="p-4 text-center text-cyan-300 font-bold">العقوبة</th></tr>
+                         <tr><th className="p-4 text-cyan-300 font-bold">اللاعب</th><th className="p-4 text-cyan-300 font-bold">الفريق</th><th className="p-4 text-center text-cyan-300 font-bold">البطاقات</th><th className="p-4 text-center text-cyan-300 font-bold">الوضعية / العقوبة</th></tr>
                       </thead>
                       <tbody>
-                        {cardsList.filter(p => p.yellow >= 3 || p.red >= 1).map((p, i) => (
+                        {cardsList.filter(p => p.yellow > 0 || p.red > 0).map((p, i) => (
                           <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                              <td className="p-4 font-black text-white text-base">{p.player}</td>
                              <td className="p-4 text-gray-300 font-bold">{p.team}</td>
-                             <td className="p-4 text-center flex justify-center gap-4 font-black"><span className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 px-2.5 py-0.5 rounded-md">🟨 {p.yellow}</span><span className="bg-red-500/10 text-red-500 border border-red-500/30 px-2.5 py-0.5 rounded-md">🟥 {p.red}</span></td>
-                             <td className="p-4 text-center"><Badge className="bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-1 font-bold shadow-sm">{p.status}</Badge></td>
+                             <td className="p-4 text-center flex justify-center gap-4 font-black">
+                                {p.yellow > 0 && <span className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 px-2.5 py-0.5 rounded-md">🟨 {p.yellow}</span>}
+                                {p.red > 0 && <span className="bg-red-500/10 text-red-500 border border-red-500/30 px-2.5 py-0.5 rounded-md">🟥 {p.red}</span>}
+                             </td>
+                             <td className="p-4 text-center">
+                                <Badge className={p.status === "طرد" || p.status === "إيقاف" ? "bg-red-500/20 text-red-400 border border-red-500/50 px-3 py-1 font-bold shadow-sm" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 px-3 py-1 font-bold shadow-sm"}>
+                                   {p.status === "طرد" ? "🔴 موقف للطرد" : p.status === "إيقاف" ? "❌ إيقاف لتراكم البطاقات" : "✔️ إنذار (متاح للمشاركة)"}
+                                </Badge>
+                             </td>
                           </tr>
                         ))}
-                        {cardsList.filter(p => p.yellow >= 3 || p.red >= 1).length === 0 && <tr><td colSpan={4} className="p-8 text-center text-emerald-400 font-bold">لا يوجد لاعبين موقوفين حالياً.</td></tr>}
+                        {cardsList.filter(p => p.yellow > 0 || p.red > 0).length === 0 && <tr><td colSpan={4} className="p-8 text-center text-emerald-400 font-bold">لا توجد إنذارات أو حالات إيقاف مسجلة حالياً.</td></tr>}
                       </tbody>
                     </table>
                   </CardContent>
