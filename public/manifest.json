@@ -7,7 +7,7 @@
   "name": "منصة مطروح الرياضية",
   "short_name": "مطروح الرياضية",
   "description": "المنصة الرسمية لبطولة كأس مطروح لكرة القدم - جداول المباريات، الإحصائيات، والـ Fantasy أونلاين.",
-  "id": "online.matrouhcup.twa.pwa",
+  "id": "com.matrouhcup.sport",
   "orientation": "portrait",
   "categories": ["sports", "utilities"],
   "icons": [

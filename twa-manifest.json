@@ -1,7 +1,7 @@
 {
-  "packageId": "online.matrouhcup.twa",
+  "packageId": "com.matrouhcup.sport",
   "host": "matrouhcup.online",
-  "id": "online.matrouhcup.twa.pwa",
+  "id": "com.matrouhcup.sport",
   "name": "منصة مطروح الرياضية",
   "shortName": "مطروح الرياضية",
   "description": "المنصة الرسمية لبطولة كأس مطروح لكرة القدم - جداول المباريات، الإحصائيات، والـ Fantasy أونلاين.",
