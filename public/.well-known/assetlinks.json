@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.matrouhcup.sports",
+      "sha256_cert_fingerprints": [
+        "40:A6:E4:09:62:F7:74:D2:13:EE:7A:01:CD:8B:62:26:82:37:4A:BB:9C:04:ED:2C:C7:35:C8:C0:36:2E:4A:8A"
+      ]
+    }
+  }
+]
