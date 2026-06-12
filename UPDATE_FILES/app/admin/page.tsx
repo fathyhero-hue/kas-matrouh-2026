@@ -1064,7 +1064,7 @@ export default function AdminPage() {
 
                       <Field label="حالة المباراة">
                         <select value={matchForm.status} onChange={e => setMatchForm({ ...matchForm, status: e.target.value })} className={selectCls}>
-                          <option value="انتهت">انتهت</option>
+                          <option value="انتهت">انتهت (تُضاف للترتيب)</option>
                           <option value="لم تبدأ">لم تبدأ (مستقبلية)</option>
                           <option value="مباشر">مباشر (لايف)</option>
                           <option value="ضربات جزاء">ضربات جزاء</option>
@@ -1074,12 +1074,12 @@ export default function AdminPage() {
                       </Field>
                     </div>
 
-                    {mainAppTab === "mathani_cup" && (
+                    {mainAppTab === "mathani_cup" && matchForm.stage === "knockout" && (
                       <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <div>
                             <div className="text-emerald-300 font-black text-sm">إعدادات الأدوار الإقصائية</div>
-                            <div className="text-gray-400 text-xs mt-1">تظهر هنا دائمًا في بطولة المثاني. استخدمها عند اختيار دور الـ 16 أو دور الثمانية أو دور الـ 4 أو النهائي.</div>
+                            <div className="text-gray-400 text-xs mt-1">اربط المباراة الحالية بالمباراة القادمة حسب مخطط البطولة.</div>
                           </div>
                           <Btn
                             variant="ghost"
