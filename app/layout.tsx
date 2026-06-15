@@ -1,16 +1,10 @@
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import "./globals.css";
 import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "منصة مطروح الرياضية",
-  description: "التطبيق الرسمي لمتابعة نتائج وأخبار كل البطولات والأحداث الرياضية فى مطروح",
-  manifest: "/manifest.json?v=2",
-  icons: {
-    icon: "/icon.png?v=2",
-    apple: "/apple-touch-icon.png?v=2",
-  },
+  title: "مطروح الرياضية",
+  description: "منصة مطروح الرياضية للبطولات والنتائج والإحصائيات",
 };
 
 export default function RootLayout({
@@ -20,32 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl">
-      <body>
+      <body className="bg-[#041226] text-white">
         {children}
         <SiteFooter />
-        
-        {/* 🚀 عداد قياس السرعة والأداء من فيرسيل */}
-        <SpeedInsights />
-        
-        {/* كود تشغيل الـ Service Worker لضمان عمل التطبيق (PWA) بشكل سليم */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('ServiceWorker registration successful');
-                    },
-                    function(err) {
-                      console.log('ServiceWorker registration failed: ', err);
-                    }
-                  );
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );
