@@ -247,7 +247,53 @@ export default function Page() {
 
   useEffect(() => {
     setLoading(true); const stored = localStorage.getItem('predictedMatches'); if (stored) setPredictedMatches(JSON.parse(stored));
-    if (typeof window !== "undefined") { if ("Notification" in window) setNotificationPermission(Notification.permission); if (window.location.hostname.includes("matrouhcup.online")) { (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || []; (window as any).OneSignalDeferred.push(async function(OneSignal: any) { await OneSignal.init({ appId: "d73de8b7-948e-494e-84f2-6c353efee89c" }); }); if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) { const script = document.createElement('script'); script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"; script.defer = true; document.head.appendChild(script); } } }
+    if (typeof window !== "undefined") {
+      if ("Notification" in window) setNotificationPermission(Notification.permission);
+
+      const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "d73de8b7-948e-494e-84f2-6c353efee89c";
+      const isSecureOrigin =
+        window.location.protocol === "https:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+
+      if (oneSignalAppId && isSecureOrigin && !(window as any).__oneSignalInitialized) {
+        (window as any).__oneSignalInitialized = true;
+        (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
+        (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+          try {
+            await OneSignal.init({
+              appId: oneSignalAppId,
+              serviceWorkerPath: "OneSignalSDKWorker.js",
+              serviceWorkerParam: { scope: "/" },
+              notifyButton: { enable: false },
+              promptOptions: {
+                slidedown: {
+                  prompts: [{
+                    type: "push",
+                    autoPrompt: false,
+                    text: {
+                      actionMessage: "فعّل إشعارات مطروح الرياضية لتصلك الأهداف وبداية المباريات فورًا.",
+                      acceptButton: "تفعيل",
+                      cancelButton: "لاحقًا",
+                    },
+                  }],
+                },
+              },
+            });
+            if ("Notification" in window) setNotificationPermission(Notification.permission);
+          } catch (error) {
+            console.error("OneSignal init error:", error);
+          }
+        });
+
+        if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) {
+          const script = document.createElement("script");
+          script.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+      }
+    }
     
     let suffix = "";
     if(mainAppTab === 'matrouh_cup') { const edSuffix = cupEdition === "edition_4" ? "_ed4" : ""; const tourSuffix = activeTournament === "juniors" ? "_juniors" : ""; suffix = edSuffix + tourSuffix; } 
@@ -300,7 +346,37 @@ export default function Page() {
 
   useEffect(() => { setRosterForm(prev => ({ ...prev, players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null, idImagePreview: "", idImageFile: null })) })); }, [MAX_PLAYERS, mainAppTab]);
 
-  const handleSubscribe = () => { if (typeof window !== "undefined" && (window as any).OneSignalDeferred) { (window as any).OneSignalDeferred.push(async function(OneSignal: any) { await OneSignal.Slidedown.promptPush(); setTimeout(() => { if ("Notification" in window) setNotificationPermission(Notification.permission); }, 4000); }); } };
+  const handleSubscribe = () => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      alert("المتصفح الحالي لا يدعم إشعارات الويب.");
+      return;
+    }
+
+    if (!(window as any).OneSignalDeferred) {
+      alert("نظام الإشعارات لم يكتمل تحميله بعد. انتظر ثواني وجرب مرة أخرى.");
+      return;
+    }
+
+    (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+      try {
+        if (OneSignal.Slidedown?.promptPush) {
+          await OneSignal.Slidedown.promptPush();
+        } else if (OneSignal.Notifications?.requestPermission) {
+          await OneSignal.Notifications.requestPermission();
+        } else {
+          await Notification.requestPermission();
+        }
+
+        setTimeout(() => {
+          if ("Notification" in window) setNotificationPermission(Notification.permission);
+        }, 1500);
+      } catch (error) {
+        console.error("OneSignal subscribe error:", error);
+        alert("تعذر تفعيل الإشعارات. تأكد من عدم حظر الإشعارات من إعدادات المتصفح.");
+      }
+    });
+  };
   const submitPrediction = async (matchId: string, matchName: string) => { const form = predForms[matchId]; if (!form?.name || !form?.phone || form?.homeScore === undefined || form?.awayScore === undefined) return alert("يرجى إكمال الاسم، رقم الهاتف، والنتيجة!"); try { const edSuffix = cupEdition === "edition_4" ? "_ed4" : ""; const tourSuffix = activeTournament === "juniors" ? "_juniors" : ""; const suffix = edSuffix + tourSuffix; await addDoc(collection(db, `predictions${suffix}`), { matchId, matchName, name: form.name, phone: form.phone, homeScore: Number(form.homeScore), awayScore: Number(form.awayScore), timestamp: new Date().toISOString() }); alert("تم تسجيل توقعك بنجاح! حظ سعيد 🎁"); setPredictedMatches(p => { const np = {...p, [matchId]: true}; localStorage.setItem('predictedMatches', JSON.stringify(np)); return np; }); } catch(e) { alert("حدث خطأ."); } };
 
   const checkRegistrationOpen = () => { const settings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh; if(!settings.deadline) return true; const deadlineDate = new Date(settings.deadline).getTime(); return Date.now() < deadlineDate; };

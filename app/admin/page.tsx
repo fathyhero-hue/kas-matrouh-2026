@@ -98,7 +98,31 @@ const SPONSORS = [{ name: "الفهد للديكور", src: "/alfahd.png" }, { n
 function normalizeTeamName(name: string): string { return String(name || "").trim().replace(/\s+/g, " ").replace(/أ|إ|آ/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/ّ/g, "").toLowerCase(); }
 function sortMatches(arr: any[]) { return [...arr].sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return (b.time || "00:00").localeCompare(a.time || "00:00"); }); }
 function getArabicDay(dateString: string): string { if (!dateString) return ""; const d = new Date(dateString); if (isNaN(d.getTime())) return ""; const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]; return days[d.getDay()]; }
-const pushNotification = async (title: string, body: string) => { try { const res = await fetch("/api/push-service", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ title, body }) }); return res.ok; } catch(e) { return false; } };
+const pushNotification = async (title: string, body: string) => {
+  try {
+    const res = await fetch("/api/push-service", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ title, body, url: "/" })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      alert(data.error || data.details || "فشل إرسال الإشعار");
+      return false;
+    }
+
+    if (typeof data.recipients === "number") {
+      alert(`تم إرسال الإشعار. عدد المستلمين المتوقع: ${data.recipients}`);
+    }
+
+    return true;
+  } catch(e) {
+    alert("فشل الاتصال بخدمة الإشعارات. تأكد أن /api/push-service موجودة وأن السيرفر شغال.");
+    return false;
+  }
+};
 const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0; const startedAt = Number(match?.timerStartedAt || 0); const pausedTotal = Number(match?.timerPausedTotal || 0) || 0; if (!match?.isTimerRunning || !startedAt) return Number(match?.liveMinute ?? baseMinute) || 0; const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal); return baseMinute + Math.floor(elapsed / 60000); };
 
 /* ═══════════════════════════════════════════════════════
@@ -593,8 +617,20 @@ export default function AdminPage() {
   const deletePrediction = async (id: string) => { if (confirm("حذف التوقع؟")) { await deleteDoc(doc(db, getColl("predictions"), id)); alert("تم الحذف"); } };
   const deleteAllPredictions = async () => { if (!confirm("مسح جميع التوقعات؟")) return; for (const p of predictions) { await deleteDoc(doc(db, getColl("predictions"), p.id)); } alert("تم التصفية"); };
   const saveTicker = async () => { if (!tickerText.trim()) return alert("اكتب الخبر"); await setDoc(doc(db, "settings", "ticker"), { text: tickerText.trim() }); alert("تم النشر"); };
-  const sendQuickNotification = async (title: string, body: string) => { const success = await pushNotification(title, body); if (success) alert(`تم الإرسال السريع`); };
-  const sendNotification = async () => { if (!notifyTitle || !notifyBody) return alert("مطلوب العنوان والتفاصيل"); setIsSending(true); const success = await pushNotification(notifyTitle, notifyBody); if (success) { alert(`تم الإرسال للجميع`); setNotifyTitle(""); setNotifyBody(""); } setIsSending(false); };
+  const sendQuickNotification = async (title: string, body: string) => { await pushNotification(title, body); };
+  const sendNotification = async () => {
+    if (!notifyTitle.trim() || !notifyBody.trim()) return alert("مطلوب العنوان والتفاصيل");
+    setIsSending(true);
+    try {
+      const success = await pushNotification(notifyTitle.trim(), notifyBody.trim());
+      if (success) {
+        setNotifyTitle("");
+        setNotifyBody("");
+      }
+    } finally {
+      setIsSending(false);
+    }
+  };
   const addBannedEntity = async () => { if (!bannedForm.name.trim()) return alert("يرجى كتابة الاسم"); await addDoc(collection(db, "banned_entities"), { ...bannedForm, name: bannedForm.name.trim() }); setBannedForm({ name: "", type: "player" }); alert("تم الإضافة لسجل الحظر"); };
   const removeBannedEntity = async (id: string) => { if (confirm("رفع الحظر عن هذا الاسم؟")) await deleteDoc(doc(db, "banned_entities", id)); };
   const addRestrictedPlayer = async () => { if (!restrictedForm.name.trim()) return alert("يرجى كتابة اسم اللاعب"); await addDoc(collection(db, "restricted_players"), { name: restrictedForm.name.trim() }); setRestrictedForm({ name: "" }); alert("تم إضافة اللاعب لقائمة المقيدين"); };

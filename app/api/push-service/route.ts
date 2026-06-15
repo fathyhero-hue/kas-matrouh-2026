@@ -1,36 +1,89 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+type PushBody = {
+  title?: string;
+  body?: string;
+  url?: string;
+};
+
+export async function POST(request: Request) {
   try {
-    const data = await req.json().catch(() => ({}));
-    const { title, body } = data;
+    const payload = (await request.json().catch(() => ({}))) as PushBody;
 
-    const APP_ID = "d73de8b7-948e-494e-84f2-6c353efee89c"; 
-    const REST_API_KEY = "os_v2_app_2466rn4urzeu5bhsnq2t57xittzhvop5bjyemdubmfaamssu2362tmqporlevdmcjrk7thzs7txtxbzqkks5bwgoydxu3n7jdfh3cwq"; 
+    const title = String(payload.title || "").trim();
+    const body = String(payload.body || "").trim();
+    const url = String(payload.url || "/").trim();
 
-    const response = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
+    if (!title || !body) {
+      return NextResponse.json(
+        { ok: false, error: "مطلوب عنوان الإشعار والتفاصيل." },
+        { status: 400 }
+      );
+    }
+
+    const appId = process.env.ONESIGNAL_APP_ID || process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+    const apiKey = process.env.ONESIGNAL_REST_API_KEY || process.env.ONESIGNAL_APP_API_KEY;
+
+    if (!appId || !apiKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "إعدادات OneSignal ناقصة على السيرفر.",
+          details: "أضف ONESIGNAL_APP_ID و ONESIGNAL_REST_API_KEY داخل ملف .env.local ثم أعد تشغيل npm run dev.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+    const finalUrl = url.startsWith("http") ? url : siteUrl ? `${siteUrl.replace(/\/$/, "")}${url.startsWith("/") ? url : `/${url}`}` : undefined;
+
+    const oneSignalResponse = await fetch("https://api.onesignal.com/notifications", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${REST_API_KEY}`,
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Key ${apiKey}`,
       },
       body: JSON.stringify({
-        app_id: APP_ID,
-        // التعديل هنا: "Subscribed Users" هي الشريحة الأساسية لكل اللي في صورتك
-        included_segments: ["Subscribed Users", "Active Users", "All"], 
+        app_id: appId,
+        target_channel: "push",
+        included_segments: ["All Subscribers"],
         headings: { en: title, ar: title },
         contents: { en: body, ar: body },
-        // سطر إضافي لضمان الإرسال للمتصفحات والموبايل
-        isAnyWeb: true, 
+        ...(finalUrl ? { url: finalUrl } : {}),
       }),
     });
 
-    const result = await response.json();
-    return NextResponse.json({ success: response.ok, result });
+    const data = await oneSignalResponse.json().catch(() => ({}));
 
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Server Error' }, { status: 500 });
+    if (!oneSignalResponse.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "OneSignal رفض إرسال الإشعار.",
+          status: oneSignalResponse.status,
+          details: data,
+        },
+        { status: oneSignalResponse.status }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      id: data.id || null,
+      recipients: typeof data.recipients === "number" ? data.recipients : null,
+      raw: data,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "حدث خطأ غير متوقع أثناء إرسال الإشعار.",
+        details: error?.message || String(error),
+      },
+      { status: 500 }
+    );
   }
 }
