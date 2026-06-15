@@ -1,6 +1,7 @@
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import "./globals.css";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "منصة مطروح الرياضية",
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body>
         {children}
+        <SiteFooter />
         
         {/* 🚀 عداد قياس السرعة والأداء من فيرسيل */}
         <SpeedInsights />
