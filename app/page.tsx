@@ -26,17 +26,40 @@ const normalizeRoundName = (round: any) => {
 };
 const isMathaniKnockoutRound = (round: any) => KNOCKOUT_ROUNDS.includes(String(round || "").trim()) || MATHANI_BRACKET_ROUNDS.includes(normalizeRoundName(round));
 const getMathaniStage = (round: any) => isMathaniKnockoutRound(round) ? "knockout" : "group";
+const getPenaltyScoreValues = (match: any) => {
+  const legacyHome = Array.isArray(match?.penaltiesHome) ? match.penaltiesHome.filter((p: any) => p === "scored").length : 0;
+  const legacyAway = Array.isArray(match?.penaltiesAway) ? match.penaltiesAway.filter((p: any) => p === "scored").length : 0;
+  const homeRaw = match?.homePenaltyGoals ?? match?.penaltyHomeGoals ?? match?.homePenaltiesGoals;
+  const awayRaw = match?.awayPenaltyGoals ?? match?.penaltyAwayGoals ?? match?.awayPenaltiesGoals;
+  return {
+    home: homeRaw !== undefined && homeRaw !== "" ? toScore(homeRaw) : legacyHome,
+    away: awayRaw !== undefined && awayRaw !== "" ? toScore(awayRaw) : legacyAway,
+  };
+};
+const hasPenaltyScore = (match: any) => {
+  const p = getPenaltyScoreValues(match);
+  return p.home > 0 || p.away > 0 || match?.status === "ضربات جزاء";
+};
+const shouldShowPenaltyScore = (match: any) => {
+  return toScore(match?.homeGoals) === toScore(match?.awayGoals) && hasPenaltyScore(match);
+};
+const ScoreLine = ({ home, away, className = "" }: any) => (
+  <span className={`inline-flex items-center justify-center gap-1.5 ${className}`} dir="rtl">
+    <span>{toScore(home)}</span>
+    <span>-</span>
+    <span>{toScore(away)}</span>
+  </span>
+);
 const getKnockoutWinner = (match: any) => {
-  if (match?.qualifiedTeam) return match.qualifiedTeam;
   if (!match || match.status !== "انتهت") return "";
+  if (match?.qualifiedTeam) return match.qualifiedTeam;
   const homeGoals = toScore(match.homeGoals);
   const awayGoals = toScore(match.awayGoals);
   if (homeGoals > awayGoals) return match.teamA || "";
   if (awayGoals > homeGoals) return match.teamB || "";
-  const homePenalties = (match.penaltiesHome || []).filter((p: any) => p === "scored").length;
-  const awayPenalties = (match.penaltiesAway || []).filter((p: any) => p === "scored").length;
-  if (homePenalties > awayPenalties) return match.teamA || "";
-  if (awayPenalties > homePenalties) return match.teamB || "";
+  const penalties = getPenaltyScoreValues(match);
+  if (penalties.home > penalties.away) return match.teamA || "";
+  if (penalties.away > penalties.home) return match.teamB || "";
   return "";
 };
 function formatTime12(time24: string): string { if (!time24) return "—"; const [hours, minutes] = time24.split(":").map(Number); const period = hours >= 12 ? "م" : "ص"; return `${hours % 12 || 12}:${minutes.toString().padStart(2, "0")} ${period}`; }
@@ -71,7 +94,24 @@ const getWinnerData = (t1: string, t2: string, round: string, labelId: string, a
 };
 
 const TeamMatchDisplay = ({ teamName, logoUrl }: { teamName: string, logoUrl?: string }) => (<div className="flex-1 flex flex-col items-center gap-3"><div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#0a1428] border-2 border-white/10 flex items-center justify-center text-3xl shadow-inner overflow-hidden relative">{logoUrl ? <img src={logoUrl} alt={teamName} className="w-full h-full object-contain p-1" /> : <Shield className="h-8 w-8 text-gray-500 opacity-50" />}</div><div className="text-center font-bold text-sm sm:text-xl text-white leading-tight">{teamName}</div></div>);
-const renderMatchScore = (match: any) => { const isPlayed = match && match.status === "انتهت"; const isLive = match && match.isLive; const hasGoals = match && match.homeGoals !== undefined && match.awayGoals !== undefined && match.homeGoals !== "" && match.awayGoals !== ""; if (!isPlayed && !isLive && !hasGoals) return 'VS'; const hPen = (match.penaltiesHome || []).filter((p:any)=>p==='scored').length; const aPen = (match.penaltiesAway || []).filter((p:any)=>p==='scored').length; const hasPenalties = hPen > 0 || aPen > 0 || match.status === "ضربات جزاء"; return (<div className="flex flex-col items-center" dir="ltr"><span className="text-xl sm:text-3xl font-black text-white">{match.awayGoals || 0} - {match.homeGoals || 0}</span>{hasPenalties && <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30">({aPen} - {hPen} ر.ت)</span>}</div>); };
+const renderMatchScore = (match: any) => {
+  const isPlayed = match && match.status === "انتهت";
+  const isLive = match && match.isLive;
+  const hasGoals = match && match.homeGoals !== undefined && match.awayGoals !== undefined && match.homeGoals !== "" && match.awayGoals !== "";
+  if (!isPlayed && !isLive && !hasGoals) return 'VS';
+  const penalties = getPenaltyScoreValues(match);
+  return (
+    <div className="flex flex-col items-center">
+      <ScoreLine home={match.homeGoals} away={match.awayGoals} className="text-xl sm:text-3xl font-black text-white" />
+      {shouldShowPenaltyScore(match) && (
+        <span className="text-[10px] sm:text-xs text-yellow-400 mt-1 font-bold bg-[#0a1428] px-2 py-0.5 rounded-full border border-yellow-400/30 flex items-center gap-1" dir="rtl">
+          <span>ضربات الجزاء:</span>
+          <ScoreLine home={penalties.home} away={penalties.away} />
+        </span>
+      )}
+    </div>
+  );
+};
 const getAccurateLiveMinute = (match: any) => { const baseMinute = Number(match?.liveMinuteBase ?? match?.liveMinute ?? 0) || 0; const startedAt = Number(match?.timerStartedAt || 0); const pausedTotal = Number(match?.timerPausedTotal || 0) || 0; if (!match?.isTimerRunning || !startedAt) return Number(match?.liveMinute ?? baseMinute) || 0; const elapsed = Math.max(0, Date.now() - startedAt - pausedTotal); return baseMinute + Math.floor(elapsed / 60000); };
 const getPenaltyScore = (match: any) => ({ home: (match?.penaltiesHome || []).filter((p: any) => p === 'scored').length, away: (match?.penaltiesAway || []).filter((p: any) => p === 'scored').length });
 const getEventIcon = (type: string) => type === 'goal' ? '⚽' : type === 'yellow' ? '🟨' : type === 'red' ? '🟥' : '🎙️';
@@ -633,7 +673,6 @@ export default function Page() {
                         <CardContent className="p-4 grid gap-4 md:grid-cols-2">
                           {roundMatches.map((match) => {
                             const winner = getKnockoutWinner(match);
-                            const nextLabel = String(match.nextMatchLabel || "").trim();
                             const isEnded = match.status === "انتهت";
 
                             return (
@@ -652,8 +691,21 @@ export default function Page() {
                                     {match.teamA || "لم يتحدد"}
                                   </div>
 
-                                  <div className="bg-[#0a1428] border border-cyan-500/40 rounded-xl px-4 py-2 text-cyan-300 text-center min-w-[84px]" dir="ltr">
-                                    {isEnded ? `${toScore(match.homeGoals)} - ${toScore(match.awayGoals)}` : "VS"}
+                                  <div className="bg-[#0a1428] border border-cyan-500/40 rounded-xl px-4 py-2 text-cyan-300 text-center min-w-[84px]">
+                                    {isEnded ? (
+                                      <div className="flex flex-col items-center gap-1">
+                                        <ScoreLine home={match.homeGoals} away={match.awayGoals} className="font-black" />
+                                        {shouldShowPenaltyScore(match) && (() => {
+                                          const penalties = getPenaltyScoreValues(match);
+                                          return (
+                                            <div className="text-[10px] text-yellow-400 font-bold flex items-center gap-1" dir="rtl">
+                                              <span>ضربات الجزاء:</span>
+                                              <ScoreLine home={penalties.home} away={penalties.away} />
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    ) : "VS"}
                                   </div>
 
                                   <div className={`text-center leading-tight ${winner === match.teamB ? "text-yellow-300 scale-105" : ""}`}>
@@ -670,12 +722,6 @@ export default function Page() {
                                     المباراة انتهت بالتعادل — حدّد الفريق الصاعد من لوحة التحكم.
                                   </div>
                                 ) : null}
-
-                                {nextLabel && (
-                                  <div className="mt-3 text-center text-xs text-gray-400 font-bold" dir="ltr">
-                                    Next: {nextLabel} / {match.nextMatchSlot || "teamA"}
-                                  </div>
-                                )}
                               </div>
                             );
                           })}

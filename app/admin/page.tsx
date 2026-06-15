@@ -36,16 +36,55 @@ const MATHANI_BRACKET_TEMPLATE = [
 ];
 const isMathaniKnockoutRound = (round: string) => MATHANI_KNOCKOUT_ROUNDS.includes(String(round || "").trim());
 const getMathaniStage = (round: string) => isMathaniKnockoutRound(round) ? "knockout" : "group";
+const normalizeMathaniRoundName = (round: any) => {
+  const r = String(round || "").trim();
+  if (["دور الستة عشر", "دور الـ 16", "دور الـ16", "دور 16"].includes(r)) return "دور الـ 16";
+  if (["دور الثمانية", "دور الـ 8", "دور الـ8", "دور 8"].includes(r)) return "دور الثمانية";
+  if (["نصف النهائي", "دور الـ 4", "دور الـ4", "دور 4"].includes(r)) return "دور الـ 4";
+  if (r === "النهائي") return "النهائي";
+  return r || GROUP_ROUND;
+};
 const toScore = (value: any) => { const n = Number(value); return Number.isFinite(n) ? n : 0; };
+const getPenaltyScoreValues = (match: any) => {
+  const legacyHome = Array.isArray(match?.penaltiesHome) ? match.penaltiesHome.filter((p: any) => p === "scored").length : 0;
+  const legacyAway = Array.isArray(match?.penaltiesAway) ? match.penaltiesAway.filter((p: any) => p === "scored").length : 0;
+  const homeRaw = match?.homePenaltyGoals ?? match?.penaltyHomeGoals ?? match?.homePenaltiesGoals;
+  const awayRaw = match?.awayPenaltyGoals ?? match?.penaltyAwayGoals ?? match?.awayPenaltiesGoals;
+  return {
+    home: homeRaw !== undefined && homeRaw !== "" ? toScore(homeRaw) : legacyHome,
+    away: awayRaw !== undefined && awayRaw !== "" ? toScore(awayRaw) : legacyAway,
+  };
+};
+const hasPenaltyScore = (match: any) => {
+  const p = getPenaltyScoreValues(match);
+  return p.home > 0 || p.away > 0 || match?.status === "ضربات جزاء";
+};
+const shouldShowPenaltyScore = (match: any) => {
+  return toScore(match?.homeGoals) === toScore(match?.awayGoals) && hasPenaltyScore(match);
+};
 const getKnockoutWinner = (match: any) => {
+  if (!match || match.status !== "انتهت") return "";
   if (match?.qualifiedTeam) return match.qualifiedTeam;
   const homeGoals = toScore(match?.homeGoals);
   const awayGoals = toScore(match?.awayGoals);
   if (homeGoals > awayGoals) return match?.teamA || "";
   if (awayGoals > homeGoals) return match?.teamB || "";
+  const penalties = getPenaltyScoreValues(match);
+  if (penalties.home > penalties.away) return match?.teamA || "";
+  if (penalties.away > penalties.home) return match?.teamB || "";
   return "";
 };
 const getBracketDefaults = (matchLabel: string) => MATHANI_BRACKET_TEMPLATE.find(item => item.matchLabel === String(matchLabel || "").trim());
+const MATHANI_AUTO_BRACKET_PAIRS = [
+  { targetLabel: "QF-1", targetRound: "دور الثمانية", sourceA: "R16-1", sourceB: "R16-2" },
+  { targetLabel: "QF-2", targetRound: "دور الثمانية", sourceA: "R16-3", sourceB: "R16-4" },
+  { targetLabel: "QF-3", targetRound: "دور الثمانية", sourceA: "R16-5", sourceB: "R16-6" },
+  { targetLabel: "QF-4", targetRound: "دور الثمانية", sourceA: "R16-7", sourceB: "R16-8" },
+  { targetLabel: "SF-1", targetRound: "دور الـ 4", sourceA: "QF-1", sourceB: "QF-2" },
+  { targetLabel: "SF-2", targetRound: "دور الـ 4", sourceA: "QF-3", sourceB: "QF-4" },
+  { targetLabel: "FINAL-1", targetRound: "النهائي", sourceA: "SF-1", sourceB: "SF-2" },
+];
+const getAutoBracketPairForTarget = (targetLabel: string) => MATHANI_AUTO_BRACKET_PAIRS.find(item => item.targetLabel === String(targetLabel || "").trim());
 
 const BRACKET_MAP: Record<string, { targetLabel: string, targetSide: 'teamA' | 'teamB' }> = { "م 104": { targetLabel: "م 1", targetSide: 'teamB' }, "م 103": { targetLabel: "م 5", targetSide: 'teamB' }, "م 102": { targetLabel: "م 7", targetSide: 'teamB' }, "م 101": { targetLabel: "م 3", targetSide: 'teamB' }, "م 100": { targetLabel: "م 4", targetSide: 'teamB' }, "م 99": { targetLabel: "م 8", targetSide: 'teamB' }, "م 98": { targetLabel: "م 6", targetSide: 'teamB' }, "م 97": { targetLabel: "م 2", targetSide: 'teamB' } };
 const cleanTeamString = (name: any) => String(name || "").replace(/النجيلّة/g, "النجيلة").replace(/علّوش/g, "علوش").trim();
@@ -235,6 +274,8 @@ export default function AdminPage() {
     teamBLogo: "",
     homeGoals: 0,
     awayGoals: 0,
+    homePenaltyGoals: 0,
+    awayPenaltyGoals: 0,
     matchLabel: "",
     round: GROUP_ROUND,
     stage: "group",
@@ -347,41 +388,87 @@ export default function AdminPage() {
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
   
-  const advanceWinnerToNextMatch = async (savedMatch: any) => {
+  const getWinnerPayload = (match: any) => {
+    const team = getKnockoutWinner(match);
+    if (!team) return null;
+    const logo = normalizeTeamName(team) === normalizeTeamName(match?.teamA)
+      ? match?.teamALogo || ""
+      : match?.teamBLogo || "";
+    return { team, logo };
+  };
+
+  const syncMathaniKnockoutBracket = async (savedMatch: any) => {
     if (mainAppTab !== "mathani_cup") return;
 
     const isKnockout = savedMatch.stage === "knockout" || isMathaniKnockoutRound(savedMatch.round);
     if (!isKnockout) return;
-    if (savedMatch.status !== "انتهت") return;
 
-    const winner = getKnockoutWinner(savedMatch);
-    if (!winner) {
-      alert("المباراة إقصائية وانتهت بالتعادل. اختر الفريق الصاعد يدويًا من خانة الفريق الصاعد عند التعادل/الترجيح.");
+    if (savedMatch.status === "انتهت" && !getKnockoutWinner(savedMatch)) {
+      alert("المباراة إقصائية وانتهت بالتعادل. اختر الفريق الصاعد يدويًا من خانة الفريق الصاعد عند التعادل/الترجيح ثم احفظ المباراة.");
       return;
     }
 
-    if (!savedMatch.nextMatchLabel || !savedMatch.nextMatchSlot) return;
+    const collName = getColl("matches");
+    let workingMatches = [
+      ...matchesRef.current.filter((m) => m.id !== savedMatch.id),
+      savedMatch,
+    ];
 
-    const targetMatch = matchesRef.current.find((m) =>
-      String(m.matchLabel || "").trim() === String(savedMatch.nextMatchLabel || "").trim()
-    );
+    const generatedLabels: string[] = [];
 
-    if (!targetMatch) {
-      alert(`تم تحديد الفائز: ${winner}، لكن لم أجد المباراة القادمة بالكود: ${savedMatch.nextMatchLabel}`);
-      return;
+    for (const pair of MATHANI_AUTO_BRACKET_PAIRS) {
+      const sourceA = workingMatches.find((m) => String(m.matchLabel || "").trim() === pair.sourceA);
+      const sourceB = workingMatches.find((m) => String(m.matchLabel || "").trim() === pair.sourceB);
+      const winnerA = getWinnerPayload(sourceA);
+      const winnerB = getWinnerPayload(sourceB);
+
+      if (!winnerA || !winnerB) continue;
+
+      const existingTarget = workingMatches.find((m) => String(m.matchLabel || "").trim() === pair.targetLabel);
+      const generatedPayload: any = {
+        teamA: winnerA.team,
+        teamALogo: winnerA.logo,
+        teamB: winnerB.team,
+        teamBLogo: winnerB.logo,
+        matchLabel: pair.targetLabel,
+        round: pair.targetRound,
+        stage: "knockout",
+        autoGenerated: true,
+        generatedFrom: [pair.sourceA, pair.sourceB],
+        dayName: "",
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingTarget?.id) {
+        await updateDoc(doc(db, collName, existingTarget.id), generatedPayload);
+        workingMatches = workingMatches.map((m) =>
+          m.id === existingTarget.id ? { ...m, ...generatedPayload } : m
+        );
+      } else {
+        const createdData = {
+          ...generatedPayload,
+          homeGoals: 0,
+          awayGoals: 0,
+          homePenaltyGoals: 0,
+          awayPenaltyGoals: 0,
+          qualifiedTeam: "",
+          date: new Date().toISOString().slice(0, 10),
+          time: "15:30",
+          status: "لم تبدأ",
+          isLive: false,
+          streamClosed: false,
+          createdAt: new Date().toISOString(),
+        };
+        const created = await addDoc(collection(db, collName), createdData);
+        workingMatches.push({ id: created.id, ...createdData });
+      }
+
+      generatedLabels.push(pair.targetLabel);
     }
 
-    const slot = savedMatch.nextMatchSlot === "teamB" ? "teamB" : "teamA";
-    const logoSlot = slot === "teamA" ? "teamALogo" : "teamBLogo";
-    const winnerLogo = normalizeTeamName(winner) === normalizeTeamName(savedMatch.teamA)
-      ? savedMatch.teamALogo || ""
-      : savedMatch.teamBLogo || "";
-
-    await updateDoc(doc(db, getColl("matches"), targetMatch.id), {
-      [slot]: winner,
-      [logoSlot]: winnerLogo,
-      updatedAt: new Date().toISOString(),
-    });
+    if (generatedLabels.length) {
+      alert(`✅ تم تحديث/إنشاء مباريات الدور التالي تلقائيًا: ${Array.from(new Set(generatedLabels)).join("، ")}`);
+    }
   };
 
   const saveMatch = async () => {
@@ -394,6 +481,8 @@ export default function AdminPage() {
       stage,
       homeGoals: toScore(matchForm.homeGoals),
       awayGoals: toScore(matchForm.awayGoals),
+      homePenaltyGoals: toScore((matchForm as any).homePenaltyGoals),
+      awayPenaltyGoals: toScore((matchForm as any).awayPenaltyGoals),
       dayName,
       isLive: false,
       streamClosed: false,
@@ -402,12 +491,12 @@ export default function AdminPage() {
 
     if (editingId) {
       await updateDoc(doc(db, getColl("matches"), editingId), data);
-      await advanceWinnerToNextMatch({ id: editingId, ...data });
+      await syncMathaniKnockoutBracket({ id: editingId, ...data });
       setEditingId(null);
       alert("✅ تم تعديل بيانات ونتيجة المباراة بنجاح");
     } else {
       const created = await addDoc(collection(db, getColl("matches")), { ...data, createdAt: new Date().toISOString() });
-      await advanceWinnerToNextMatch({ id: created.id, ...data });
+      await syncMathaniKnockoutBracket({ id: created.id, ...data });
       alert("✅ تم إضافة المباراة بنجاح");
     }
 
@@ -424,6 +513,8 @@ export default function AdminPage() {
       teamBLogo: match.teamBLogo || "",
       homeGoals: toScore(match.homeGoals),
       awayGoals: toScore(match.awayGoals),
+      homePenaltyGoals: toScore(match.homePenaltyGoals ?? match.penaltyHomeGoals ?? getPenaltyScoreValues(match).home),
+      awayPenaltyGoals: toScore(match.awayPenaltyGoals ?? match.penaltyAwayGoals ?? getPenaltyScoreValues(match).away),
       matchLabel: match.matchLabel || "",
       round: match.round || GROUP_ROUND,
       stage: match.stage || getMathaniStage(match.round || GROUP_ROUND),
@@ -472,7 +563,7 @@ export default function AdminPage() {
       id,
       stage: currentMatch?.stage || getMathaniStage(currentMatch?.round || GROUP_ROUND),
     };
-    await advanceWinnerToNextMatch(updatedMatch);
+    await syncMathaniKnockoutBracket(updatedMatch);
   };
   
   const startEditRoster = (teamName: string) => { const existing = rostersList.find(r => r.id === teamName); let loadedPlayers = Array.from({ length: 12 }, () => ({ name: "", number: "" })); if (existing && existing.players) { loadedPlayers = [...existing.players]; while (loadedPlayers.length < 12) loadedPlayers.push({ name: "", number: "" }); } setRosterFormAdmin({ managerName: existing?.managerName || "", managerPhone: existing?.managerPhone || "", password: existing?.password || "", logoUrl: existing?.logoUrl || "", isSubmitted: existing?.isSubmitted || false, players: loadedPlayers.slice(0, 12) }); setEditingRosterId(teamName); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -558,6 +649,116 @@ export default function AdminPage() {
     }
     return true;
   });
+
+  const adminRoundSections = useMemo(() => {
+    const visibleMatches = matches
+      .filter(m => !koSearchTerm || String(m.teamA || "").includes(koSearchTerm) || String(m.teamB || "").includes(koSearchTerm) || String(m.matchLabel || "").includes(koSearchTerm))
+      .sort((a, b) => {
+        const da = String(a.date || "9999-12-31");
+        const db = String(b.date || "9999-12-31");
+        if (da !== db) return da.localeCompare(db);
+        return String(a.time || "00:00").localeCompare(String(b.time || "00:00"));
+      });
+
+    const roundOrder = mainAppTab === 'mathani_cup'
+      ? [GROUP_ROUND, "دور الـ 16", "دور الثمانية", "دور الـ 4", "النهائي"]
+      : Array.from(new Set(visibleMatches.map(m => String(m.round || GROUP_ROUND))));
+
+    const grouped = visibleMatches.reduce((acc: Record<string, any[]>, match: any) => {
+      const key = mainAppTab === 'mathani_cup' ? normalizeMathaniRoundName(match.round) : String(match.round || GROUP_ROUND);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(match);
+      return acc;
+    }, {});
+
+    const ordered = [
+      ...roundOrder.filter(r => grouped[r]?.length),
+      ...Object.keys(grouped).filter(r => !roundOrder.includes(r)),
+    ];
+
+    return ordered.map(roundName => ({ roundName, items: grouped[roundName] }));
+  }, [matches, koSearchTerm, mainAppTab]);
+
+  const renderAdminMatchCard = (match: any) => (
+    <div key={match.id} className={`rounded-2xl border overflow-hidden transition-all ${match.isLive ? 'border-red-500/60 bg-red-900/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : match.status === 'انتهت' ? 'border-white/5 bg-[#0a1228] opacity-75' : 'border-white/8 bg-[#0f1c35]'}`}>
+      <div className={`px-4 py-2 text-xs font-bold flex items-center justify-between ${match.isLive ? 'bg-red-600' : 'bg-[#060e1e]'}`}>
+        <span className="text-gray-300">{getArabicDay(match.date)} • {match.date} • {match.time}</span>
+        <div className="flex items-center gap-2">
+          {match.isLive && <span className="animate-pulse text-white font-black">🔴 مباشر</span>}
+          {match.matchLabel && <span className="text-cyan-300 font-black px-2" dir="ltr">{match.matchLabel}</span>}
+          <span className="text-gray-400 font-black px-2">{match.round}</span>
+          {(match.stage === "knockout" || isMathaniKnockoutRound(match.round)) && <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full">إقصائي</span>}
+        </div>
+      </div>
+      <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="bg-[#060e1e] rounded-xl p-4 border border-white/5 flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-center flex-1"><div className="font-black text-white text-base">{match.teamA}</div></div>
+            <div className="bg-[#0f1c35] border border-yellow-400/20 rounded-xl px-5 py-2 font-black text-2xl text-yellow-400 mx-3 text-center">
+              <div>{match.homeGoals || 0} - {match.awayGoals || 0}</div>
+              {shouldShowPenaltyScore(match) && (() => {
+                const penalties = getPenaltyScoreValues(match);
+                return <div className="text-xs text-yellow-300 mt-1 font-bold">ضربات الجزاء: {penalties.home} - {penalties.away}</div>;
+              })()}
+            </div>
+            <div className="text-center flex-1"><div className="font-black text-white text-base">{match.teamB}</div></div>
+          </div>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Btn size="sm" onClick={() => startEdit(match)} variant="blue"><Edit className="h-3 w-3" /> تعديل المباراة</Btn>
+            <Btn size="sm" onClick={() => updateMatchLive(match.id, { isLive: !match.isLive })} variant={match.isLive ? "red" : "ghost"}>{match.isLive ? "⏹ إيقاف اللايف" : "▶ تشغيل اللايف"}</Btn>
+            <Btn size="sm" onClick={() => updateMatchLive(match.id, { status: "انتهت", isLive: false, streamClosed: true, isTimerRunning: false })} variant="emerald">إنهاء</Btn>
+            <Btn size="sm" onClick={() => openPoster(match)} variant="ghost"><Camera className="h-3 w-3" /> بوستر</Btn>
+            <Btn size="sm" onClick={() => deleteMatch(match.id)} variant="danger"><Trash2 className="h-3 w-3" /> حذف</Btn>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
+            <div className="text-xs text-gray-400 font-bold">تعديل سريع للأهداف (مباشر)</div>
+            {[{ label: match.teamA, key: 'homeGoals', val: match.homeGoals }, { label: match.teamB, key: 'awayGoals', val: match.awayGoals }].map(g => (
+              <div key={g.key} className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-400 truncate flex-1">{g.label}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => updateMatchLive(match.id, { [g.key]: Math.max(0, (g.val || 0) - 1) })} className="w-7 h-7 rounded-lg bg-red-600/20 text-red-400 font-black text-lg hover:bg-red-600/40">−</button>
+                  <span className="text-lg font-black text-white w-5 text-center">{g.val || 0}</span>
+                  <button onClick={() => updateMatchLive(match.id, { [g.key]: (g.val || 0) + 1 })} className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-400 font-black text-lg hover:bg-emerald-600/40">+</button>
+                </div>
+              </div>
+            ))}
+            {(match.stage === "knockout" || isMathaniKnockoutRound(match.round)) && toScore(match.homeGoals) === toScore(match.awayGoals) && (
+              <div className="border-t border-white/5 pt-3 mt-3 space-y-2">
+                <div className="text-xs text-yellow-300 font-black">ضربات الجزاء</div>
+                {[{ label: match.teamA, key: 'homePenaltyGoals', val: getPenaltyScoreValues(match).home }, { label: match.teamB, key: 'awayPenaltyGoals', val: getPenaltyScoreValues(match).away }].map(g => (
+                  <div key={g.key} className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-gray-400 truncate flex-1">{g.label}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => updateMatchLive(match.id, { [g.key]: Math.max(0, (g.val || 0) - 1) })} className="w-7 h-7 rounded-lg bg-red-600/20 text-red-400 font-black text-lg hover:bg-red-600/40">−</button>
+                      <span className="text-lg font-black text-yellow-300 w-5 text-center">{g.val || 0}</span>
+                      <button onClick={() => updateMatchLive(match.id, { [g.key]: (g.val || 0) + 1 })} className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-400 font-black text-lg hover:bg-emerald-600/40">+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <select value={match.status} onChange={e => updateMatchLive(match.id, { status: e.target.value })} className={`${selectCls} text-xs`}>
+              {["لم تبدأ", "ستبدأ بعد قليل", "الشوط الأول", "استراحة", "الشوط الثاني", "ضربات جزاء", "انتهت"].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 font-bold">العداد</span>
+              <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full" dir="ltr">{getAccurateLiveMinute(match)}'</span>
+            </div>
+            <div className="flex gap-2">
+              <input type="number" value={match.liveMinute || 0} onChange={e => updateMatchLive(match.id, { liveMinute: parseInt(e.target.value) || 0, liveMinuteBase: parseInt(e.target.value) || 0, timerStartedAt: match.isTimerRunning ? Date.now() : null })} className={`${inputCls} w-20 text-center text-sm`} />
+              <Btn onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} variant={match.isTimerRunning ? "red" : "emerald"} size="md" className="flex-1 text-xs">
+                {match.isTimerRunning ? <><Pause className="h-3 w-3" /> إيقاف</> : <><Play className="h-3 w-3" /> تشغيل</>}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (!isAuth) return (
     <div dir="rtl" className="min-h-screen bg-[#060e1e] flex items-center justify-center p-4">
@@ -1033,6 +1234,21 @@ export default function AdminPage() {
                       </Field>
                     </div>
 
+                    {mainAppTab === 'mathani_cup' && getMathaniStage(matchForm.round) === "knockout" && toScore(matchForm.homeGoals) === toScore(matchForm.awayGoals) && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                        <div className="text-yellow-300 font-black text-sm mb-3">ضربات الجزاء عند التعادل</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Field label={`ضربات جزاء ${matchForm.teamA || "الفريق الأول"}`}>
+                            <input type="number" min="0" value={(matchForm as any).homePenaltyGoals ?? 0} onChange={e => setMatchForm({ ...matchForm, homePenaltyGoals: Number(e.target.value) } as any)} className={`${inputCls} text-center font-black text-xl text-yellow-400`} />
+                          </Field>
+                          <Field label={`ضربات جزاء ${matchForm.teamB || "الفريق الثاني"}`}>
+                            <input type="number" min="0" value={(matchForm as any).awayPenaltyGoals ?? 0} onChange={e => setMatchForm({ ...matchForm, awayPenaltyGoals: Number(e.target.value) } as any)} className={`${inputCls} text-center font-black text-xl text-yellow-400`} />
+                          </Field>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-2">لو المباراة متعادلة، نتيجة ضربات الجزاء هي التي تحدد الفريق الصاعد وتظهر أسفل النتيجة في الصفحة الرئيسية.</div>
+                      </div>
+                    )}
+
                     {/* قسم الشعارات (اختياري) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field label="رابط شعار الفريق الأول (اختياري)"><input value={matchForm.teamALogo} onChange={e => setMatchForm({ ...matchForm, teamALogo: e.target.value })} className={inputCls} dir="ltr" placeholder="https://..." /></Field>
@@ -1076,60 +1292,35 @@ export default function AdminPage() {
 
                     {mainAppTab === "mathani_cup" && (
                       <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <div>
-                            <div className="text-emerald-300 font-black text-sm">إعدادات الأدوار الإقصائية</div>
-                            <div className="text-gray-400 text-xs mt-1">تظهر هنا دائمًا في بطولة المثاني. استخدمها عند اختيار دور الـ 16 أو دور الثمانية أو دور الـ 4 أو النهائي.</div>
-                          </div>
-                          <Btn
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const defaults = getBracketDefaults(matchForm.matchLabel);
-                              if (!defaults) return alert("اكتب كود مباراة معروف مثل R16-1 أو QF-1 أو SF-1 أولًا.");
-                              setMatchForm({ ...matchForm, nextMatchLabel: defaults.nextMatchLabel, nextMatchSlot: defaults.nextMatchSlot });
-                            }}
-                          >تعبئة الربط تلقائيًا</Btn>
+                        <div>
+                          <div className="text-emerald-300 font-black text-sm">نظام الإقصائيات التلقائي</div>
+                          <div className="text-gray-400 text-xs mt-1">أضف مباريات دور الـ16 فقط بأكواد R16-1 إلى R16-8. بعد انتهاء كل مباراتين مرتبطتين، سيتم إنشاء مباراة الدور التالي تلقائيًا.</div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <Field label="كود المباراة الحالية">
-                            <input
-                              value={matchForm.matchLabel}
-                              onChange={e => {
-                                const matchLabel = e.target.value;
-                                const defaults = getBracketDefaults(matchLabel);
-                                setMatchForm({
-                                  ...matchForm,
-                                  matchLabel,
-                                  nextMatchLabel: defaults?.nextMatchLabel ?? matchForm.nextMatchLabel,
-                                  nextMatchSlot: defaults?.nextMatchSlot ?? matchForm.nextMatchSlot,
-                                });
-                              }}
-                              className={inputCls}
-                              placeholder="مثال: R16-1"
-                              dir="ltr"
-                            />
-                          </Field>
-
-                          <Field label="المباراة القادمة للفائز">
-                            <input
-                              value={matchForm.nextMatchLabel}
-                              onChange={e => setMatchForm({ ...matchForm, nextMatchLabel: e.target.value })}
-                              className={inputCls}
-                              placeholder="مثال: QF-1"
-                              dir="ltr"
-                            />
-                          </Field>
-
-                          <Field label="مكان الفائز في المباراة القادمة">
                             <select
-                              value={matchForm.nextMatchSlot}
-                              onChange={e => setMatchForm({ ...matchForm, nextMatchSlot: e.target.value })}
+                              value={matchForm.matchLabel}
+                              onChange={e => setMatchForm({ ...matchForm, matchLabel: e.target.value })}
                               className={selectCls}
+                              dir="ltr"
                             >
-                              <option value="teamA">الفريق الأول</option>
-                              <option value="teamB">الفريق الثاني</option>
+                              <option value="">بدون كود</option>
+                              <option value="R16-1">R16-1</option>
+                              <option value="R16-2">R16-2</option>
+                              <option value="R16-3">R16-3</option>
+                              <option value="R16-4">R16-4</option>
+                              <option value="R16-5">R16-5</option>
+                              <option value="R16-6">R16-6</option>
+                              <option value="R16-7">R16-7</option>
+                              <option value="R16-8">R16-8</option>
+                              <option value="QF-1">QF-1</option>
+                              <option value="QF-2">QF-2</option>
+                              <option value="QF-3">QF-3</option>
+                              <option value="QF-4">QF-4</option>
+                              <option value="SF-1">SF-1</option>
+                              <option value="SF-2">SF-2</option>
+                              <option value="FINAL-1">FINAL-1</option>
                             </select>
                           </Field>
 
@@ -1144,6 +1335,14 @@ export default function AdminPage() {
                               {matchForm.teamB && <option value={matchForm.teamB}>{matchForm.teamB}</option>}
                             </select>
                           </Field>
+
+                          <div className="bg-[#061426] border border-white/10 rounded-xl p-3 text-xs text-gray-300 leading-6">
+                            <div className="text-white font-black mb-1">المسار الثابت:</div>
+                            <div dir="ltr">R16-1 + R16-2 → QF-1</div>
+                            <div dir="ltr">R16-3 + R16-4 → QF-2</div>
+                            <div dir="ltr">QF-1 + QF-2 → SF-1</div>
+                            <div dir="ltr">SF-1 + SF-2 → FINAL-1</div>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1168,73 +1367,21 @@ export default function AdminPage() {
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <input value={koSearchTerm} onChange={e => setKoSearchTerm(e.target.value)} placeholder="بحث في المباريات (بالاسم)..." className={`${inputCls} pr-10`} />
                   </div>
-                  {matches.filter(m => !koSearchTerm || m.teamA.includes(koSearchTerm) || m.teamB.includes(koSearchTerm)).map(match => (
-                    <div key={match.id} className={`rounded-2xl border overflow-hidden transition-all ${match.isLive ? 'border-red-500/60 bg-red-900/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : match.status === 'انتهت' ? 'border-white/5 bg-[#0a1228] opacity-75' : 'border-white/8 bg-[#0f1c35]'}`}>
-                      <div className={`px-4 py-2 text-xs font-bold flex items-center justify-between ${match.isLive ? 'bg-red-600' : 'bg-[#060e1e]'}`}>
-                        <span className="text-gray-300">{getArabicDay(match.date)} • {match.date} • {match.time}</span>
-                        <div className="flex items-center gap-2">
-                          {match.isLive && <span className="animate-pulse text-white font-black">🔴 مباشر</span>}
-                          {match.matchLabel && <span className="text-cyan-300 font-black px-2" dir="ltr">{match.matchLabel}</span>}
-                          <span className="text-gray-400 font-black px-2">{match.round}</span>
-                          {(match.stage === "knockout" || isMathaniKnockoutRound(match.round)) && <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full">إقصائي</span>}
+                  {adminRoundSections.length === 0 ? (
+                    <div className="text-center text-gray-400 font-bold py-10 bg-[#0a1228] rounded-2xl border border-white/5">لا توجد مباريات مطابقة للبحث.</div>
+                  ) : (
+                    <div className="space-y-8">
+                      {adminRoundSections.map(section => (
+                        <div key={section.roundName} className="space-y-3">
+                          <div className="sticky top-0 z-10 bg-[#061426]/95 backdrop-blur border border-emerald-500/25 rounded-2xl px-4 py-3 flex items-center justify-between shadow-lg">
+                            <div className="text-emerald-300 font-black text-lg">{section.roundName}</div>
+                            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black">{section.items.length} مباراة</Badge>
+                          </div>
+                          {section.items.map(match => renderAdminMatchCard(match))}
                         </div>
-                      </div>
-                      <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="bg-[#060e1e] rounded-xl p-4 border border-white/5 flex flex-col justify-between">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="text-center flex-1">
-                              <div className="font-black text-white text-base">{match.teamA}</div>
-                            </div>
-                            <div className="bg-[#0f1c35] border border-yellow-400/20 rounded-xl px-5 py-2 font-black text-2xl text-yellow-400 mx-3">{match.homeGoals || 0} - {match.awayGoals || 0}</div>
-                            <div className="text-center flex-1">
-                              <div className="font-black text-white text-base">{match.teamB}</div>
-                            </div>
-                          </div>
-                          
-                          {/* أزرار التحكم في المباراة الموجودة بالأسفل */}
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            <Btn size="sm" onClick={() => startEdit(match)} variant="blue"><Edit className="h-3 w-3" /> تعديل المباراة</Btn>
-                            <Btn size="sm" onClick={() => updateMatchLive(match.id, { isLive: !match.isLive })} variant={match.isLive ? "red" : "ghost"}>{match.isLive ? "⏹ إيقاف اللايف" : "▶ تشغيل اللايف"}</Btn>
-                            <Btn size="sm" onClick={() => updateMatchLive(match.id, { status: "انتهت", isLive: false, streamClosed: true, isTimerRunning: false })} variant="emerald">إنهاء</Btn>
-                            <Btn size="sm" onClick={() => openPoster(match)} variant="ghost"><Camera className="h-3 w-3" /> بوستر</Btn>
-                            <Btn size="sm" onClick={() => deleteMatch(match.id)} variant="danger"><Trash2 className="h-3 w-3" /> حذف</Btn>
-                          </div>
-                        </div>
-                        
-                        {/* العداد والتعديل اللحظي (اللايف) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
-                            <div className="text-xs text-gray-400 font-bold">تعديل سريع للأهداف (مباشر)</div>
-                            {[{ label: match.teamA, key: 'homeGoals', val: match.homeGoals }, { label: match.teamB, key: 'awayGoals', val: match.awayGoals }].map(g => (
-                              <div key={g.key} className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-gray-400 truncate flex-1">{g.label}</span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button onClick={() => updateMatchLive(match.id, { [g.key]: Math.max(0, (g.val || 0) - 1) })} className="w-7 h-7 rounded-lg bg-red-600/20 text-red-400 font-black text-lg hover:bg-red-600/40">−</button>
-                                  <span className="text-lg font-black text-white w-5 text-center">{g.val || 0}</span>
-                                  <button onClick={() => updateMatchLive(match.id, { [g.key]: (g.val || 0) + 1 })} className="w-7 h-7 rounded-lg bg-emerald-600/20 text-emerald-400 font-black text-lg hover:bg-emerald-600/40">+</button>
-                                </div>
-                              </div>
-                            ))}
-                            <select value={match.status} onChange={e => updateMatchLive(match.id, { status: e.target.value })} className={`${selectCls} text-xs`}>
-                              {["لم تبدأ", "ستبدأ بعد قليل", "الشوط الأول", "استراحة", "الشوط الثاني", "ضربات جزاء", "انتهت"].map(s => <option key={s}>{s}</option>)}
-                            </select>
-                          </div>
-                          <div className="bg-[#060e1e] rounded-xl p-3 border border-white/5 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-400 font-bold">العداد</span>
-                              <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full" dir="ltr">{getAccurateLiveMinute(match)}'</span>
-                            </div>
-                            <div className="flex gap-2">
-                              <input type="number" value={match.liveMinute || 0} onChange={e => updateMatchLive(match.id, { liveMinute: parseInt(e.target.value) || 0, liveMinuteBase: parseInt(e.target.value) || 0, timerStartedAt: match.isTimerRunning ? Date.now() : null })} className={`${inputCls} w-20 text-center text-sm`} />
-                              <Btn onClick={() => updateMatchLive(match.id, { isTimerRunning: !match.isTimerRunning })} variant={match.isTimerRunning ? "red" : "emerald"} size="md" className="flex-1 text-xs">
-                                {match.isTimerRunning ? <><Pause className="h-3 w-3" /> إيقاف</> : <><Play className="h-3 w-3" /> تشغيل</>}
-                              </Btn>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             )}
