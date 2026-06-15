@@ -250,41 +250,19 @@ export default function Page() {
     if (typeof window !== "undefined") {
       if ("Notification" in window) setNotificationPermission(Notification.permission);
 
-      const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "d73de8b7-948e-494e-84f2-6c353efee89c";
+      const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
       const isSecureOrigin =
         window.location.protocol === "https:" ||
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1";
 
+      if (!oneSignalAppId) {
+        console.error("Missing NEXT_PUBLIC_ONESIGNAL_APP_ID");
+      }
+
       if (oneSignalAppId && isSecureOrigin && !(window as any).__oneSignalInitialized) {
         (window as any).__oneSignalInitialized = true;
         (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
-        (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
-          try {
-            await OneSignal.init({
-              appId: oneSignalAppId,
-              serviceWorkerPath: "OneSignalSDKWorker.js",
-              serviceWorkerParam: { scope: "/" },
-              notifyButton: { enable: false },
-              promptOptions: {
-                slidedown: {
-                  prompts: [{
-                    type: "push",
-                    autoPrompt: false,
-                    text: {
-                      actionMessage: "فعّل إشعارات مطروح الرياضية لتصلك الأهداف وبداية المباريات فورًا.",
-                      acceptButton: "تفعيل",
-                      cancelButton: "لاحقًا",
-                    },
-                  }],
-                },
-              },
-            });
-            if ("Notification" in window) setNotificationPermission(Notification.permission);
-          } catch (error) {
-            console.error("OneSignal init error:", error);
-          }
-        });
 
         if (!document.querySelector('script[src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"]')) {
           const script = document.createElement("script");
@@ -292,9 +270,25 @@ export default function Page() {
           script.defer = true;
           document.head.appendChild(script);
         }
+
+        (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
+          try {
+            await OneSignal.init({
+              appId: oneSignalAppId,
+              serviceWorkerPath: "/OneSignalSDKWorker.js",
+              serviceWorkerUpdaterPath: "/OneSignalSDKUpdaterWorker.js",
+              serviceWorkerParam: { scope: "/" },
+              notifyButton: { enable: false },
+              allowLocalhostAsSecureOrigin: true,
+            });
+
+            if ("Notification" in window) setNotificationPermission(Notification.permission);
+          } catch (error) {
+            console.error("OneSignal init error:", error);
+          }
+        });
       }
-    }
-    
+    }    
     let suffix = "";
     if(mainAppTab === 'matrouh_cup') { const edSuffix = cupEdition === "edition_4" ? "_ed4" : ""; const tourSuffix = activeTournament === "juniors" ? "_juniors" : ""; suffix = edSuffix + tourSuffix; } 
     else if (mainAppTab === 'elite_cup') { suffix = "_elite"; }
@@ -348,8 +342,21 @@ export default function Page() {
 
   const handleSubscribe = () => {
     if (typeof window === "undefined") return;
+
     if (!("Notification" in window)) {
       alert("المتصفح الحالي لا يدعم إشعارات الويب.");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      setNotificationPermission("granted");
+      alert("الإشعارات مفعلة بالفعل على هذا الجهاز.");
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      setNotificationPermission("denied");
+      alert("الإشعارات مرفوضة من إعدادات المتصفح. افتح إعدادات الموقع واسمح بالإشعارات ثم جرب مرة أخرى.");
       return;
     }
 
@@ -360,9 +367,7 @@ export default function Page() {
 
     (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
       try {
-        if (OneSignal.Slidedown?.promptPush) {
-          await OneSignal.Slidedown.promptPush();
-        } else if (OneSignal.Notifications?.requestPermission) {
+        if (OneSignal.Notifications?.requestPermission) {
           await OneSignal.Notifications.requestPermission();
         } else {
           await Notification.requestPermission();
@@ -587,6 +592,41 @@ export default function Page() {
         <div className="mb-4 rounded-3xl border border-yellow-400/50 bg-[#13213a] p-4 flex items-center gap-4">
           <span className="shrink-0 rounded-2xl bg-yellow-400 px-5 py-2 text-sm font-black text-black shadow-[0_0_10px_rgba(250,204,21,0.5)]">آخر تحديث</span>
           <div className="flex-1 overflow-hidden"><div className="animate-marquee whitespace-nowrap text-lg font-bold text-yellow-300">{tickerText}</div></div>
+        </div>
+
+        <div className="mb-6 rounded-3xl border border-cyan-500/30 bg-[#13213a] p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3 text-center sm:text-right">
+            <div className="bg-cyan-500/20 p-2.5 rounded-xl border border-cyan-500/30">
+              {notificationPermission === "granted" ? <BellRing className="text-emerald-400 h-5 w-5" /> : <BellOff className="text-yellow-400 h-5 w-5" />}
+            </div>
+            <div>
+              <h3 className="text-white font-black text-base">إشعارات البطولة</h3>
+              <p className="text-gray-400 text-xs sm:text-sm font-bold">
+                {notificationPermission === "granted"
+                  ? "الإشعارات مفعلة على هذا الجهاز."
+                  : notificationPermission === "denied"
+                    ? "الإشعارات مرفوضة من إعدادات المتصفح."
+                    : "فعّل الإشعارات لتصلك أهداف وبداية المباريات فورًا."}
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleSubscribe}
+            disabled={notificationPermission === "granted" || notificationPermission === "denied"}
+            className={`font-black px-6 py-5 rounded-2xl shadow-md ${
+              notificationPermission === "granted"
+                ? "bg-emerald-500 text-white cursor-default"
+                : notificationPermission === "denied"
+                  ? "bg-red-500 text-white cursor-default"
+                  : "bg-yellow-400 text-black hover:bg-yellow-300"
+            }`}
+          >
+            {notificationPermission === "granted"
+              ? "الإشعارات مفعلة"
+              : notificationPermission === "denied"
+                ? "الإشعارات مرفوضة"
+                : "تفعيل الإشعارات 🔔"}
+          </Button>
         </div>
 
         <style dangerouslySetInnerHTML={{__html: `@keyframes infinite-scroll-rtl { 0% { transform: translateX(0); } 100% { transform: translateX(50%); } } .sponsor-track { display: flex; width: max-content; animation: infinite-scroll-rtl 40s linear infinite; } .sponsor-track:hover { animation-play-state: paused; }`}} />
@@ -1617,7 +1657,23 @@ export default function Page() {
              <Card className="bg-[#13213a] border border-white/5 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
                 <BellRing className="w-12 h-12 text-yellow-400 mx-auto" />
                 <h3 className="text-2xl font-black text-white">إشعارات المنصة الفورية</h3>
-                <Button onClick={handleSubscribe} className="bg-yellow-400 text-black font-black text-base px-8 py-5 rounded-2xl shadow-md">تفعيل الإشعارات الفورية على هاتفي 🔔</Button>
+                <Button
+                  onClick={handleSubscribe}
+                  disabled={notificationPermission === "granted" || notificationPermission === "denied"}
+                  className={`font-black text-base px-8 py-5 rounded-2xl shadow-md ${
+                    notificationPermission === "granted"
+                      ? "bg-emerald-500 text-white cursor-default"
+                      : notificationPermission === "denied"
+                        ? "bg-red-500 text-white cursor-default"
+                        : "bg-yellow-400 text-black hover:bg-yellow-300"
+                  }`}
+                >
+                  {notificationPermission === "granted"
+                    ? "الإشعارات مفعلة على هاتفي"
+                    : notificationPermission === "denied"
+                      ? "الإشعارات مرفوضة من المتصفح"
+                      : "تفعيل الإشعارات الفورية على هاتفي 🔔"}
+                </Button>
              </Card>
 
              <Card className="bg-[#13213a] border border-cyan-500/20 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
