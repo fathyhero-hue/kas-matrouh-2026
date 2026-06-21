@@ -303,7 +303,12 @@ export default function Page() {
     const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
     const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, `team_rosters${suffix}`), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProducts = onSnapshot(collection(db, "products"), (snap) => setProductsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((p:any) => p.isActive !== false).sort((a:any,b:any)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")))));
+    const unsubProducts = onSnapshot(collection(db, "shop_products"), (snap) => setProductsList(
+      snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((p:any) => p.isActive !== false)
+        .sort((a:any,b:any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.title || a.name || "").localeCompare(String(b.title || b.name || ""), "ar"))
+    ));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
     
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -528,8 +533,39 @@ export default function Page() {
   const currentFormation = useMemo(() => { const form = formationsList.find(f => f.round === activeTotwRound); if (!form || !form.players) return { players: Array(7).fill(null), coach: { name: "", team: "", imageUrl: "", rating: 99 } }; const playersArr = Array.isArray(form.players) ? [...form.players] : Array(7).fill(null); while(playersArr.length < 7) playersArr.push(null); return { ...form, players: playersArr, coach: form.coach || { name: "", team: "", imageUrl: "", rating: 99 } }; }, [formationsList, activeTotwRound]);
   
   const cartTotal = useMemo(() => cartItems.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.qty) || 1)), 0), [cartItems]);
-  const addToCart = (product: any) => { setCartItems(prev => { const found = prev.find(item => item.id === product.id); if (found) return prev.map(item => item.id === product.id ? { ...item, qty: (Number(item.qty) || 1) + 1 } : item); return [...prev, { ...product, qty: 1 }]; }); };
-  const updateCartQty = (productId: string, qty: number) => { if (qty <= 0) return setCartItems(prev => prev.filter(item => item.id !== productId)); setCartItems(prev => prev.map(item => item.id === productId ? { ...item, qty } : item)); };
+  const getShopImageViewStyle = (source: any): React.CSSProperties => ({
+    width: "100%",
+    height: "100%",
+    objectFit: source?.imageFit || "cover",
+    objectPosition: `${Number(source?.imagePositionX ?? 50)}% ${Number(source?.imagePositionY ?? 50)}%`,
+    transform: `scale(${Number(source?.imageScale ?? 1)})`,
+    transition: "all 180ms ease",
+  });
+  const addToCart = (product: any) => {
+    const hasStockValue = product.stock !== undefined && product.stock !== null && String(product.stock).trim() !== "";
+    const stockNumber = Number(product.stock) || 0;
+    if (hasStockValue && stockNumber <= 0) return alert("هذا المنتج غير متاح حالياً.");
+    setCartItems(prev => {
+      const found = prev.find(item => item.id === product.id);
+      const nextQty = found ? (Number(found.qty) || 1) + 1 : 1;
+      if (hasStockValue && nextQty > stockNumber) {
+        alert("الكمية المطلوبة أكبر من المتاح حالياً.");
+        return prev;
+      }
+      if (found) return prev.map(item => item.id === product.id ? { ...item, qty: nextQty } : item);
+      return [...prev, { ...product, title: product.title || product.name || "منتج رياضي", qty: 1 }];
+    });
+  };
+  const updateCartQty = (productId: string, qty: number) => {
+    if (qty <= 0) return setCartItems(prev => prev.filter(item => item.id !== productId));
+    setCartItems(prev => prev.map(item => {
+      if (item.id !== productId) return item;
+      const hasStockValue = item.stock !== undefined && item.stock !== null && String(item.stock).trim() !== "";
+      const stockNumber = Number(item.stock) || 0;
+      const safeQty = hasStockValue && stockNumber > 0 ? Math.min(qty, stockNumber) : qty;
+      return { ...item, qty: safeQty };
+    }));
+  };
   
   const handleReceiptImageUpload = (file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); const previewUrl = URL.createObjectURL(file); setCheckoutForm((p:any) => ({ ...p, receiptImagePreview: previewUrl, receiptImageFile: file, receiptFileName: file.name })); };
   
@@ -537,7 +573,7 @@ export default function Page() {
     if (cartItems.length === 0) return alert("السلة فارغة"); if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إكمال البيانات"); setIsUploading(true);
     try {
         let receiptUrl = ""; if (checkoutForm.receiptImageFile) { const rRef = ref(storage, `receipts/order_${Date.now()}`); await uploadBytes(rRef, checkoutForm.receiptImageFile); receiptUrl = await getDownloadURL(rRef); }
-        await addDoc(collection(db, "orders"), { customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" }, items: cartItems.map(item => ({ id: item.id, title: item.title, price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })), total: cartTotal, paymentMethod: checkoutForm.paymentMethod, status: "طلب جديد", createdAt: new Date().toISOString() }); 
+        await addDoc(collection(db, "orders"), { customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" }, items: cartItems.map(item => ({ id: item.id, title: item.title || item.name || "منتج رياضي", price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })), total: cartTotal, paymentMethod: checkoutForm.paymentMethod, status: "طلب جديد", createdAt: new Date().toISOString() }); 
         alert("✅ تم إرسال الطلب بنجاح!"); setCartItems([]); setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
     } catch(e) { alert("حدث خطأ."); } setIsUploading(false);
   };
@@ -1633,20 +1669,117 @@ export default function Page() {
         {/* 3. SHOP SECTION */}
         {mainAppTab === 'shop' && (
           <div className="space-y-8 animate-in fade-in duration-500 mt-4">
-            <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 shadow-xl text-center md:text-right"><h2 className="text-3xl font-black text-yellow-400 mb-2">🛒 متجر هيرو سبورت الرياضي</h2><p className="text-cyan-300 font-bold">اختر التيشرتات والجوائز المخصصة لفريقك مع الدفع السريع والآمن.</p></div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="bg-[#13213a] border border-yellow-400/30 rounded-3xl p-6 shadow-xl text-center md:text-right">
+              <h2 className="text-3xl font-black text-yellow-400 mb-2">🛒 متجر هيرو سبورت الرياضي</h2>
+              <p className="text-cyan-300 font-bold">المنتجات المعروضة هنا يتم التحكم فيها مباشرة من لوحة الإدارة: الاسم، السعر، الصورة، المخزون، الترتيب، والإظهار أو الإخفاء.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
               <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {productsList.length > 0 ? productsList.map(product => (
-                  <Card key={product.id} className="bg-[#13213a] border-yellow-400/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-400 transition-colors">
-                    <div className="aspect-square bg-[#0a1428] overflow-hidden">{product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">🛍️</div>}</div>
-                    <CardContent className="p-5 space-y-3">
-                      <h3 className="text-xl font-black text-white truncate">{product.title}</h3>
-                      <div className="flex items-center justify-between"><Badge className="bg-yellow-400 text-black font-black text-lg px-3 py-1">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</Badge></div>
-                      <Button onClick={() => addToCart(product)} className="w-full bg-yellow-400 text-black font-black rounded-2xl py-6 mt-2">إضافة للسلة 🛒</Button>
-                    </CardContent>
-                  </Card>
-                )) : <div className="col-span-full text-center py-20 bg-[#13213a] border border-yellow-400/20 rounded-3xl text-white font-black text-xl">لا توجد منتجات معروضة للبيع حالياً.</div>}
+                {productsList.length > 0 ? productsList.map(product => {
+                  const productTitle = String(product.title || product.name || "منتج رياضي");
+                  const hasStockValue = product.stock !== undefined && product.stock !== null && String(product.stock).trim() !== "";
+                  const stockNumber = Number(product.stock) || 0;
+                  const isOutOfStock = hasStockValue && stockNumber <= 0;
+                  return (
+                    <Card key={product.id} className="bg-[#13213a] border-yellow-400/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-400 transition-colors">
+                      <div className="aspect-square bg-[#0a1428] overflow-hidden relative">
+                        {product.imageUrl ? <img src={product.imageUrl} alt={productTitle} style={getShopImageViewStyle(product)} /> : <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">🛍️</div>}
+                        {product.category && <Badge className="absolute top-3 right-3 bg-black/70 text-yellow-300 border border-yellow-400/30 font-black">{product.category}</Badge>}
+                        {isOutOfStock && <div className="absolute inset-0 bg-black/65 flex items-center justify-center text-white font-black text-2xl">غير متاح</div>}
+                      </div>
+                      <CardContent className="p-5 space-y-3">
+                        <h3 className="text-xl font-black text-white line-clamp-2 min-h-[3.5rem]">{productTitle}</h3>
+                        {product.description && <p className="text-sm text-gray-300 leading-6 line-clamp-2">{product.description}</p>}
+                        <div className="flex items-center justify-between gap-2">
+                          <Badge className="bg-yellow-400 text-black font-black text-lg px-3 py-1">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</Badge>
+                          {hasStockValue && <span className={`text-xs font-black ${isOutOfStock ? 'text-red-300' : 'text-emerald-300'}`}>المتاح: {stockNumber.toLocaleString("ar-EG")}</span>}
+                        </div>
+                        <Button
+                          onClick={() => addToCart(product)}
+                          disabled={isOutOfStock}
+                          className={`w-full font-black rounded-2xl py-6 mt-2 ${isOutOfStock ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 'bg-yellow-400 hover:bg-yellow-300 text-black'}`}
+                        >
+                          {isOutOfStock ? "غير متاح حالياً" : "إضافة للسلة 🛒"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                }) : <div className="col-span-full text-center py-20 bg-[#13213a] border border-yellow-400/20 rounded-3xl text-white font-black text-xl">لا توجد منتجات معروضة للبيع حالياً.</div>}
               </div>
+
+              <Card className="bg-[#13213a] border border-yellow-400/30 rounded-3xl shadow-2xl lg:sticky lg:top-4 overflow-hidden">
+                <CardHeader className="border-b border-white/10 bg-[#0a1428]/70">
+                  <CardTitle className="text-2xl font-black text-yellow-400 flex items-center justify-between gap-3">
+                    <span>سلة الطلب</span>
+                    <Badge className="bg-yellow-400 text-black font-black">{cartItems.length.toLocaleString("ar-EG")}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 space-y-5">
+                  {cartItems.length === 0 ? (
+                    <div className="text-center py-10 text-gray-300 font-bold border border-dashed border-white/15 rounded-3xl">
+                      السلة فارغة حالياً. اختر منتجاً من المتجر.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {cartItems.map(item => {
+                        const itemTitle = String(item.title || item.name || "منتج رياضي");
+                        return (
+                          <div key={item.id} className="flex gap-3 bg-[#0a1428] rounded-2xl p-3 border border-white/10">
+                            <div className="w-16 h-16 rounded-xl bg-black/30 overflow-hidden flex-shrink-0">
+                              {item.imageUrl ? <img src={item.imageUrl} alt={itemTitle} style={getShopImageViewStyle(item)} /> : <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>}
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-white font-black text-sm leading-5 line-clamp-2">{itemTitle}</p>
+                                <button onClick={() => updateCartQty(item.id, 0)} className="text-red-300 hover:text-red-200 font-black text-lg leading-none">×</button>
+                              </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-yellow-300 font-black text-sm">{Number(item.price || 0).toLocaleString("ar-EG")} ج.م</span>
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => updateCartQty(item.id, (Number(item.qty) || 1) - 1)} className="w-8 h-8 rounded-full bg-white/10 text-white font-black">-</button>
+                                  <span className="text-white font-black min-w-6 text-center">{Number(item.qty) || 1}</span>
+                                  <button onClick={() => updateCartQty(item.id, (Number(item.qty) || 1) + 1)} className="w-8 h-8 rounded-full bg-yellow-400 text-black font-black">+</button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="border-t border-white/10 pt-4 flex items-center justify-between">
+                    <span className="text-white font-black text-lg">الإجمالي</span>
+                    <span className="text-yellow-400 font-black text-2xl">{cartTotal.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Input placeholder="اسم العميل" value={checkoutForm.name} onChange={e => setCheckoutForm((p:any) => ({ ...p, name: e.target.value }))} className="bg-[#0a1428] border-white/10 text-white font-bold h-12" />
+                    <Input placeholder="رقم الهاتف" value={checkoutForm.phone} onChange={e => setCheckoutForm((p:any) => ({ ...p, phone: e.target.value }))} className="bg-[#0a1428] border-white/10 text-white font-bold h-12" />
+                    <textarea placeholder="العنوان أو ملاحظات الاستلام" value={checkoutForm.address} onChange={e => setCheckoutForm((p:any) => ({ ...p, address: e.target.value }))} className="w-full min-h-24 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
+                    <select value={checkoutForm.paymentMethod} onChange={e => setCheckoutForm((p:any) => ({ ...p, paymentMethod: e.target.value }))} className="w-full h-12 rounded-xl bg-[#0a1428] border border-white/10 text-white font-black px-3 outline-none focus:border-yellow-400">
+                      <option value="cash">الدفع عند الاستلام</option>
+                      <option value="wallet">محفظة / تحويل</option>
+                      <option value="bank">تحويل بنكي</option>
+                    </select>
+                    {checkoutForm.paymentMethod !== "cash" && (
+                      <div className="space-y-3 bg-[#0a1428]/70 border border-white/10 rounded-2xl p-3">
+                        <Input placeholder="رقم العملية أو التحويل" value={checkoutForm.transactionRef} onChange={e => setCheckoutForm((p:any) => ({ ...p, transactionRef: e.target.value }))} className="bg-[#13213a] border-white/10 text-white font-bold h-12" />
+                        <label className="block cursor-pointer rounded-xl border border-dashed border-yellow-400/40 p-3 text-center text-yellow-300 font-black">
+                          {checkoutForm.receiptFileName || "رفع صورة إيصال الدفع"}
+                          <input type="file" accept="image/*" className="hidden" onChange={e => handleReceiptImageUpload(e.target.files?.[0])} />
+                        </label>
+                        {checkoutForm.receiptImagePreview && <img src={checkoutForm.receiptImagePreview} alt="إيصال الدفع" className="w-full max-h-40 object-contain rounded-xl bg-black/30" />}
+                      </div>
+                    )}
+                    <textarea placeholder="ملاحظات إضافية اختيارية" value={checkoutForm.notes} onChange={e => setCheckoutForm((p:any) => ({ ...p, notes: e.target.value }))} className="w-full min-h-20 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
+                    <Button onClick={submitOrder} disabled={isUploading || cartItems.length === 0} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl py-6 text-lg disabled:opacity-60">
+                      {isUploading ? "جاري إرسال الطلب..." : "إرسال الطلب للإدارة ✅"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}

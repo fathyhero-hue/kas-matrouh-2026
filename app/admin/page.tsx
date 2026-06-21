@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, LogOut, Edit, Trash2, Plus, Play, Pause, BellRing, Star, Activity, Search, ClipboardList, Lock, Unlock, Shield, Camera, Loader2, Archive, Clock, Ban, AlertTriangle, CalendarClock, UserX } from "lucide-react";
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
@@ -228,6 +229,27 @@ export default function AdminPage() {
   const [formationsList, setFormationsList] = useState<any[]>([]);
   const [rostersList, setRostersList] = useState<any[]>([]);
   const [ordersList, setOrdersList] = useState<any[]>([]);
+  const [shopProducts, setShopProducts] = useState<any[]>([]);
+  const emptyShopProductForm = {
+    title: "",
+    price: "",
+    imageUrl: "",
+    description: "",
+    category: "",
+    stock: "",
+    sortOrder: "0",
+    isActive: true,
+    imageFit: "cover",
+    imagePositionX: 50,
+    imagePositionY: 50,
+    imageScale: 1,
+  };
+  const [shopProductForm, setShopProductForm] = useState<any>(emptyShopProductForm);
+  const [editingShopProductId, setEditingShopProductId] = useState<string | null>(null);
+  const [shopImageFile, setShopImageFile] = useState<File | null>(null);
+  const [shopImagePreview, setShopImagePreview] = useState("");
+  const [isUploadingShopImage, setIsUploadingShopImage] = useState(false);
+  const shopImageInputRef = useRef<HTMLInputElement | null>(null);
   const [tickerText, setTickerText] = useState("");
 
   const [bannedList, setBannedList] = useState<any[]>([]);
@@ -374,6 +396,7 @@ export default function AdminPage() {
     const unsubForms = onSnapshot(collection(db, getColl("formations")), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, getColl("team_rosters")), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubOrders = onSnapshot(collection(db, "orders"), (snap) => setOrdersList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))));
+    const unsubShopProducts = onSnapshot(collection(db, "shop_products"), (snap) => setShopProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.title || a.name || "").localeCompare(String(b.title || b.name || ""), "ar"))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
     const unsubEliteTeams = onSnapshot(collection(db, "elite_teams"), (snap) => setEliteTeams(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -407,7 +430,7 @@ export default function AdminPage() {
         }
       });
     }, 5000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); unsubMathaniGroups(); clearInterval(timerInterval); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubShopProducts(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); unsubMathaniGroups(); clearInterval(timerInterval); };
   }, [isAuth, activeTournament, cupEdition, mainAppTab]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
@@ -609,6 +632,130 @@ export default function AdminPage() {
   const addCard = async () => { if (!cardForm.player.trim()) return alert("اكتب اسم اللاعب"); const existingPlayer = cardEvents.find(c => normalizeTeamName(c.player) === normalizeTeamName(cardForm.player.trim()) && c.team === cardForm.team); if (existingPlayer) { await updateDoc(doc(db, getColl("cards"), existingPlayer.id), { yellow: (Number(existingPlayer.yellow) || 0) + (cardForm.type === "yellow" ? 1 : 0), red: (Number(existingPlayer.red) || 0) + (cardForm.type === "red" ? 1 : 0) }); alert(`تمت إضافة بطاقة تراكمية`); } else { await addDoc(collection(db, getColl("cards")), { player: cardForm.player.trim(), team: cardForm.team, yellow: cardForm.type === "yellow" ? 1 : 0, red: cardForm.type === "red" ? 1 : 0 }); alert("تم الإضافة"); } setCardForm(p => ({ ...p, player: "" })); };
   const deleteCard = async (id: string) => confirm("حذف البطاقة؟") && await deleteDoc(doc(db, getColl("cards"), id));
   const archiveAndResetCards = async () => { if (!confirm("تصفير للأرشيف؟")) return; try { for (const card of cardEvents) { if (card.yellow > 0 || card.red > 0) { await addDoc(collection(db, getColl("archived_cards")), { ...card, archivedAt: new Date().toISOString() }); await updateDoc(doc(db, getColl("cards"), card.id), { yellow: 0, red: 0 }); } } alert(`تمت الأرشفة بنجاح`); } catch (e) { } };
+  const getShopImageViewStyle = (source: any = shopProductForm): React.CSSProperties => ({
+    width: "100%",
+    height: "100%",
+    objectFit: source.imageFit || "cover",
+    objectPosition: `${Number(source.imagePositionX ?? 50)}% ${Number(source.imagePositionY ?? 50)}%`,
+    transform: `scale(${Number(source.imageScale ?? 1)})`,
+    transition: "all 180ms ease",
+  });
+
+  const updateShopImageControls = (updates: any) => {
+    setShopProductForm((prev: any) => ({
+      ...prev,
+      ...updates,
+      imagePositionX: Math.min(100, Math.max(0, Number(updates.imagePositionX ?? prev.imagePositionX ?? 50))),
+      imagePositionY: Math.min(100, Math.max(0, Number(updates.imagePositionY ?? prev.imagePositionY ?? 50))),
+      imageScale: Math.min(2, Math.max(1, Number(updates.imageScale ?? prev.imageScale ?? 1))),
+    }));
+  };
+
+  const handleShopImageSelect = (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return alert("اختار ملف صورة صحيح");
+    if (file.size > 6 * 1024 * 1024) return alert("حجم الصورة كبير. الأفضل أقل من 6 ميجا");
+    if (shopImagePreview) URL.revokeObjectURL(shopImagePreview);
+    setShopImageFile(file);
+    setShopImagePreview(URL.createObjectURL(file));
+    setShopProductForm((prev: any) => ({ ...prev, imageFit: prev.imageFit || "cover", imagePositionX: 50, imagePositionY: 50, imageScale: 1 }));
+  };
+
+  const uploadShopProductImageIfNeeded = async (title: string) => {
+    if (!shopImageFile) return String(shopProductForm.imageUrl || "").trim();
+    const safeTitle = title.replace(/[^a-zA-Z0-9؀-ۿ_-]+/g, "_").slice(0, 45) || "product";
+    const fileExt = shopImageFile.name.includes(".") ? shopImageFile.name.split(".").pop() : "jpg";
+    const imageRef = ref(storage, `shop-products/${Date.now()}_${safeTitle}.${fileExt}`);
+    await uploadBytes(imageRef, shopImageFile, { contentType: shopImageFile.type });
+    return await getDownloadURL(imageRef);
+  };
+
+  const resetShopProductForm = () => {
+    if (shopImagePreview) URL.revokeObjectURL(shopImagePreview);
+    setShopImageFile(null);
+    setShopImagePreview("");
+    setShopProductForm({ ...emptyShopProductForm });
+    setEditingShopProductId(null);
+    if (shopImageInputRef.current) shopImageInputRef.current.value = "";
+  };
+
+  const saveShopProduct = async () => {
+    const title = String(shopProductForm.title || "").trim();
+    const price = Number(shopProductForm.price);
+    const stockValue = String(shopProductForm.stock ?? "").trim();
+    if (!title) return alert("اكتب اسم المنتج");
+    if (!Number.isFinite(price) || price <= 0) return alert("اكتب سعر صحيح للمنتج");
+
+    setIsUploadingShopImage(true);
+    try {
+      const finalImageUrl = await uploadShopProductImageIfNeeded(title);
+      if (!finalImageUrl) return alert("ارفع صورة المنتج من لوحة الإدارة");
+
+      const data: any = {
+        title,
+        name: title,
+        price,
+        imageUrl: finalImageUrl,
+        description: String(shopProductForm.description || "").trim(),
+        category: String(shopProductForm.category || "").trim(),
+        stock: stockValue === "" ? null : Number(stockValue),
+        sortOrder: Number(shopProductForm.sortOrder || 0),
+        isActive: Boolean(shopProductForm.isActive),
+        imageFit: shopProductForm.imageFit || "cover",
+        imagePositionX: Number(shopProductForm.imagePositionX ?? 50),
+        imagePositionY: Number(shopProductForm.imagePositionY ?? 50),
+        imageScale: Number(shopProductForm.imageScale ?? 1),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (editingShopProductId) {
+        await updateDoc(doc(db, "shop_products", editingShopProductId), data);
+        alert("تم تعديل المنتج بنجاح ✅");
+      } else {
+        await addDoc(collection(db, "shop_products"), { ...data, createdAt: new Date().toISOString() });
+        alert("تم إضافة المنتج وسيظهر في المتجر ✅");
+      }
+
+      resetShopProductForm();
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ أثناء رفع صورة المنتج أو حفظ البيانات");
+    } finally {
+      setIsUploadingShopImage(false);
+    }
+  };
+  const startEditShopProduct = (product: any) => {
+    setEditingShopProductId(product.id);
+    setShopProductForm({
+      title: product.title || product.name || "",
+      price: product.price ?? "",
+      imageUrl: product.imageUrl || "",
+      description: product.description || "",
+      category: product.category || "",
+      stock: product.stock ?? "",
+      sortOrder: product.sortOrder ?? "0",
+      isActive: product.isActive !== false,
+      imageFit: product.imageFit || "cover",
+      imagePositionX: Number(product.imagePositionX ?? 50),
+      imagePositionY: Number(product.imagePositionY ?? 50),
+      imageScale: Number(product.imageScale ?? 1),
+    });
+    setShopImageFile(null);
+    setShopImagePreview("");
+    if (shopImageInputRef.current) shopImageInputRef.current.value = "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const deleteShopProduct = async (id: string) => {
+    if (confirm("متأكد من حذف هذا المنتج نهائياً؟")) {
+      await deleteDoc(doc(db, "shop_products", id));
+      if (editingShopProductId === id) resetShopProductForm();
+      alert("تم حذف المنتج");
+    }
+  };
+  const toggleShopProductActive = async (product: any) => {
+    await updateDoc(doc(db, "shop_products", product.id), { isActive: product.isActive === false, updatedAt: new Date().toISOString() });
+  };
+
   const addMedia = async () => { if (!mediaForm.title.trim()) return alert("العنوان مطلوب"); await addDoc(collection(db, getColl("media")), mediaForm); setMediaForm({ type: "news", title: "", url: "", imageUrl: "", body: "" }); alert("تم الإضافة"); };
   const deleteMedia = async (id: string) => confirm("حذف العنصر؟") && await deleteDoc(doc(db, getColl("media"), id));
   const saveFormation = async () => { const existing = formationsList.find(f => f.round === formationForm.round); if (existing) { await updateDoc(doc(db, getColl("formations"), existing.id), { players: formationForm.players, coach: formationForm.coach || { ...defaultCoach } }); alert("تم التحديث"); } else { await addDoc(collection(db, getColl("formations")), { round: formationForm.round, players: formationForm.players, coach: formationForm.coach || { ...defaultCoach } }); alert("تم الحفظ"); } };
@@ -944,32 +1091,153 @@ export default function AdminPage() {
 
         {/* المتجر */}
         {mainAppTab === 'shop' && (
-          <SectionCard title="طلبات المتجر" icon="🛒" color="orange">
-            <div className="overflow-x-auto rounded-xl border border-white/5">
-              <table className="w-full text-right text-white text-sm min-w-[900px]">
-                <thead className="bg-[#060e1e]">
-                  <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "الدفع", "الإيصال", "الحالة"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {ordersList.map(order => (
-                    <tr key={order.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                      <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs font-black text-gray-300">{order.id.slice(-6).toUpperCase()}</span><div className="text-xs text-gray-500 mt-1">{new Date(order.createdAt).toLocaleDateString('ar-EG')}</div></td>
-                      <td className="px-4 py-3 font-bold">{order.customer?.name}<br /><span className="text-cyan-400 text-xs" dir="ltr">{order.customer?.phone}</span></td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{order.items?.map((item: any, i: number) => <div key={i}>{item.title} (x{item.qty})</div>)}</td>
-                      <td className="px-4 py-3 font-black text-yellow-400">{Number(order.total || 0).toLocaleString("ar-EG")} ج.م</td>
-                      <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs">{order.paymentMethod === "cash" ? "الدفع عند الاستلام" : order.paymentMethod}</span></td>
-                      <td className="px-4 py-3">{order.customer?.receiptImage ? <a href={order.customer.receiptImage} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline text-xs">عرض</a> : "—"}</td>
-                      <td className="px-4 py-3">
-                        <select value={order.status} onChange={async (e) => await updateDoc(doc(db, "orders", order.id), { status: e.target.value })} className="bg-[#0a1428] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs font-bold outline-none cursor-pointer">
-                          {["طلب جديد", "قيد التأكيد", "قيد التجهيز", "تم الشحن", "تم التسليم", "ملغي"].map(s => <option key={s}>{s}</option>)}
-                        </select>
-                      </td>
-                    </tr>
+          <div className="space-y-6">
+            <SectionCard
+              title={editingShopProductId ? "تعديل منتج في المتجر" : "إضافة منتج جديد للمتجر"}
+              icon="🛍️"
+              color="orange"
+              action={<span className="text-xs bg-orange-500/15 text-orange-300 border border-orange-500/20 px-3 py-1 rounded-full font-bold">{shopProducts.length} منتج</span>}
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
+                <div className="space-y-3">
+                  <div className="relative bg-[#060e1e] border border-white/10 rounded-2xl overflow-hidden h-[280px] flex items-center justify-center">
+                    {(shopImagePreview || shopProductForm.imageUrl) ? (
+                      <img src={shopImagePreview || shopProductForm.imageUrl} alt="معاينة المنتج" style={getShopImageViewStyle()} />
+                    ) : (
+                      <div className="text-center text-gray-500 p-6">
+                        <Camera className="w-10 h-10 mx-auto mb-2 opacity-60" />
+                        <div className="text-sm font-bold">ارفع صورة المنتج من اللوحة</div>
+                        <div className="text-xs mt-1">يفضل صورة مربعة أو رأسية بجودة عالية</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    ref={shopImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleShopImageSelect(e.target.files?.[0])}
+                  />
+                  <Btn onClick={() => shopImageInputRef.current?.click()} variant="orange" size="lg">
+                    <Camera className="w-4 h-4" /> رفع صورة من الجهاز
+                  </Btn>
+
+                  <div className="bg-[#060e1e] border border-white/10 rounded-2xl p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Btn onClick={() => updateShopImageControls({ imageFit: "cover" })} variant={shopProductForm.imageFit === "cover" ? "orange" : "ghost"} size="sm">قص احترافي</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imageFit: "contain", imageScale: 1 })} variant={shopProductForm.imageFit === "contain" ? "orange" : "ghost"} size="sm">عرض كامل</Btn>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Btn onClick={() => updateShopImageControls({ imagePositionY: Number(shopProductForm.imagePositionY ?? 50) - 8 })} variant="ghost" size="sm">↑ فوق</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imagePositionX: 50, imagePositionY: 50, imageScale: 1 })} variant="ghost" size="sm">توسيط</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imagePositionY: Number(shopProductForm.imagePositionY ?? 50) + 8 })} variant="ghost" size="sm">↓ تحت</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imagePositionX: Number(shopProductForm.imagePositionX ?? 50) + 8 })} variant="ghost" size="sm">يمين</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imageScale: Number(shopProductForm.imageScale ?? 1) + 0.08 })} variant="ghost" size="sm">تكبير</Btn>
+                      <Btn onClick={() => updateShopImageControls({ imagePositionX: Number(shopProductForm.imagePositionX ?? 50) - 8 })} variant="ghost" size="sm">شمال</Btn>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Btn onClick={() => updateShopImageControls({ imageScale: Number(shopProductForm.imageScale ?? 1) - 0.08 })} variant="ghost" size="sm">تصغير</Btn>
+                      <Btn onClick={() => { setShopImageFile(null); setShopImagePreview(""); setShopProductForm((p: any) => ({ ...p, imageUrl: "", imageFit: "cover", imagePositionX: 50, imagePositionY: 50, imageScale: 1 })); if (shopImageInputRef.current) shopImageInputRef.current.value = ""; }} variant="danger" size="sm">حذف الصورة</Btn>
+                    </div>
+                    <div className="text-[11px] text-gray-500 leading-5">
+                      الإعدادات الحالية: {shopProductForm.imageFit === "contain" ? "عرض كامل" : "قص احترافي"} — X {shopProductForm.imagePositionX}% / Y {shopProductForm.imagePositionY}% / Zoom {Number(shopProductForm.imageScale || 1).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <Field label="اسم المنتج"><input value={shopProductForm.title} onChange={e => setShopProductForm({ ...shopProductForm, title: e.target.value })} className={inputCls} placeholder="مثال: تيشرت رياضي" /></Field>
+                  <Field label="السعر بالجنيه"><input type="number" value={shopProductForm.price} onChange={e => setShopProductForm({ ...shopProductForm, price: e.target.value })} className={`${inputCls} text-yellow-400 font-black`} placeholder="250" /></Field>
+                  <Field label="التصنيف"><input value={shopProductForm.category} onChange={e => setShopProductForm({ ...shopProductForm, category: e.target.value })} className={inputCls} placeholder="ملابس / إكسسوارات" /></Field>
+                  <Field label="الترتيب"><input type="number" value={shopProductForm.sortOrder} onChange={e => setShopProductForm({ ...shopProductForm, sortOrder: e.target.value })} className={inputCls} placeholder="0" /></Field>
+                  <Field label="الكمية المتاحة"><input type="number" value={shopProductForm.stock} onChange={e => setShopProductForm({ ...shopProductForm, stock: e.target.value })} className={inputCls} placeholder="اتركها فارغة لو غير محددة" /></Field>
+                  <Field label="حالة الظهور">
+                    <select value={shopProductForm.isActive ? "true" : "false"} onChange={e => setShopProductForm({ ...shopProductForm, isActive: e.target.value === "true" })} className={selectCls}>
+                      <option value="true">ظاهر في المتجر</option>
+                      <option value="false">مخفي مؤقتًا</option>
+                    </select>
+                  </Field>
+                  <Field label="وصف مختصر"><textarea value={shopProductForm.description} onChange={e => setShopProductForm({ ...shopProductForm, description: e.target.value })} className={`${inputCls} h-24 md:col-span-2 xl:col-span-4 resize-none`} placeholder="وصف بسيط يظهر للعميل داخل المتجر..." /></Field>
+                  <div className="md:col-span-2 xl:col-span-4 flex flex-col sm:flex-row gap-3">
+                    <Btn onClick={saveShopProduct} disabled={isUploadingShopImage} variant="orange" size="lg" className="sm:flex-1">
+                      {isUploadingShopImage ? <><Loader2 className="w-4 h-4 animate-spin" /> جاري رفع الصورة والحفظ...</> : editingShopProductId ? <><Edit className="w-4 h-4" /> حفظ تعديل المنتج</> : <><Plus className="w-4 h-4" /> إضافة المنتج للمتجر</>}
+                    </Btn>
+                    {editingShopProductId && <Btn onClick={resetShopProductForm} variant="ghost" size="lg" className="sm:w-52">إلغاء التعديل</Btn>}
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="إدارة منتجات المتجر" icon="📦" color="orange" action={<Btn onClick={resetShopProductForm} variant="ghost" size="sm"><Plus className="w-4 h-4" /> منتج جديد</Btn>}>
+              {shopProducts.length === 0 ? (
+                <div className="bg-[#060e1e] border border-dashed border-white/10 rounded-2xl p-8 text-center text-gray-400 font-bold">
+                  لا توجد منتجات حتى الآن. أضف أول منتج من النموذج بالأعلى.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {shopProducts.map((product: any) => (
+                    <div key={product.id} className={`rounded-2xl border overflow-hidden bg-[#060e1e] ${product.isActive === false ? "border-red-500/30 opacity-70" : "border-white/10"}`}>
+                      <div className="relative h-44 bg-[#0a1428]">
+                        {product.imageUrl ? <img src={product.imageUrl} alt={product.title || product.name} style={getShopImageViewStyle(product)} /> : <div className="w-full h-full flex items-center justify-center text-5xl">🛍️</div>}
+                        <span className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-xs font-black border ${product.isActive === false ? "bg-red-900/80 text-red-200 border-red-500/30" : "bg-emerald-900/80 text-emerald-200 border-emerald-500/30"}`}>
+                          {product.isActive === false ? "مخفي" : "ظاهر"}
+                        </span>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <h3 className="font-black text-white text-base line-clamp-1">{product.title || product.name}</h3>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-yellow-400 font-black">{Number(product.price || 0).toLocaleString("ar-EG")} ج.م</span>
+                            {product.category && <span className="text-[11px] bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-gray-300">{product.category}</span>}
+                          </div>
+                        </div>
+                        {product.description && <p className="text-xs text-gray-400 leading-5 line-clamp-2">{product.description}</p>}
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>ترتيب: {product.sortOrder ?? 0}</span>
+                          <span>مخزون: {product.stock === null || product.stock === undefined || product.stock === "" ? "غير محدد" : product.stock}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Btn onClick={() => startEditShopProduct(product)} variant="blue" size="sm"><Edit className="w-3 h-3" /> تعديل</Btn>
+                          <Btn onClick={() => toggleShopProductActive(product)} variant={product.isActive === false ? "emerald" : "ghost"} size="sm">{product.isActive === false ? "إظهار" : "إخفاء"}</Btn>
+                          <Btn onClick={() => deleteShopProduct(product.id)} variant="danger" size="sm"><Trash2 className="w-3 h-3" /> حذف</Btn>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard title="طلبات المتجر" icon="🛒" color="orange">
+              <div className="overflow-x-auto rounded-xl border border-white/5">
+                <table className="w-full text-right text-white text-sm min-w-[900px]">
+                  <thead className="bg-[#060e1e]">
+                    <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "الدفع", "الإيصال", "الحالة"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {ordersList.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500 font-bold">لا توجد طلبات حالية</td></tr>
+                    ) : ordersList.map(order => (
+                      <tr key={order.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                        <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs font-black text-gray-300">{order.id.slice(-6).toUpperCase()}</span><div className="text-xs text-gray-500 mt-1">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-EG') : "—"}</div></td>
+                        <td className="px-4 py-3 font-bold">{order.customer?.name}<br /><span className="text-cyan-400 text-xs" dir="ltr">{order.customer?.phone}</span></td>
+                        <td className="px-4 py-3 text-sm text-gray-300">{order.items?.map((item: any, i: number) => <div key={i}>{item.title || item.name} (x{item.qty})</div>)}</td>
+                        <td className="px-4 py-3 font-black text-yellow-400">{Number(order.total || 0).toLocaleString("ar-EG")} ج.م</td>
+                        <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs">{order.paymentMethod === "cash" ? "الدفع عند الاستلام" : order.paymentMethod}</span></td>
+                        <td className="px-4 py-3">{order.customer?.receiptImage ? <a href={order.customer.receiptImage} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline text-xs">عرض</a> : "—"}</td>
+                        <td className="px-4 py-3">
+                          <select value={order.status || "طلب جديد"} onChange={async (e) => await updateDoc(doc(db, "orders", order.id), { status: e.target.value })} className="bg-[#0a1428] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs font-bold outline-none cursor-pointer">
+                            {["طلب جديد", "قيد التأكيد", "قيد التجهيز", "تم الشحن", "تم التسليم", "ملغي"].map(s => <option key={s}>{s}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+          </div>
         )}
 
         {/* النخبة */}
