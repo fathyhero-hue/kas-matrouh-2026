@@ -173,8 +173,31 @@ const DEFAULT_TOURNAMENT_LINEUP = {
   ]
 };
 
+
+const DEFAULT_PLAYER_CARD_TOURNAMENTS = [
+  { id: "matrouh_cup_players", name: "بطولة كأس مطروح", logoUrl: "/tournament-logos/matrouh-cup.png", isActive: true, sortOrder: 1 },
+  { id: "elite_cup_players", name: "بطولة كأس النخبة", logoUrl: "/tournament-logos/elite-cup.png", isActive: true, sortOrder: 2 },
+  { id: "republican_people_party_players", name: "بطولة حزب الشعب الجمهوري", logoUrl: "/tournament-logos/republican-party-cup.png", isActive: true, sortOrder: 3 },
+];
+
+const PLAYER_CARD_BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
+const PLAYER_CARD_SIGNATURE_IMAGE = "/tournament-logos/signature-fathy-hero.svg";
+const PLAYER_CARD_FONT_FAMILY = "'Cairo', 'Tajawal', system-ui, sans-serif";
+const PLAYER_CARD_ROLE_OPTIONS = [
+  { value: "player", label: "لاعب" },
+  { value: "manager", label: "مدير فني" },
+];
+
+const generatePlayerCardSerial = (prefix = "MTR") => {
+  const cleanPrefix = String(prefix || "MTR").replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "MTR";
+  const year = new Date().getFullYear();
+  const stamp = Date.now().toString().slice(-6);
+  const rnd = Math.floor(100 + Math.random() * 900);
+  return `${cleanPrefix}-${year}-${stamp}${rnd}`;
+};
+
 export default function Page() {
-  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop' | 'settings'>('matrouh_cup');
+  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'player_cards' | 'shop' | 'settings'>('matrouh_cup');
   useEffect(() => {
     if (mainAppTab === 'mathani_cup') setMainAppTab('matrouh_cup');
   }, [mainAppTab]);
@@ -194,6 +217,13 @@ export default function Page() {
   const [formationsList, setFormationsList] = useState<any[]>([]); 
   const [rostersList, setRostersList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
+
+  const [playerCardTournaments, setPlayerCardTournaments] = useState<any[]>([]);
+  const [playerRegistrations, setPlayerRegistrations] = useState<any[]>([]);
+  const [selectedPlayerTournamentId, setSelectedPlayerTournamentId] = useState("");
+  const [playerCardForm, setPlayerCardForm] = useState<any>({ fullName: "", role: "player", teamName: "", birthDate: "", nationalId: "", photoPreview: "", photoFile: null, photoUrl: "", cropX: 50, cropY: 50, zoom: 1, serialNumber: "" });
+  const [lastPlayerCard, setLastPlayerCard] = useState<any | null>(null);
+  const [isSavingPlayerCard, setIsSavingPlayerCard] = useState(false);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [checkoutForm, setCheckoutForm] = useState<any>({ name: "", phone: "", address: "", paymentMethod: "paymob_card", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
@@ -343,6 +373,8 @@ export default function Page() {
     const unsubPreds = listenToCollection(`predictions${suffix}`, (docs) => setPredictionsList(docs.sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
     const unsubForms = listenToCollection(`formations${suffix}`, (docs) => setFormationsList(docs));
     const unsubRosters = listenToCollection(`team_rosters${suffix}`, (docs) => setRostersList(docs));
+    const unsubPlayerTournaments = listenToCollection("player_registration_tournaments", (docs) => setPlayerCardTournaments(docs.sort((a:any,b:any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.name || "").localeCompare(String(b.name || ""), "ar"))));
+    const unsubPlayerRegistrations = listenToCollection("player_registrations", (docs) => setPlayerRegistrations(docs.sort((a:any,b:any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))));
     const unsubProducts = listenToCollection("shop_products", (docs) => setProductsList(
       docs
         .filter((p:any) => p.isActive !== false)
@@ -367,7 +399,7 @@ export default function Page() {
     });
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubMathaniGroups(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubPlayerTournaments(); unsubPlayerRegistrations(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubMathaniGroups(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
   }, [activeTournament, cupEdition, mainAppTab]);
 
   useEffect(() => { setRosterForm(prev => ({ ...prev, players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null, idImagePreview: "", idImageFile: null })) })); }, [MAX_PLAYERS, mainAppTab]);
@@ -667,6 +699,190 @@ export default function Page() {
   
   const handleReceiptImageUpload = (file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); const previewUrl = URL.createObjectURL(file); setCheckoutForm((p:any) => ({ ...p, receiptImagePreview: previewUrl, receiptImageFile: file, receiptFileName: file.name })); };
   
+
+  const handlePlayerCardPhotoUpload = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return alert("يرجى رفع صورة فقط");
+    const previewUrl = URL.createObjectURL(file);
+    setPlayerCardForm((p:any) => ({ ...p, photoPreview: previewUrl, photoFile: file, photoUrl: p.photoUrl || "", cropX: 50, cropY: 50, zoom: 1 }));
+  };
+
+  const playerCardRoleLabel = (value?: string) => PLAYER_CARD_ROLE_OPTIONS.find((r) => r.value === value)?.label || "لاعب";
+
+  const availablePlayerCardTournaments = useMemo(() => {
+    const active = (playerCardTournaments || []).filter((t:any) => t.isActive !== false);
+    return active.length ? active : DEFAULT_PLAYER_CARD_TOURNAMENTS;
+  }, [playerCardTournaments]);
+
+  useEffect(() => {
+    if (!availablePlayerCardTournaments.length) return;
+    if (!selectedPlayerTournamentId || !availablePlayerCardTournaments.some((t:any) => t.id === selectedPlayerTournamentId)) {
+      setSelectedPlayerTournamentId(availablePlayerCardTournaments[0].id);
+    }
+  }, [availablePlayerCardTournaments, selectedPlayerTournamentId]);
+
+  const selectedPlayerCardTournament = useMemo(() => {
+    return availablePlayerCardTournaments.find((t:any) => t.id === selectedPlayerTournamentId) || availablePlayerCardTournaments[0] || DEFAULT_PLAYER_CARD_TOURNAMENTS[0];
+  }, [availablePlayerCardTournaments, selectedPlayerTournamentId]);
+
+  const currentPlayerCardPreview = useMemo(() => {
+    const registrationDate = new Date().toISOString().slice(0, 10);
+    return {
+      ...playerCardForm,
+      fullName: String(playerCardForm.fullName || "").trim(),
+      playerName: String(playerCardForm.fullName || "").trim(),
+      roleLabel: playerCardRoleLabel(playerCardForm.role),
+      teamName: String(playerCardForm.teamName || "").trim() || "لاعب حر",
+      registrationDate,
+      tournamentId: selectedPlayerCardTournament?.id || "",
+      tournamentName: selectedPlayerCardTournament?.name || "بطولة رياضية",
+      tournamentLogoUrl: selectedPlayerCardTournament?.logoUrl || "/logo.png",
+      brandLogoUrl: PLAYER_CARD_BRAND_LOGO,
+      signatureImageUrl: PLAYER_CARD_SIGNATURE_IMAGE,
+      cropX: Number(playerCardForm.cropX ?? 50),
+      cropY: Number(playerCardForm.cropY ?? 50),
+      zoom: Number(playerCardForm.zoom ?? 1),
+      photoUrl: playerCardForm.photoPreview || playerCardForm.photoUrl || "",
+      serialNumber: playerCardForm.serialNumber || `${String(selectedPlayerCardTournament?.id || "MTR").replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "MTR"}-${new Date().getFullYear()}-PREVIEW`,
+      qrPayload: JSON.stringify({ serial: playerCardForm.serialNumber || "PREVIEW", name: String(playerCardForm.fullName || "").trim(), role: playerCardRoleLabel(playerCardForm.role), tournament: selectedPlayerCardTournament?.name || "بطولة رياضية" }),
+    };
+  }, [playerCardForm, selectedPlayerCardTournament]);
+
+  const savePlayerCardRegistration = async () => {
+    const fullName = String(playerCardForm.fullName || "").trim();
+    const birthDate = String(playerCardForm.birthDate || "").trim();
+    const nationalId = String(playerCardForm.nationalId || "").trim();
+    const teamName = String(playerCardForm.teamName || "").trim() || "لاعب حر";
+    if (!fullName) return alert("اكتب الاسم");
+    if (!birthDate) return alert("اكتب تاريخ الميلاد");
+    if (!nationalId) return alert("اكتب الرقم القومي");
+    if (nationalId.replace(/\D/g, "").length < 10) return alert("الرقم القومي غير مكتمل");
+    setIsSavingPlayerCard(true);
+    try {
+      const registrationDate = new Date().toISOString().slice(0, 10);
+      let uploadedPhotoUrl = String(playerCardForm.photoUrl || "").trim();
+      const serialNumber = playerCardForm.serialNumber || generatePlayerCardSerial(selectedPlayerCardTournament?.id || "MTR");
+      if (playerCardForm.photoFile) {
+        const safeName = `${Date.now()}_${fullName.replace(/[^\w؀-ۿ-]+/g, "_")}.jpg`;
+        const photoRef = ref(storage, `player_registration_photos/${safeName}`);
+        await uploadBytes(photoRef, playerCardForm.photoFile);
+        uploadedPhotoUrl = await getDownloadURL(photoRef);
+      }
+      const payload = {
+        playerName: fullName,
+        fullName,
+        role: playerCardForm.role || "player",
+        roleLabel: playerCardRoleLabel(playerCardForm.role),
+        teamName,
+        birthDate,
+        nationalId,
+        registrationDate,
+        tournamentId: selectedPlayerCardTournament?.id || "",
+        tournamentName: selectedPlayerCardTournament?.name || "بطولة رياضية",
+        tournamentLogoUrl: selectedPlayerCardTournament?.logoUrl || "/logo.png",
+        brandLogoUrl: PLAYER_CARD_BRAND_LOGO,
+        signatureImageUrl: PLAYER_CARD_SIGNATURE_IMAGE,
+        photoUrl: uploadedPhotoUrl || "",
+        cropX: Number(playerCardForm.cropX ?? 50),
+        cropY: Number(playerCardForm.cropY ?? 50),
+        zoom: Number(playerCardForm.zoom ?? 1),
+        serialNumber,
+        qrPayload: JSON.stringify({ serial: serialNumber, name: fullName, role: playerCardRoleLabel(playerCardForm.role), tournament: selectedPlayerCardTournament?.name || "بطولة رياضية" }),
+        status: "new",
+        createdAt: new Date().toISOString(),
+      };
+      const docRef = await addDoc(collection(db, "player_registrations"), payload);
+      setLastPlayerCard({ id: docRef.id, ...payload });
+      setPlayerCardForm((p:any) => ({ ...p, serialNumber, photoUrl: uploadedPhotoUrl || p.photoPreview || "", photoFile: null }));
+      alert("تم تسجيل البيانات وتجهيز الكارت للطباعة ✅");
+    } catch (e:any) {
+      console.error("Player registration error", e);
+      alert(e?.message || "حدث خطأ أثناء تسجيل اللاعب");
+    }
+    setIsSavingPlayerCard(false);
+  };
+
+  const loadExternalScript = (src: string) => new Promise<void>((resolve, reject) => {
+    if (typeof window === "undefined") return resolve();
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) return resolve();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`تعذر تحميل مكتبة PDF: ${src}`));
+    document.head.appendChild(script);
+  });
+
+  const downloadPlayerCardsPdf = async () => {
+    if (typeof window === "undefined") return;
+    const zone = document.getElementById("player-card-print-zone");
+    if (!zone) return alert("الكارت غير جاهز للتصدير");
+    const cardElements = Array.from(zone.querySelectorAll(".id-card-print")) as HTMLElement[];
+    if (!cardElements.length) return alert("لا توجد كروت للتصدير");
+
+    try {
+      await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+      await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+
+      const html2canvas = (window as any).html2canvas;
+      const jsPDF = (window as any).jspdf?.jsPDF;
+      if (!html2canvas || !jsPDF) throw new Error("مكتبات PDF لم يتم تحميلها");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const marginX = 12;
+      const marginY = 12;
+      const gapX = 9;
+      const gapY = 8;
+      const cardW = 85.6;
+      const cardH = 53.98;
+      let x = marginX;
+      let y = marginY;
+      let col = 0;
+      let row = 0;
+
+      for (let i = 0; i < cardElements.length; i++) {
+        const canvas = await html2canvas(cardElements[i], {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: null,
+          logging: false,
+        });
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        pdf.addImage(imgData, "PNG", x, y, cardW, cardH, undefined, "FAST");
+
+        col += 1;
+        if (col >= 2) {
+          col = 0;
+          row += 1;
+          x = marginX;
+          y += cardH + gapY;
+        } else {
+          x += cardW + gapX;
+        }
+
+        if (row >= 4 && i < cardElements.length - 1) {
+          pdf.addPage();
+          x = marginX;
+          y = marginY;
+          col = 0;
+          row = 0;
+        }
+      }
+
+      const safeName = String(currentPlayerCardPreview.fullName || currentPlayerCardPreview.tournamentName || "player-card")
+        .replace(/[^\w\u0600-\u06FF-]+/g, "_")
+        .slice(0, 60);
+      pdf.save(`${safeName || "player-card"}_${currentPlayerCardPreview.serialNumber || "card"}.pdf`);
+    } catch (e:any) {
+      console.error(e);
+      alert(e?.message || "تعذر إنشاء ملف PDF. تأكد من اتصال الإنترنت ثم حاول مرة أخرى.");
+    }
+  };
+
+  const printPlayerCard = downloadPlayerCardsPdf;
+
   const submitOrder = async () => { 
     if (cartItems.length === 0) return alert("السلة فارغة");
     if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إكمال البيانات");
@@ -903,6 +1119,7 @@ export default function Page() {
           <div className="bg-[#13213a] p-2 rounded-2xl border border-yellow-400/30 inline-flex shadow-xl gap-2 w-max min-w-full sm:min-w-0 sm:w-auto">
             <button onClick={() => setMainAppTab('matrouh_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'matrouh_cup' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 كأس مطروح</button>
             <button onClick={() => setMainAppTab('elite_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'elite_cup' ? 'bg-indigo-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏅 بطولة كأس النخبة</button>
+            <button onClick={() => setMainAppTab('player_cards')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'player_cards' ? 'bg-cyan-500 text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🪪 تسجيل اللاعبين</button>
             <button onClick={() => setMainAppTab('shop')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'shop' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🛒 المتجر</button>
             <button onClick={() => setMainAppTab('settings')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'settings' ? 'bg-gray-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>⚙️ الإعدادات</button>
           </div>
@@ -1878,6 +2095,269 @@ export default function Page() {
                  </CardContent>
                </Card>
              )}
+          </div>
+        )}
+
+
+        {/* PLAYER REGISTRATION CARDS SECTION */}
+        {mainAppTab === 'player_cards' && (
+          <div className="space-y-8 animate-in fade-in duration-500 mt-4 print:bg-white player-cards-ui">
+            <style>{`
+              @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');
+              .player-cards-ui, #player-card-print-zone { font-family: ${PLAYER_CARD_FONT_FAMILY}; }
+              @media print {
+                body * { visibility: hidden !important; }
+                #player-card-print-zone, #player-card-print-zone * { visibility: visible !important; }
+                #player-card-print-zone { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; padding: 8mm !important; }
+                .no-print { display: none !important; }
+                .print-card-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8mm !important; align-items: start !important; justify-items: center !important; }
+                .id-card-print { width: 85.6mm !important; height: 53.98mm !important; break-inside: avoid !important; }
+              }
+            `}</style>
+
+            <div className="no-print bg-gradient-to-br from-[#45108A]/95 via-[#4D1689]/95 to-[#1f3d94]/95 border border-cyan-400/20 rounded-3xl p-6 shadow-2xl text-center md:text-right overflow-hidden relative">
+              <div className="absolute -left-10 -top-10 w-40 h-40 rounded-full bg-green-400/20 blur-3xl"></div>
+              <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-orange-400/20 blur-3xl"></div>
+              <div className="relative z-10">
+                <div className="flex flex-col md:flex-row items-center gap-4 md:gap-5 justify-center md:justify-between">
+                  <div>
+                    <h2 className="text-3xl sm:text-4xl font-black text-white mb-2">🪪 بطاقة لاعب / مدير فني</h2>
+                    <p className="text-white/80 font-bold leading-7">نسخة أفخم للكارت مع لوجو البطولة من الإدارة، وصورة داخل إطار احترافي، وتوقيع وختم واضحين، وظهر مخصص باسم البطولة ونوع البطاقة فقط.</p>
+                  </div>
+                  <div className="shrink-0 w-24 h-24 rounded-full bg-white/95 p-2 shadow-2xl">
+                    <img src={PLAYER_CARD_BRAND_LOGO} alt="مطروح الرياضية" className="w-full h-full object-contain rounded-full" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="no-print flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+              {availablePlayerCardTournaments.map((t:any) => (
+                <button key={t.id} onClick={() => setSelectedPlayerTournamentId(t.id)} className={`shrink-0 px-5 py-3 rounded-2xl font-black border transition-all ${selectedPlayerTournamentId === t.id ? 'bg-gradient-to-r from-[#46d834] via-[#1da1f2] to-[#f59e0b] text-white border-white/30 shadow-lg scale-105' : 'bg-[#13213a] text-white border-cyan-400/20 hover:border-cyan-400/60'}`}>
+                  {t.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[430px_1fr] gap-6 items-start">
+              <Card className="no-print bg-[#13213a] border border-cyan-400/30 rounded-3xl shadow-2xl overflow-hidden">
+                <CardHeader className="bg-[#0a1428]/70 border-b border-white/10">
+                  <CardTitle className="text-2xl font-black text-cyan-300">بيانات الكارت</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">اسم البطولة</label>
+                    <select value={selectedPlayerTournamentId} onChange={e => setSelectedPlayerTournamentId(e.target.value)} className="w-full h-12 rounded-xl bg-[#0a1428] border border-cyan-400/20 text-white font-black px-3 outline-none focus:border-cyan-400">
+                      {availablePlayerCardTournaments.map((t:any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">الاسم</label>
+                    <Input placeholder="اكتب الاسم" value={playerCardForm.fullName} onChange={e => setPlayerCardForm((p:any) => ({ ...p, fullName: e.target.value }))} className="bg-[#0a1428] border-cyan-400/20 text-white font-bold h-12" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">الصفة</label>
+                    <select value={playerCardForm.role} onChange={e => setPlayerCardForm((p:any) => ({ ...p, role: e.target.value }))} className="w-full h-12 rounded-xl bg-[#0a1428] border border-cyan-400/20 text-white font-black px-3 outline-none focus:border-cyan-400">
+                      {PLAYER_CARD_ROLE_OPTIONS.map((r:any) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">اسم الفريق</label>
+                    <Input placeholder="اتركه فارغًا لو لاعب حر" value={playerCardForm.teamName} onChange={e => setPlayerCardForm((p:any) => ({ ...p, teamName: e.target.value }))} className="bg-[#0a1428] border-cyan-400/20 text-white font-bold h-12" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">تاريخ الميلاد</label>
+                    <Input type="date" value={playerCardForm.birthDate} onChange={e => setPlayerCardForm((p:any) => ({ ...p, birthDate: e.target.value }))} className="bg-[#0a1428] border-cyan-400/20 text-white font-bold h-12" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-300 font-black mb-2">الرقم القومي</label>
+                    <Input inputMode="numeric" placeholder="الرقم القومي" value={playerCardForm.nationalId} onChange={e => setPlayerCardForm((p:any) => ({ ...p, nationalId: e.target.value }))} className="bg-[#0a1428] border-cyan-400/20 text-white font-bold h-12" dir="ltr" />
+                  </div>
+
+                  <div className="rounded-2xl border border-cyan-400/20 bg-[#0a1428]/70 p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="text-white font-black">صورة المشارك</div>
+                        <div className="text-xs text-gray-400 font-bold">ارفع الصورة ثم عدّل موضعها داخل الإطار</div>
+                      </div>
+                      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-400 text-black font-black cursor-pointer hover:bg-cyan-300 transition-colors">
+                        <Upload className="w-4 h-4" /> رفع صورة
+                        <input type="file" accept="image/*" className="hidden" onChange={e => handlePlayerCardPhotoUpload(e.target.files?.[0])} />
+                      </label>
+                    </div>
+
+                    <div className="mx-auto w-[170px] h-[220px] rounded-2xl overflow-hidden border-2 border-dashed border-cyan-300/40 bg-slate-900 relative">
+                      {(playerCardForm.photoPreview || playerCardForm.photoUrl) ? (
+                        <img
+                          src={playerCardForm.photoPreview || playerCardForm.photoUrl}
+                          alt="معاينة الصورة"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ objectPosition: `${Number(playerCardForm.cropX || 50)}% ${Number(playerCardForm.cropY || 50)}%`, transform: `scale(${Number(playerCardForm.zoom || 1)})` }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-400 p-4">
+                          <Camera className="w-8 h-8 mb-2" />
+                          <span className="font-black text-sm">مكان الصورة</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between text-xs text-gray-300 font-bold mb-1"><span>تكبير / تصغير</span><span>{Number(playerCardForm.zoom || 1).toFixed(2)}x</span></div>
+                        <input type="range" min="1" max="2.5" step="0.05" value={playerCardForm.zoom || 1} onChange={e => setPlayerCardForm((p:any) => ({ ...p, zoom: Number(e.target.value) }))} className="w-full accent-cyan-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between text-xs text-gray-300 font-bold mb-1"><span>تحريك أفقي</span><span>{Number(playerCardForm.cropX || 50)}%</span></div>
+                        <input type="range" min="0" max="100" step="1" value={playerCardForm.cropX || 50} onChange={e => setPlayerCardForm((p:any) => ({ ...p, cropX: Number(e.target.value) }))} className="w-full accent-green-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between text-xs text-gray-300 font-bold mb-1"><span>تحريك رأسي</span><span>{Number(playerCardForm.cropY || 50)}%</span></div>
+                        <input type="range" min="0" max="100" step="1" value={playerCardForm.cropY || 50} onChange={e => setPlayerCardForm((p:any) => ({ ...p, cropY: Number(e.target.value) }))} className="w-full accent-orange-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <Button onClick={savePlayerCardRegistration} disabled={isSavingPlayerCard} className="bg-cyan-400 hover:bg-cyan-300 text-black font-black rounded-2xl py-6">
+                      {isSavingPlayerCard ? <Loader2 className="animate-spin" /> : "حفظ وتجهيز الكارت"}
+                    </Button>
+                    <Button onClick={printPlayerCard} className="bg-yellow-400 hover:bg-yellow-300 text-black font-black rounded-2xl py-6">تحميل PDF جاهز للطباعة 📄</Button>
+                  </div>
+                  {lastPlayerCard && <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 p-3 text-sm font-bold">آخر كارت محفوظ: {(lastPlayerCard.fullName || lastPlayerCard.playerName)} — {lastPlayerCard.tournamentName}</div>}
+                </CardContent>
+              </Card>
+
+              <div id="player-card-print-zone" className="space-y-4">
+                <div className="print-card-grid grid grid-cols-1 md:grid-cols-2 gap-5 justify-items-center">
+                  <div className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#d5d5d5] text-black bg-white">
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(84,28,162,0.10),rgba(13,148,136,0.04)_44%,rgba(245,158,11,0.08)_100%)]"></div>
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#4b1690] via-[#1da1f2] to-[#22c55e]"></div>
+                    <div className="absolute -right-14 -top-14 w-44 h-44 rounded-full bg-[#4b1690]/8 blur-2xl"></div>
+                    <div className="absolute -left-16 -bottom-12 w-48 h-48 rounded-full bg-[#22c55e]/8 blur-2xl"></div>
+                    <div className="relative z-10 p-4 h-full flex flex-col" style={{ fontFamily: PLAYER_CARD_FONT_FAMILY }}>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 h-12 rounded-full bg-white border border-gray-200 shadow-sm p-1.5 overflow-hidden">
+                            <img src={PLAYER_CARD_BRAND_LOGO} className="w-full h-full object-contain rounded-full" alt="مطروح الرياضية" />
+                          </div>
+                          <div>
+                            <div className="text-[#4b1690] text-[16px] leading-none font-black">مطروح الرياضية</div>
+                            <div className="text-[9px] text-gray-500 font-bold mt-1">بطاقة تعريف معتمدة</div>
+                          </div>
+                        </div>
+                        <div className="text-left flex flex-col items-center gap-1">
+                          <div className="w-12 h-12 object-contain bg-transparent border-0 p-0 overflow-visible">{currentPlayerCardPreview.tournamentLogoUrl ? <img src={currentPlayerCardPreview.tournamentLogoUrl} className="w-full h-full object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.25)]" alt="بطولة" /> : <img src={PLAYER_CARD_BRAND_LOGO} className="w-full h-full object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.25)]" alt="بطولة" />}</div>
+                          <div className="text-[8px] text-gray-500 font-black max-w-[105px] leading-tight text-center">{currentPlayerCardPreview.tournamentName}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 flex-1 min-h-0 mt-1">
+                        <div className="w-[103px] shrink-0 flex flex-col items-center">
+                          <div className="relative w-[94px] h-[121px] rounded-[18px] overflow-hidden border-2 border-[#4b1690]/20 bg-gradient-to-b from-slate-100 to-slate-200 shadow-inner">
+                            {currentPlayerCardPreview.photoUrl ? (
+                              <img
+                                src={currentPlayerCardPreview.photoUrl}
+                                alt="صورة المشارك"
+                                className="absolute inset-0 w-full h-full object-cover"
+                                style={{ objectPosition: `${Number(currentPlayerCardPreview.cropX || 50)}% ${Number(currentPlayerCardPreview.cropY || 50)}%`, transform: `scale(${Number(currentPlayerCardPreview.zoom || 1)})` }}
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-gray-500 font-black p-2 text-center">مكان الصورة</div>
+                            )}
+                          </div>
+                          <div className="mt-2 text-[9px] text-white font-black px-3 py-1 rounded-full bg-gradient-to-r from-[#4b1690] to-[#1da1f2] shadow-md">{currentPlayerCardPreview.role === 'manager' ? 'مدير فني' : 'لاعب'}</div>
+                          <div className="mt-1 text-[7px] text-slate-600 font-black" dir="ltr">{currentPlayerCardPreview.serialNumber}</div>
+                        </div>
+
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div className="space-y-1.5 text-right">
+                            <div>
+                              <div className="text-[9px] text-gray-500 font-black">الاسم</div>
+                              <div className="text-[16px] leading-tight font-black text-[#111827] border-b border-[#e6e6e6] pb-0.5 min-h-[24px]">{currentPlayerCardPreview.fullName || '................'}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                              <div>
+                                <div className="text-[8px] text-gray-500 font-black">الصفة</div>
+                                <div className="font-black text-[#4b1690]">{currentPlayerCardPreview.roleLabel}</div>
+                              </div>
+                              <div>
+                                <div className="text-[8px] text-gray-500 font-black">الفريق</div>
+                                <div className="font-black text-[#0f766e] truncate">{currentPlayerCardPreview.teamName || 'لاعب حر'}</div>
+                              </div>
+                              <div>
+                                <div className="text-[8px] text-gray-500 font-black">تاريخ الميلاد</div>
+                                <div className="font-black">{currentPlayerCardPreview.birthDate || '----/--/--'}</div>
+                              </div>
+                              <div>
+                                <div className="text-[8px] text-gray-500 font-black">تاريخ التسجيل</div>
+                                <div className="font-black">{currentPlayerCardPreview.registrationDate}</div>
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-[8px] text-gray-500 font-black">الرقم القومي</div>
+                                <div className="font-black tracking-wide" dir="ltr">{currentPlayerCardPreview.nationalId || '00000000000000'}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 grid grid-cols-[70px_1fr_54px] items-end gap-2 border-t border-[#ececec] mt-2">
+                            <div className="relative w-[62px] h-[62px] rounded-full border-[2.4px] border-red-600 text-red-700 overflow-hidden flex items-center justify-center bg-red-50/70 shadow-[0_0_0_2px_rgba(220,38,38,0.16)]">
+                              <div className="absolute inset-[5px] rounded-full border border-red-500/60"></div>
+                              <img src={PLAYER_CARD_BRAND_LOGO} alt="ختم" className="absolute inset-0 w-full h-full object-contain opacity-12" />
+                              <div className="relative z-10 text-center leading-tight -rotate-6">
+                                <div className="text-[9px] font-black">مطروح</div>
+                                <div className="text-[10px] font-black">معتمد</div>
+                                <div className="text-[7px] font-black">OFFICIAL</div>
+                              </div>
+                            </div>
+
+                            <div className="text-center min-w-0">
+                              <div className="flex items-end justify-center gap-2">
+                                <div className="min-w-[116px]">
+                                  <div className="text-[10px] font-black text-gray-600 mb-1">يعتمد</div>
+                                  <div className="h-[34px] flex items-end justify-center bg-white rounded-md border border-dashed border-slate-300 px-1">
+                                    <img src={PLAYER_CARD_SIGNATURE_IMAGE} alt="التوقيع" className="max-h-[32px] w-auto object-contain opacity-100 drop-shadow-sm" />
+                                    <span className="sr-only">فتحي هيرو</span>
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-[80px]">
+                                  <div className="h-[18px] rounded-sm overflow-hidden bg-[repeating-linear-gradient(90deg,#111_0_1px,transparent_1px_3px,#111_3px_5px,transparent_5px_8px,#111_8px_9px,transparent_9px_12px)]"></div>
+                                  <div className="text-[7px] text-slate-700 font-black mt-0.5" dir="ltr">{currentPlayerCardPreview.serialNumber}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="w-[48px] h-[48px] rounded-md bg-white border border-slate-200 p-0.5 overflow-hidden">
+                              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${encodeURIComponent(currentPlayerCardPreview.qrPayload || currentPlayerCardPreview.serialNumber || "MTR")}`} alt="QR Code" className="w-full h-full object-contain" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#4b1690]/20 text-white">
+                    <div className="absolute inset-0 bg-[linear-gradient(135deg,#35115f_0%,#4b1690_45%,#1d4ed8_82%,#16a34a_100%)]"></div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.20),transparent_28%)]"></div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.14]">
+                      <img src={PLAYER_CARD_BRAND_LOGO} className="w-[65%] h-[65%] object-contain" alt="Watermark" />
+                    </div>
+                    <div className="relative z-10 h-full flex flex-col items-center justify-center text-center p-6" style={{ fontFamily: PLAYER_CARD_FONT_FAMILY }}>
+                      <div className="w-20 h-20 rounded-full bg-white/12 backdrop-blur-sm p-2 shadow-2xl border border-white/20 overflow-hidden">
+                        <img src={PLAYER_CARD_BRAND_LOGO} className="w-full h-full object-contain" alt="مطروح الرياضية" />
+                      </div>
+                      <div className="mt-5 text-[24px] leading-tight font-black text-white max-w-[280px]">{currentPlayerCardPreview.tournamentName}</div>
+                      <div className="mt-3 text-[15px] text-yellow-300 font-black tracking-wide">{currentPlayerCardPreview.role === 'manager' ? 'بطاقة مدير فني' : 'بطاقة لاعب'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

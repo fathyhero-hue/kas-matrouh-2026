@@ -15,6 +15,8 @@ import { db, storage } from "@/lib/firebase";
 import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
+const PLAYER_CARD_BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
+const PLAYER_CARD_SIGNATURE_IMAGE = "/tournament-logos/signature-fathy-hero.svg";
 
 const GROUP_ROUND = "دور المجموعات";
 const MATHANI_KNOCKOUT_ROUNDS = ["دور الـ 16", "دور الستة عشر", "دور الثمانية", "دور الـ 8", "دور الـ 4", "نصف النهائي", "النهائي"];
@@ -208,7 +210,7 @@ const TogglePill = ({ options, value, onChange, activeColor = "bg-yellow-400 tex
 export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop'>('matrouh_cup');
+  const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'player_cards' | 'shop'>('matrouh_cup');
   useEffect(() => {
     if (mainAppTab === 'mathani_cup') {
       setMainAppTab('matrouh_cup');
@@ -242,6 +244,12 @@ export default function AdminPage() {
   const [formationsList, setFormationsList] = useState<any[]>([]);
   const [rostersList, setRostersList] = useState<any[]>([]);
   const [ordersList, setOrdersList] = useState<any[]>([]);
+
+  const [playerCardTournaments, setPlayerCardTournaments] = useState<any[]>([]);
+  const [playerRegistrations, setPlayerRegistrations] = useState<any[]>([]);
+  const [playerTournamentForm, setPlayerTournamentForm] = useState({ name: "", logoUrl: "", sortOrder: "0", isActive: true });
+  const [isUploadingPlayerTournamentLogo, setIsUploadingPlayerTournamentLogo] = useState(false);
+  const [replacingTournamentLogoId, setReplacingTournamentLogoId] = useState("");
   const [shopProducts, setShopProducts] = useState<any[]>([]);
   const emptyShopProductForm = {
     title: "",
@@ -409,6 +417,8 @@ export default function AdminPage() {
     const unsubForms = onSnapshot(collection(db, getColl("formations")), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubRosters = onSnapshot(collection(db, getColl("team_rosters")), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubOrders = onSnapshot(collection(db, "orders"), (snap) => setOrdersList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))));
+    const unsubPlayerTournaments = onSnapshot(collection(db, "player_registration_tournaments"), (snap) => setPlayerCardTournaments(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any,b:any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.name || "").localeCompare(String(b.name || ""), "ar"))));
+    const unsubPlayerRegistrations = onSnapshot(collection(db, "player_registrations"), (snap) => setPlayerRegistrations(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any,b:any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))));
     const unsubShopProducts = onSnapshot(collection(db, "shop_products"), (snap) => setShopProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.title || a.name || "").localeCompare(String(b.title || b.name || ""), "ar"))));
     const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (docSnap) => setTickerText(docSnap.data()?.text || ""));
     const unsubEliteTeams = onSnapshot(collection(db, "elite_teams"), (snap) => setEliteTeams(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -443,7 +453,7 @@ export default function AdminPage() {
         }
       });
     }, 5000);
-    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubShopProducts(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); unsubMathaniGroups(); clearInterval(timerInterval); };
+    return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubMedia(); unsubPredictions(); unsubMotm(); unsubForms(); unsubRosters(); unsubOrders(); unsubPlayerTournaments(); unsubPlayerRegistrations(); unsubShopProducts(); unsubTicker(); unsubEliteTeams(); unsubBanned(); unsubRestricted(); unsubRegMat(); unsubRegElite(); unsubTourLineup(); unsubMathaniGroups(); clearInterval(timerInterval); };
   }, [isAuth, activeTournament, cupEdition, mainAppTab]);
 
   const handleLogin = () => passwordInput === ADMIN_PASSWORD ? setIsAuth(true) : alert("كلمة السر خاطئة");
@@ -767,6 +777,212 @@ export default function AdminPage() {
   };
   const toggleShopProductActive = async (product: any) => {
     await updateDoc(doc(db, "shop_products", product.id), { isActive: product.isActive === false, updatedAt: new Date().toISOString() });
+  };
+
+
+  const loadPdfScript = (src: string) => new Promise<void>((resolve, reject) => {
+    if (typeof window === "undefined") return resolve();
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) return resolve();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`تعذر تحميل مكتبة PDF: ${src}`));
+    document.head.appendChild(script);
+  });
+
+  const exportPlayerRegistrationsA4Pdf = async () => {
+    if (!playerRegistrations.length) return alert("لا توجد كروت للتصدير");
+    try {
+      await loadPdfScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+      await loadPdfScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const html2canvas = (window as any).html2canvas;
+      const jsPDF = (window as any).jspdf?.jsPDF;
+      if (!html2canvas || !jsPDF) throw new Error("مكتبات PDF لم يتم تحميلها");
+
+      const temp = document.createElement("div");
+      temp.style.position = "fixed";
+      temp.style.left = "-10000px";
+      temp.style.top = "0";
+      temp.style.width = "430px";
+      temp.style.background = "#fff";
+      document.body.appendChild(temp);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const cardW = 85.6, cardH = 53.98, marginX = 12, marginY = 12, gapX = 9, gapY = 8;
+      let x = marginX, y = marginY, col = 0, row = 0;
+
+      for (let i = 0; i < playerRegistrations.length; i++) {
+        const r:any = playerRegistrations[i];
+        const serial = r.serialNumber || `MTR-${String(i + 1).padStart(4, "0")}`;
+        const roleText = r.roleLabel || (r.role === "manager" ? "مدير فني" : "لاعب");
+        const qrData = encodeURIComponent(r.qrPayload || JSON.stringify({ serial, name: r.fullName || r.playerName || "", tournament: r.tournamentName || "" }));
+        temp.innerHTML = `
+          <div style="width:430px;height:271px;border-radius:22px;overflow:hidden;background:white;color:#111827;position:relative;font-family:Cairo,Tajawal,Arial,sans-serif;border:1px solid #d5d5d5;">
+            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(84,28,162,.10),rgba(13,148,136,.04) 44%,rgba(245,158,11,.08));"></div>
+            <div style="position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#4b1690,#1da1f2,#22c55e);"></div>
+            <div style="position:relative;z-index:2;padding:16px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;direction:rtl;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <img src="${r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:48px;height:48px;object-fit:contain;border-radius:50%;" />
+                  <div><div style="font-size:16px;font-weight:900;color:#4b1690;">مطروح الرياضية</div><div style="font-size:9px;color:#666;font-weight:700;">بطاقة تعريف معتمدة</div></div>
+                </div>
+                <img src="${r.tournamentLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:56px;height:56px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));" />
+              </div>
+              <div style="display:flex;gap:12px;flex:1;min-height:0;">
+                <div style="width:102px;text-align:center;">
+                  <div style="width:94px;height:121px;border-radius:18px;overflow:hidden;border:2px solid rgba(75,22,144,.2);background:#e5e7eb;">
+                    ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;height:100%;object-fit:cover;object-position:${Number(r.cropX || 50)}% ${Number(r.cropY || 50)}%;transform:scale(${Number(r.zoom || 1)});" />` : `<div style="font-size:12px;color:#777;display:flex;align-items:center;justify-content:center;height:100%;">صورة</div>`}
+                  </div>
+                  <div style="margin-top:6px;font-size:10px;color:white;font-weight:900;background:linear-gradient(90deg,#4b1690,#1da1f2);border-radius:999px;padding:3px 8px;">${roleText}</div>
+                  <div dir="ltr" style="font-size:7px;color:#555;font-weight:900;margin-top:3px;">${serial}</div>
+                </div>
+                <div style="flex:1;font-size:11px;font-weight:800;">
+                  <div style="color:#777;font-size:9px;">الاسم</div>
+                  <div style="font-size:16px;font-weight:900;border-bottom:1px solid #e5e7eb;padding-bottom:2px;">${r.fullName || r.playerName || "—"}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;">
+                    <div><div style="color:#777;font-size:8px;">الصفة</div><div style="color:#4b1690;">${roleText}</div></div>
+                    <div><div style="color:#777;font-size:8px;">الفريق</div><div style="color:#0f766e;">${r.teamName || "لاعب حر"}</div></div>
+                    <div><div style="color:#777;font-size:8px;">تاريخ الميلاد</div><div>${r.birthDate || "—"}</div></div>
+                    <div><div style="color:#777;font-size:8px;">تاريخ التسجيل</div><div>${r.registrationDate || String(r.createdAt || "").slice(0,10)}</div></div>
+                    <div style="grid-column:span 2;"><div style="color:#777;font-size:8px;">الرقم القومي</div><div dir="ltr">${r.nationalId || "—"}</div></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:62px 1fr 48px;gap:8px;align-items:end;border-top:1px solid #eee;margin-top:8px;padding-top:6px;">
+                    <div style="width:58px;height:58px;border-radius:50%;border:2px solid #dc2626;color:#b91c1c;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;font-weight:900;line-height:1.1;">مطروح<br/>معتمد<br/><span style="font-size:7px">OFFICIAL</span></div>
+                    <div><div style="text-align:center;font-size:10px;color:#555;font-weight:900;">يعتمد</div><img src="${r.signatureImageUrl || PLAYER_CARD_SIGNATURE_IMAGE}" style="height:32px;max-width:130px;object-fit:contain;display:block;margin:auto;opacity:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2));" /><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 3px,#111 3px 5px,transparent 5px 8px);"></div><div dir="ltr" style="font-size:7px;text-align:center;">${serial}</div></div>
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" style="width:48px;height:48px;" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        const canvas = await html2canvas(temp.firstElementChild, { scale: 3, useCORS: true, allowTaint: true, backgroundColor: null, logging: false });
+        pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", x, y, cardW, cardH, undefined, "FAST");
+        col += 1;
+        if (col >= 2) { col = 0; row += 1; x = marginX; y += cardH + gapY; } else { x += cardW + gapX; }
+        if (row >= 4 && i < playerRegistrations.length - 1) { pdf.addPage(); x = marginX; y = marginY; col = 0; row = 0; }
+      }
+      document.body.removeChild(temp);
+      pdf.save(`player-cards-a4-${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch(e:any) {
+      console.error(e);
+      alert(e?.message || "تعذر تصدير PDF");
+    }
+  };
+
+  const convertLogoToTransparentPng = (file: File) => new Promise<File>((resolve) => {
+    if (typeof window === "undefined") return resolve(file);
+    const imageUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = data.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const nearWhite = r > 238 && g > 238 && b > 238;
+          const paleBackground = max > 232 && (max - min) < 18;
+          if (nearWhite || paleBackground) {
+            pixels[i + 3] = 0;
+          } else if (r > 220 && g > 220 && b > 220) {
+            pixels[i + 3] = Math.round(pixels[i + 3] * 0.25);
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(imageUrl);
+          if (!blob) return resolve(file);
+          const baseName = String(file.name || "tournament_logo").replace(/\.[^.]+$/, "").replace(/[^\w\u0600-\u06FF-]+/g, "_");
+          resolve(new File([blob], `${baseName || "tournament_logo"}.png`, { type: "image/png" }));
+        }, "image/png");
+      } catch {
+        URL.revokeObjectURL(imageUrl);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      resolve(file);
+    };
+    img.src = imageUrl;
+  });
+
+  const uploadPlayerTournamentLogo = async (file?: File, tournamentId?: string) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return alert("اختر صورة صحيحة للشعار");
+    try {
+      if (tournamentId) setReplacingTournamentLogoId(tournamentId); else setIsUploadingPlayerTournamentLogo(true);
+      const pngLogoFile = await convertLogoToTransparentPng(file);
+      const safeName = `${Date.now()}_${String(pngLogoFile.name || "tournament_logo.png").replace(/[^\w.\-]+/g, "_").replace(/\.[^.]+$/, "")}.png`;
+      const storageRef = ref(storage, `player_tournament_logos/${safeName}`);
+      await uploadBytes(storageRef, pngLogoFile);
+      const url = await getDownloadURL(storageRef);
+      if (tournamentId) {
+        await updateDoc(doc(db, "player_registration_tournaments", tournamentId), { logoUrl: url, updatedAt: new Date().toISOString() });
+        alert("تم تحديث لوجو البطولة ✅");
+      } else {
+        setPlayerTournamentForm(prev => ({ ...prev, logoUrl: url }));
+      }
+    } catch (e:any) {
+      alert(e?.message || "حدث خطأ أثناء رفع الشعار");
+    } finally {
+      setIsUploadingPlayerTournamentLogo(false);
+      setReplacingTournamentLogoId("");
+    }
+  };
+
+  const createDefaultPlayerTournaments = async () => {
+    const defaults = [
+      { id: "matrouh_cup_players", name: "بطولة كأس مطروح", logoUrl: "/tournament-logos/matrouh-cup.png", isActive: true, sortOrder: 1 },
+      { id: "elite_cup_players", name: "بطولة كأس النخبة", logoUrl: "/tournament-logos/elite-cup.png", isActive: true, sortOrder: 2 },
+      { id: "republican_people_party_players", name: "بطولة حزب الشعب الجمهوري", logoUrl: "/tournament-logos/republican-party-cup.png", isActive: true, sortOrder: 3 },
+    ];
+    for (const item of defaults) {
+      await setDoc(doc(db, "player_registration_tournaments", item.id), { ...item, updatedAt: new Date().toISOString(), createdAt: new Date().toISOString() }, { merge: true });
+    }
+    alert("تم إنشاء البطولات الافتراضية لتسجيل اللاعبين");
+  };
+
+  const savePlayerTournament = async () => {
+    const name = playerTournamentForm.name.trim();
+    if (!name) return alert("اكتب اسم البطولة");
+    const id = name.toLowerCase().replace(/\s+/g, "_").replace(/[^\u0600-\u06FFa-z0-9_]/gi, "_") + "_" + Date.now();
+    await setDoc(doc(db, "player_registration_tournaments", id), {
+      name,
+      logoUrl: playerTournamentForm.logoUrl.trim() || "/logo.png",
+      sortOrder: Number(playerTournamentForm.sortOrder) || 0,
+      isActive: playerTournamentForm.isActive !== false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setPlayerTournamentForm({ name: "", logoUrl: "", sortOrder: "0", isActive: true });
+    alert("تم حفظ البطولة وظهورها في تبويب تسجيل اللاعبين");
+  };
+
+  const togglePlayerTournament = async (item:any) => {
+    await updateDoc(doc(db, "player_registration_tournaments", item.id), { isActive: item.isActive === false, updatedAt: new Date().toISOString() });
+  };
+
+  const deletePlayerTournament = async (id:string) => {
+    if (!confirm("حذف هذه البطولة من تبويب تسجيل اللاعبين؟")) return;
+    await deleteDoc(doc(db, "player_registration_tournaments", id));
+  };
+
+  const deletePlayerRegistration = async (id:string) => {
+    if (!confirm("حذف تسجيل هذا اللاعب نهائيًا؟")) return;
+    await deleteDoc(doc(db, "player_registrations", id));
   };
 
   const addMedia = async () => { if (!mediaForm.title.trim()) return alert("العنوان مطلوب"); await addDoc(collection(db, getColl("media")), mediaForm); setMediaForm({ type: "news", title: "", url: "", imageUrl: "", body: "" }); alert("تم الإضافة"); };
@@ -1194,6 +1410,7 @@ export default function AdminPage() {
             {[
               { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
               { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
+              { key: 'player_cards', label: '🪪 تسجيل اللاعبين', active: 'bg-cyan-500 text-black' },
               { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
             ].map(tab => (
               <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
@@ -1208,7 +1425,8 @@ export default function AdminPage() {
           {[
             { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
             { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
-            { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
+            { key: 'player_cards', label: '🪪 تسجيل اللاعبين', active: 'bg-cyan-500 text-black' },
+              { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
           ].map(tab => (
             <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${mainAppTab === tab.key ? tab.active : "text-gray-400"}`}>
@@ -1219,6 +1437,87 @@ export default function AdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 pt-6 w-full">
+
+
+        {/* تسجيل اللاعبين */}
+        {mainAppTab === 'player_cards' && (
+          <div className="space-y-6">
+            <SectionCard title="إدارة بطولات تسجيل اللاعبين" icon="🪪" color="cyan" action={<Btn onClick={createDefaultPlayerTournaments} variant="blue" size="sm">إنشاء البطولات الافتراضية</Btn>}>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Field label="اسم البطولة"><input value={playerTournamentForm.name} onChange={e => setPlayerTournamentForm({ ...playerTournamentForm, name: e.target.value })} className={inputCls} placeholder="مثال: بطولة كأس مطروح" /></Field>
+                <Field label="رابط شعار البطولة"><input value={playerTournamentForm.logoUrl} onChange={e => setPlayerTournamentForm({ ...playerTournamentForm, logoUrl: e.target.value })} className={inputCls} placeholder="/logo.png أو رابط صورة" dir="ltr" /></Field>
+                <Field label="ترتيب الظهور"><input type="number" value={playerTournamentForm.sortOrder} onChange={e => setPlayerTournamentForm({ ...playerTournamentForm, sortOrder: e.target.value })} className={inputCls} /></Field>
+                <Field label="الحالة">
+                  <select value={playerTournamentForm.isActive ? "true" : "false"} onChange={e => setPlayerTournamentForm({ ...playerTournamentForm, isActive: e.target.value === "true" })} className={selectCls}>
+                    <option value="true">ظاهرة في صفحة التسجيل</option>
+                    <option value="false">مخفية</option>
+                  </select>
+                </Field>
+                <div className="lg:col-span-4 grid grid-cols-1 lg:grid-cols-[140px_1fr] gap-4 items-center bg-[#060e1e] border border-cyan-400/20 rounded-2xl p-4">
+                  <div className="w-28 h-28 rounded-2xl bg-transparent flex items-center justify-center overflow-visible mx-auto lg:mx-0">{playerTournamentForm.logoUrl ? <img src={playerTournamentForm.logoUrl} className="w-full h-full object-contain drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]" /> : <span className="text-5xl">🏆</span>}</div>
+                  <div className="space-y-3">
+                    <div className="text-white font-black">رفع لوجو PNG بدون خلفية</div>
+                    <div className="text-xs text-gray-400 font-bold">عند رفع صورة من الجهاز يتم تحويل الخلفية البيضاء تلقائيًا إلى شفافة ورفعها كـ PNG. هذا اللوجو يظهر فقط في وجه الكارت الأمامي.</div>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 text-black font-black cursor-pointer hover:bg-cyan-400 transition-colors">
+                      {isUploadingPlayerTournamentLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} رفع PNG شفاف
+                      <input type="file" accept="image/*" className="hidden" onChange={e => uploadPlayerTournamentLogo(e.target.files?.[0])} />
+                    </label>
+                  </div>
+                </div>
+                <div className="lg:col-span-4"><Btn onClick={savePlayerTournament} variant="blue" size="lg"><Plus className="w-4 h-4" /> إضافة بطولة لتسجيل اللاعبين</Btn></div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="البطولات المتاحة في صفحة تسجيل اللاعبين" icon="🏆" color="cyan">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {playerCardTournaments.length ? playerCardTournaments.map((t:any) => (
+                  <div key={t.id} className="bg-[#060e1e] border border-cyan-400/20 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-transparent flex items-center justify-center overflow-visible shrink-0">{t.logoUrl ? <img src={t.logoUrl} className="w-full h-full object-contain drop-shadow-[0_8px_14px_rgba(0,0,0,0.35)]" /> : <span className="text-3xl">🏆</span>}</div>
+                    <div className="flex-1 min-w-0"><div className="text-white font-black truncate">{t.name}</div><div className="text-xs text-gray-500 mt-1">ترتيب: {Number(t.sortOrder || 0)}</div><Badge className={`mt-2 border ${t.isActive === false ? 'bg-red-500/15 text-red-300 border-red-500/30' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'}`}>{t.isActive === false ? 'مخفية' : 'ظاهرة'}</Badge></div>
+                    <div className="flex flex-col gap-2">
+                      <label className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-cyan-500 text-black text-xs font-black cursor-pointer hover:bg-cyan-400 transition-colors">
+                        {replacingTournamentLogoId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} لوجو
+                        <input type="file" accept="image/*" className="hidden" onChange={e => uploadPlayerTournamentLogo(e.target.files?.[0], t.id)} />
+                      </label>
+                      <Btn onClick={() => togglePlayerTournament(t)} variant="ghost" size="sm">{t.isActive === false ? 'إظهار' : 'إخفاء'}</Btn>
+                      <Btn onClick={() => deletePlayerTournament(t.id)} variant="danger" size="sm"><Trash2 className="w-4 h-4" /></Btn>
+                    </div>
+                  </div>
+                )) : <div className="col-span-full text-center text-gray-400 font-bold border border-dashed border-white/10 rounded-2xl p-8">لا توجد بطولات. اضغط إنشاء البطولات الافتراضية أو أضف بطولة جديدة.</div>}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="سجل اللاعبين المسجلين" icon="📋" color="blue" action={<div className="flex items-center gap-2 flex-wrap">
+                <Btn onClick={exportPlayerRegistrationsA4Pdf} variant="blue" size="sm">تصدير PDF A4</Btn>
+                <span className="text-xs bg-blue-500/15 text-blue-300 border border-blue-500/20 px-3 py-1 rounded-full font-bold">{playerRegistrations.length} لاعب</span>
+              </div>}>
+              {playerRegistrations.length === 0 ? (
+                <div className="text-center text-gray-400 font-bold border border-dashed border-white/10 rounded-2xl p-8">لا يوجد تسجيل لاعبين حتى الآن.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-white/10">
+                  <table className="w-full min-w-[980px] text-sm text-right">
+                    <thead className="bg-[#060e1e] text-gray-300"><tr><th className="p-3">الصورة</th><th className="p-3">الاسم</th><th className="p-3">الصفة</th><th className="p-3">الفريق</th><th className="p-3">البطولة</th><th className="p-3">تاريخ الميلاد</th><th className="p-3">الرقم القومي</th><th className="p-3">تاريخ التسجيل</th><th className="p-3">إجراء</th></tr></thead>
+                    <tbody>
+                      {playerRegistrations.map((r:any) => (
+                        <tr key={r.id} className="border-t border-white/10 hover:bg-white/5">
+                          <td className="p-3"><div className="w-12 h-14 rounded-xl overflow-hidden border border-white/10 bg-[#081120] flex items-center justify-center">{(r.photoUrl || r.personalPhotoUrl) ? <img src={r.photoUrl || r.personalPhotoUrl} className="w-full h-full object-cover" /> : <span className="text-xl">🪪</span>}</div></td>
+                          <td className="p-3 font-black text-white">{r.fullName || r.playerName || '—'}</td>
+                          <td className="p-3 text-fuchsia-300 font-bold">{r.roleLabel || (r.role === 'manager' ? 'مدير فني' : 'لاعب') || 'لاعب'}</td>
+                          <td className="p-3 text-cyan-200 font-bold">{r.teamName || 'لاعب حر'}</td>
+                          <td className="p-3 text-yellow-300 font-bold">{r.tournamentName || '—'}</td>
+                          <td className="p-3 text-gray-300">{r.birthDate || '—'}</td>
+                          <td className="p-3 text-gray-300" dir="ltr">{r.nationalId || '—'}</td>
+                          <td className="p-3 text-gray-300">{r.registrationDate || String(r.createdAt || '').slice(0,10) || '—'}</td>
+                          <td className="p-3"><Btn onClick={() => deletePlayerRegistration(r.id)} variant="danger" size="sm"><Trash2 className="w-4 h-4" /> حذف</Btn></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+        )}
 
         {/* المتجر */}
         {mainAppTab === 'shop' && (
@@ -2213,7 +2512,7 @@ export default function AdminPage() {
                     <Field label="الرابط"><input value={mediaForm.url} onChange={e => setMediaForm({ ...mediaForm, url: e.target.value })} className={inputCls} dir="ltr" /></Field>
                     <Field label="رابط الصورة"><input value={mediaForm.imageUrl} onChange={e => setMediaForm({ ...mediaForm, imageUrl: e.target.value })} className={inputCls} dir="ltr" /></Field>
                   </div>
-                  <Btn onClick={addMedia} variant="cyan" size="xl">نشر الآن ✍️</Btn>
+                  <Btn onClick={addMedia} variant="blue" size="xl">نشر الآن ✍️</Btn>
                 </SectionCard>
                 <SectionCard title="المحتوى المنشور" icon="📋" color="blue">
                   <div className="space-y-2">
