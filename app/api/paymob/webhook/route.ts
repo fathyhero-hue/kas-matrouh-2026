@@ -90,7 +90,7 @@ async function resolveOrderRef(orderId: string, transactionId: string) {
     const snap = await getDocs(q);
     if (!snap.empty) {
       const found = snap.docs[0];
-      return { orderId: found.id, ref: doc(db, "orders", found.id), data: { id: found.id, ...found.data() } as any };
+      return { orderId: found.id, ref: doc(db, "orders", found.id), data: { id: found.id, ...(found.data() as Record<string, any>) } as any };
     }
   }
 
@@ -119,7 +119,7 @@ async function handleCallback(req: NextRequest, body: any) {
       let current = resolved.data;
       if (!current) {
         const snap = await getDoc(resolved.ref);
-        current = snap.exists() ? ({ id: snap.id, ...snap.data() } as any) : null;
+        current = snap.exists() ? ({ id: snap.id, ...(snap.data() as Record<string, any>) } as any) : null;
       }
 
       accessPassword = String(current?.accessPassword || current?.rosterAccessPassword || "");
