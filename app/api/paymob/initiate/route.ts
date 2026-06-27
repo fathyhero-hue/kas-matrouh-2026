@@ -7,6 +7,10 @@ export const runtime = "nodejs";
 const paymobBaseUrl = () => (process.env.PAYMOB_BASE_URL || "https://accept.paymob.com").replace(/\/$/, "");
 const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || "https://matrouhcup.online").replace(/\/$/, "");
 
+function generateAccessPassword() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 function normalizeIntegrationIds(raw: string) {
   return String(raw || "")
     .split(",")
@@ -83,6 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     const orderId = `${tournament}_${Date.now()}`;
+    const accessPassword = generateAccessPassword();
     const { firstName, lastName } = splitArabicName(managerName);
 
     await setDoc(doc(db, "orders", orderId), {
@@ -109,6 +114,9 @@ export async function POST(req: NextRequest) {
       paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
       paymentStatus: "pending_payment",
       status: "في انتظار الدفع",
+      accessPassword,
+      rosterAccessPassword: accessPassword,
+      rosterAccessActive: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

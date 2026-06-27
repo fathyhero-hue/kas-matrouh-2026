@@ -24,6 +24,10 @@ type ShopItem = {
 const paymobBaseUrl = () => (process.env.PAYMOB_BASE_URL || "https://accept.paymob.com").replace(/\/$/, "");
 const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || "https://matrouhcup.online").replace(/\/$/, "");
 
+function generateAccessPassword() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 function toAmountCents(amount: any) {
   const pounds = Number(amount || 0);
   return Math.max(0, Math.round(pounds * 100));
@@ -108,6 +112,7 @@ export async function POST(req: NextRequest) {
     const address = String(shopCustomer.address || body.address || "Matrouh").trim();
 
     const orderId = String(body.orderId || `${tournament}_${Date.now()}`);
+    const accessPassword = String(body.accessPassword || generateAccessPassword());
     const rawItems: ShopItem[] = Array.isArray(body.items) ? body.items : [];
     const price = Number(body.price || body.total || 0);
     const items: ShopItem[] = rawItems.length
@@ -156,6 +161,9 @@ export async function POST(req: NextRequest) {
       paymobMethod: "wallet_direct_api",
       paymentStatus: "pending_payment",
       status: "في انتظار دفع المحفظة",
+      accessPassword,
+      rosterAccessPassword: accessPassword,
+      rosterAccessActive: false,
       updatedAt: new Date().toISOString(),
     };
 
@@ -249,6 +257,7 @@ export async function POST(req: NextRequest) {
         paymobCheckoutUrl: redirectUrl,
         paymentStatus: walletPay?.success === true ? "paid" : "pending_payment",
         status: walletPay?.success === true ? "مدفوع" : "في انتظار تأكيد المحفظة",
+        rosterAccessActive: walletPay?.success === true ? true : false,
         updatedAt: new Date().toISOString(),
       },
       { merge: true }

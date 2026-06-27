@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Clock, Trophy, Target, Shield, ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, CheckCircle2, BellOff, ClipboardList, Lock, Unlock, Phone, RefreshCw, Camera, Upload, Ban } from "lucide-react";
 import { TEAM_NAMES } from "@/data/tournament";
-import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc, query, where, getDocs, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 
@@ -231,6 +231,22 @@ export default function Page() {
   
   const MAX_PLAYERS = mainAppTab === 'elite_cup' ? 10 : 12;
   const [rosterForm, setRosterForm] = useState({ teamName: "", managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: 12 }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null as File | null, idImagePreview: "", idImageFile: null as File | null })) });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.get("paid");
+    const tournament = params.get("tournament");
+    const accessPassword = params.get("accessPassword") || params.get("password");
+    if (paid === "1" && (tournament === "elite_cup" || tournament === "matrouh_cup")) {
+      setMainAppTab(tournament as any);
+      setActiveTab("rosters");
+      setRosterViewMode("register");
+      setShowPaymentForm(false);
+      if (accessPassword) setRosterAccessPassword(accessPassword);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => { if (cupEdition === 'edition_3' && ['live', 'today', 'tomorrow'].includes(activeTab)) { setActiveTab('champion'); } }, [cupEdition, activeTab]);
@@ -444,7 +460,52 @@ export default function Page() {
     setIsInitiatingPay(false);
   };
 
-  const handleRosterLogin = () => { if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫"); if(!rosterAccessPassword) return alert("الرجاء إدخال الرقم السري."); const correctPassword = mainAppTab === 'elite_cup' ? regSettingsElite.password : regSettingsMatrouh.password; if(rosterAccessPassword !== correctPassword) return alert("❌ الرقم السري غير صحيح!"); setUnlockedRoster("NEW_TEAM"); setRosterForm({ teamName: "", managerName: "", managerPhone: "", logoUrl: "", players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null as File | null, idImagePreview: "", idImageFile: null as File | null })) }); };
+  const unlockRosterForm = (prefill?: any) => {
+    setUnlockedRoster("NEW_TEAM");
+    setRosterForm({
+      teamName: "",
+      managerName: prefill?.managerName || prefill?.name || paymentForm.managerName || "",
+      managerPhone: prefill?.phone || paymentForm.phone || "",
+      logoUrl: "",
+      players: Array.from({ length: MAX_PLAYERS }, () => ({ name: "", number: "", personalImagePreview: "", personalImageFile: null as File | null, idImagePreview: "", idImageFile: null as File | null }))
+    });
+  };
+
+  const handleRosterLogin = async () => {
+    if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫");
+    const code = String(rosterAccessPassword || "").trim();
+    if(!code) return alert("الرجاء إدخال الرقم السري.");
+
+    const correctPassword = mainAppTab === 'elite_cup' ? regSettingsElite.password : regSettingsMatrouh.password;
+    if(code === correctPassword) {
+      unlockRosterForm();
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("accessPassword", "==", code),
+        where("tournament", "==", mainAppTab),
+        limit(5)
+      );
+      const snap = await getDocs(q);
+      const paidOrder = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as any))
+        .find((o) => o.paymentStatus === "paid" || o.rosterAccessActive === true || o.status === "تم الدفع" || o.status === "مدفوع");
+
+      if(!paidOrder) return alert("❌ الرقم السري غير صحيح أو لم يتم تأكيد الدفع بعد.");
+
+      unlockRosterForm({
+        managerName: paidOrder?.customer?.managerName || paidOrder?.customer?.name,
+        name: paidOrder?.customer?.name,
+        phone: paidOrder?.customer?.phone,
+      });
+    } catch (e) {
+      console.error("Roster paid password login error", e);
+      alert("تعذر التحقق من الرقم السري حالياً. حاول مرة أخرى.");
+    }
+  };
   const handlePlayerImageUpload = (index: number, field: 'personalImage' | 'idImage', file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); if (file.size > 2 * 1024 * 1024) return alert("حجم الصورة كبير جداً (أقصى حد 2 ميجا)."); const previewUrl = URL.createObjectURL(file); setRosterForm(prev => { const newPlayers = [...prev.players]; newPlayers[index] = { ...newPlayers[index], [`${field}Preview`]: previewUrl, [`${field}File`]: file }; return { ...prev, players: newPlayers }; }); };
   const updateRosterPlayer = (index: number, field: string, value: string) => { setRosterForm(prev => { const newPlayers = [...prev.players]; newPlayers[index] = { ...newPlayers[index], [field]: value }; return { ...prev, players: newPlayers }; }); };
 
