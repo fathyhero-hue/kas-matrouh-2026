@@ -639,25 +639,54 @@ export default function Page() {
 
           const data = await response.json().catch(() => ({}));
           const checkoutUrl = data.checkoutUrl || data.url || data.redirectUrl;
-          if (!response.ok || !checkoutUrl) {
+
+          if (!response.ok) {
             await updateDoc(doc(db, "orders", orderRef.id), {
               paymentStatus: "payment_init_failed",
-              status: "فشل إنشاء رابط الدفع",
+              status: "فشل إنشاء الدفع",
               paymobError: data?.error || "Paymob request failed",
               updatedAt: new Date().toISOString()
             });
-            throw new Error(data?.error || "تعذر إنشاء رابط الدفع");
+            throw new Error(data?.error || "تعذر إنشاء الدفع");
+          }
+
+          if (checkoutUrl) {
+            await updateDoc(doc(db, "orders", orderRef.id), {
+              paymobIntentionId: data.intentionId || "",
+              paymobClientSecret: data.clientSecret || "",
+              paymobCheckoutUrl: checkoutUrl,
+              paymobTransactionId: data.transactionId || "",
+              updatedAt: new Date().toISOString()
+            });
+
+            window.location.href = checkoutUrl;
+            return;
+          }
+
+          // بعض عمليات المحافظ لا ترجع رابط تحويل، بل ترسل إشعار تأكيد على رقم المحفظة.
+          if (data.ok && data.message) {
+            await updateDoc(doc(db, "orders", orderRef.id), {
+              paymobTransactionId: data.transactionId || "",
+              paymobOrderId: data.paymobOrderId || "",
+              paymentStatus: "pending_payment",
+              status: "في انتظار تأكيد المحفظة",
+              paymobWalletMessage: data.message,
+              updatedAt: new Date().toISOString()
+            });
+
+            alert(data.message);
+            setCartItems([]);
+            setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "paymob_card", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" });
+            return;
           }
 
           await updateDoc(doc(db, "orders", orderRef.id), {
-            paymobIntentionId: data.intentionId || "",
-            paymobClientSecret: data.clientSecret || "",
-            paymobCheckoutUrl: data.checkoutUrl,
+            paymentStatus: "payment_init_failed",
+            status: "لم يرجع Paymob رابط دفع أو رسالة تأكيد",
+            paymobError: data?.error || "No checkout URL or wallet message returned",
             updatedAt: new Date().toISOString()
           });
-
-          window.location.href = data.checkoutUrl;
-          return;
+          throw new Error(data?.error || "تعذر إنشاء رابط الدفع");
         }
 
         let receiptUrl = "";

@@ -134,37 +134,43 @@ export async function POST(req: NextRequest) {
 
     const { firstName, lastName } = splitName(customerName);
 
-    await setDoc(
-      doc(db, "orders", orderId),
-      {
-        id: orderId,
-        type: isShopOrder ? "shop_order" : "tournament_registration",
-        tournament: isShopOrder ? undefined : tournament,
-        tournamentLabel: isShopOrder ? undefined : tournamentLabel(tournament),
-        customer: {
-          name: customerName,
-          managerName: customerName,
-          email,
-          phone,
-          address,
-        },
-        items: items.map((item) => ({
-          id: item.id || "item",
-          title: String(item.title || item.name || "منتج رياضي"),
-          price: Number(item.price || 0),
-          qty: Number(item.qty || 1),
-          imageUrl: item.imageUrl || "",
-        })),
-        total,
-        paymentMethod: "paymob_wallet",
-        paymobMethod: "wallet_direct_api",
-        paymentStatus: "pending_payment",
-        status: "في انتظار دفع المحفظة",
-        updatedAt: new Date().toISOString(),
-        createdAt: body.orderId ? undefined : new Date().toISOString(),
+    const orderData: any = {
+      id: orderId,
+      type: isShopOrder ? "shop_order" : "tournament_registration",
+      customer: {
+        name: customerName,
+        managerName: customerName,
+        email,
+        phone,
+        address,
       },
-      { merge: true }
-    );
+      items: items.map((item) => ({
+        id: item.id || "item",
+        title: String(item.title || item.name || "منتج رياضي"),
+        price: Number(item.price || 0),
+        qty: Number(item.qty || 1),
+        imageUrl: item.imageUrl || "",
+      })),
+      total,
+      paymentMethod: "paymob_wallet",
+      paymobMethod: "wallet_direct_api",
+      paymentStatus: "pending_payment",
+      status: "في انتظار دفع المحفظة",
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Firestore لا يقبل قيمة undefined نهائيًا.
+    // لذلك نضيف حقول البطولة فقط في تسجيل البطولات، ولا نرسلها في طلبات المتجر.
+    if (!isShopOrder) {
+      orderData.tournament = tournament;
+      orderData.tournamentLabel = tournamentLabel(tournament);
+    }
+
+    if (!body.orderId) {
+      orderData.createdAt = new Date().toISOString();
+    }
+
+    await setDoc(doc(db, "orders", orderId), orderData, { merge: true });
 
     const auth = await paymobPost("/api/auth/tokens", { api_key: apiKey });
     const authToken = auth?.token;
