@@ -949,6 +949,63 @@ export default function AdminPage() {
     </div>
   );
 
+
+
+  const isEliteRegistrationPayment = (order: any) => {
+    const id = String(order?.id || "").toLowerCase();
+    const type = String(order?.type || "").toLowerCase();
+    const tournament = String(order?.tournament || order?.tournamentId || "").toLowerCase();
+    const tournamentLabel = String(order?.tournamentLabel || "").toLowerCase();
+    const itemText = Array.isArray(order?.items) ? order.items.map((item: any) => `${item?.title || ""} ${item?.name || ""} ${item?.id || ""}`).join(" ").toLowerCase() : "";
+    return (
+      tournament === "elite_cup" ||
+      id.startsWith("elite_cup") ||
+      type === "tournament_registration" && (tournament.includes("elite") || tournamentLabel.includes("النخبة") || itemText.includes("النخبة")) ||
+      itemText.includes("elite_cup") ||
+      itemText.includes("كأس النخبة")
+    );
+  };
+
+  const getPaymentStatusText = (status: any) => {
+    const value = String(status || "");
+    if (value === "paid") return "مدفوع";
+    if (value === "pending_payment") return "بانتظار الدفع";
+    if (value === "failed") return "فشل الدفع";
+    if (value === "payment_init_failed") return "فشل إنشاء الدفع";
+    if (value === "cash_on_delivery") return "دفع عند الاستلام";
+    if (value === "manual_review") return "مراجعة يدوية";
+    return value || "—";
+  };
+
+  const getPaymentStatusClass = (status: any) => {
+    const value = String(status || "");
+    if (value === "paid") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+    if (value === "pending_payment") return "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
+    if (value === "failed" || value === "payment_init_failed") return "bg-red-500/15 text-red-300 border-red-500/30";
+    return "bg-white/5 text-gray-300 border-white/10";
+  };
+
+  const getPaymentMethodText = (order: any) => {
+    const method = String(order?.paymentMethod || order?.paymobMethod || "");
+    if (method === "paymob_wallet" || method === "wallet_direct_api" || method === "paymob_wallet_direct") return "محفظة إلكترونية";
+    if (method === "paymob_card" || method === "card" || method === "paymob") return "كارت بنكي";
+    if (method === "cash") return "كاش";
+    return method || "—";
+  };
+
+  const formatPaymentDate = (value: any) => {
+    if (!value) return "—";
+    try { return new Date(value).toLocaleString("ar-EG"); } catch { return String(value); }
+  };
+
+  const elitePaymentOrders = ordersList
+    .filter(isEliteRegistrationPayment)
+    .sort((a: any, b: any) => String(b.createdAt || b.updatedAt || b.paidAt || "").localeCompare(String(a.createdAt || a.updatedAt || a.paidAt || "")));
+  const elitePaidPayments = elitePaymentOrders.filter((order: any) => order.paymentStatus === "paid" || order.rosterAccessActive === true);
+  const elitePendingPayments = elitePaymentOrders.filter((order: any) => order.paymentStatus === "pending_payment");
+  const eliteFailedPayments = elitePaymentOrders.filter((order: any) => order.paymentStatus === "failed" || order.paymentStatus === "payment_init_failed");
+  const elitePaidTotal = elitePaidPayments.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0);
+
   if (!isAuth) return (
     <div dir="rtl" className="min-h-screen bg-[#060e1e] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -1257,6 +1314,7 @@ export default function AdminPage() {
             <div className="flex flex-wrap gap-2">
               {[
                 { key: "reg_settings", label: "⚙️ إعدادات التسجيل" },
+                { key: "payments", label: "💳 مدفوعات التسجيل" },
                 { key: "teams", label: "🛡️ إدارة الفرق" },
                 { key: "matches", label: "⚽ المباريات" },
                 { key: "stats", label: "📈 الإحصائيات" },
@@ -1314,6 +1372,92 @@ export default function AdminPage() {
                     </div>
                   </SectionCard>
                 </div>
+              </div>
+            )}
+
+
+            {eliteActiveTab === "payments" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-[#0f1c35] border border-white/10 rounded-2xl p-4">
+                    <div className="text-gray-400 text-xs font-bold mb-2">إجمالي طلبات الدفع</div>
+                    <div className="text-3xl font-black text-white">{elitePaymentOrders.length}</div>
+                  </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-2xl p-4">
+                    <div className="text-emerald-300 text-xs font-bold mb-2">مدفوع</div>
+                    <div className="text-3xl font-black text-emerald-300">{elitePaidPayments.length}</div>
+                  </div>
+                  <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-2xl p-4">
+                    <div className="text-yellow-300 text-xs font-bold mb-2">بانتظار الدفع</div>
+                    <div className="text-3xl font-black text-yellow-300">{elitePendingPayments.length}</div>
+                  </div>
+                  <div className="bg-indigo-500/10 border border-indigo-500/25 rounded-2xl p-4">
+                    <div className="text-indigo-300 text-xs font-bold mb-2">إجمالي المدفوع</div>
+                    <div className="text-2xl font-black text-indigo-200">{elitePaidTotal.toLocaleString("ar-EG")} ج.م</div>
+                  </div>
+                </div>
+
+                <SectionCard title="مدفوعات تسجيل بطولة النخبة" icon="💳" color="indigo">
+                  <div className="mb-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-sm text-yellow-100 font-bold leading-7">
+                    هنا تظهر بيانات كل مسؤول فريق دفع رسوم بطولة النخبة، وحالة الدفع، ورقم Paymob، والرقم السري الذي يفتح له تسجيل قائمة الفريق.
+                  </div>
+                  <div className="overflow-x-auto rounded-xl border border-white/5">
+                    <table className="w-full text-right text-white text-sm min-w-[1150px]">
+                      <thead className="bg-[#060e1e]">
+                        <tr>{["الطلب", "مسؤول الفريق", "رقم الموبايل", "المبلغ", "وسيلة الدفع", "حالة الدفع", "الرقم السري", "Paymob", "فتح التسجيل", "التاريخ"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {elitePaymentOrders.length === 0 ? (
+                          <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-500 font-bold">لا توجد مدفوعات تسجيل لبطولة النخبة حتى الآن</td></tr>
+                        ) : elitePaymentOrders.map((order: any) => {
+                          const accessPassword = String(order.accessPassword || order.rosterAccessPassword || "");
+                          const isPaid = order.paymentStatus === "paid" || order.rosterAccessActive === true;
+                          return (
+                            <tr key={order.id} className="border-b border-white/5 hover:bg-white/3 transition-colors align-top">
+                              <td className="px-4 py-3">
+                                <span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs font-black text-gray-300" dir="ltr">{String(order.id || "").slice(-10)}</span>
+                                <div className="text-[11px] text-indigo-300 mt-2 font-bold">{order.tournamentLabel || "بطولة كأس النخبة"}</div>
+                              </td>
+                              <td className="px-4 py-3 font-bold">
+                                {order.customer?.managerName || order.customer?.name || order.managerName || "—"}
+                                {order.customer?.email && <div className="text-[11px] text-gray-500 mt-1" dir="ltr">{order.customer.email}</div>}
+                              </td>
+                              <td className="px-4 py-3"><span className="text-cyan-300 font-bold" dir="ltr">{order.customer?.phone || order.phone || "—"}</span></td>
+                              <td className="px-4 py-3 font-black text-yellow-400">{Number(order.total || 0).toLocaleString("ar-EG")} ج.م</td>
+                              <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs font-bold">{getPaymentMethodText(order)}</span></td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-lg text-xs font-black border ${getPaymentStatusClass(order.paymentStatus)}`}>{getPaymentStatusText(order.paymentStatus)}</span>
+                                {eliteFailedPayments.some((x: any) => x.id === order.id) && order.paymobError && <div className="text-[11px] text-red-300 mt-2 max-w-[220px] break-words">{String(order.paymobError)}</div>}
+                              </td>
+                              <td className="px-4 py-3">
+                                {accessPassword ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="bg-yellow-400 text-black px-3 py-1 rounded-xl font-black tracking-widest" dir="ltr">{accessPassword}</span>
+                                    <button onClick={() => { navigator.clipboard?.writeText(accessPassword); alert("تم نسخ الرقم السري"); }} className="text-[11px] bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg px-2 py-1 font-bold">نسخ</button>
+                                  </div>
+                                ) : <span className="text-gray-500">لم يتم إنشاؤه بعد</span>}
+                              </td>
+                              <td className="px-4 py-3 text-xs">
+                                {order.paymobTransactionId ? <div className="text-emerald-300 font-bold" dir="ltr">#{order.paymobTransactionId}</div> : <span className="text-gray-500">—</span>}
+                                {order.paymobOrderId && <div className="text-gray-500 mt-1" dir="ltr">Order: {order.paymobOrderId}</div>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className={`mb-2 text-xs font-black ${order.rosterAccessActive ? "text-emerald-300" : "text-gray-400"}`}>{order.rosterAccessActive ? "مفتوح" : "غير مفتوح"}</div>
+                                <Btn onClick={async () => await updateDoc(doc(db, "orders", order.id), { rosterAccessActive: !order.rosterAccessActive, updatedAt: new Date().toISOString() })} variant={order.rosterAccessActive ? "danger" : "emerald"} size="sm">
+                                  {order.rosterAccessActive ? "إغلاق" : "فتح"}
+                                </Btn>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-400 leading-6">
+                                <div>إنشاء: {formatPaymentDate(order.createdAt)}</div>
+                                <div>دفع: {formatPaymentDate(order.paidAt)}</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionCard>
               </div>
             )}
 
