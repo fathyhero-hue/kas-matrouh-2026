@@ -7,11 +7,7 @@ export const runtime = "nodejs";
 const paymobBaseUrl = () => (process.env.PAYMOB_BASE_URL || "https://accept.paymob.com").replace(/\/$/, "");
 const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || "https://matrouhcup.online").replace(/\/$/, "");
 
-function parsePaymentMethods() {
-  const raw =
-    process.env.PAYMOB_INTEGRATION_IDS ||
-    [process.env.PAYMOB_CARD_INTEGRATION_ID, process.env.PAYMOB_WALLET_INTEGRATION_ID].filter(Boolean).join(",");
-
+function normalizeIntegrationIds(raw: string) {
   return String(raw || "")
     .split(",")
     .map((v) => v.trim())
@@ -20,6 +16,26 @@ function parsePaymentMethods() {
       const n = Number(v);
       return Number.isFinite(n) ? n : v;
     });
+}
+
+function getSelectedPaymentMethods(method?: string) {
+  const selectedMethod = String(method || "").toLowerCase();
+  const cardId = process.env.PAYMOB_CARD_INTEGRATION_ID;
+  const walletId = process.env.PAYMOB_WALLET_INTEGRATION_ID;
+
+  if (selectedMethod === "wallet" && walletId) {
+    return normalizeIntegrationIds(walletId);
+  }
+
+  if (selectedMethod === "card" && cardId) {
+    return normalizeIntegrationIds(cardId);
+  }
+
+  const raw =
+    process.env.PAYMOB_INTEGRATION_IDS ||
+    [cardId, walletId].filter(Boolean).join(",");
+
+  return normalizeIntegrationIds(raw);
 }
 
 function toAmountCents(amount: any) {
@@ -45,16 +61,16 @@ export async function POST(req: NextRequest) {
   try {
     const secretKey = process.env.PAYMOB_SECRET_KEY;
     const publicKey = process.env.PAYMOB_PUBLIC_KEY;
-    const paymentMethods = parsePaymentMethods();
+    const body = await req.json().catch(() => ({}));
+    const paymentMethods = getSelectedPaymentMethods(body.paymobMethod || body.paymentMethodType);
 
     if (!secretKey || !publicKey || paymentMethods.length === 0) {
       return NextResponse.json(
-        { message: "Paymob غير مكتمل. أضف PAYMOB_SECRET_KEY و PAYMOB_PUBLIC_KEY و PAYMOB_INTEGRATION_IDS." },
+        { message: "Paymob غير مكتمل. أضف PAYMOB_SECRET_KEY و PAYMOB_PUBLIC_KEY و PAYMOB_CARD_INTEGRATION_ID و PAYMOB_WALLET_INTEGRATION_ID." },
         { status: 500 }
       );
     }
 
-    const body = await req.json().catch(() => ({}));
     const tournament = String(body.tournament || "matrouh_cup");
     const price = Number(body.price || 0);
     const amount = toAmountCents(price);
@@ -90,6 +106,7 @@ export async function POST(req: NextRequest) {
       ],
       total: price,
       paymentMethod: "paymob",
+      paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
       paymentStatus: "pending_payment",
       status: "في انتظار الدفع",
       createdAt: new Date().toISOString(),
@@ -129,6 +146,7 @@ export async function POST(req: NextRequest) {
         orderId,
         source: "matrouhcup-registration",
         tournament,
+        paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
       },
     };
 

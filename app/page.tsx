@@ -195,7 +195,7 @@ export default function Page() {
   const [rostersList, setRostersList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [cartItems, setCartItems] = useState<any[]>([]);
-  const [checkoutForm, setCheckoutForm] = useState<any>({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
+  const [checkoutForm, setCheckoutForm] = useState<any>({ name: "", phone: "", address: "", paymentMethod: "paymob_card", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
   const [tickerText, setTickerText] = useState("مطروح الرياضية...");
   
   const [bannedEntities, setBannedEntities] = useState<any[]>([]);
@@ -415,7 +415,7 @@ export default function Page() {
      return customTournamentLineup || DEFAULT_TOURNAMENT_LINEUP;
   }, [customTournamentLineup]);
 
-  const handleInitiatePayment = async () => {
+  const handleInitiatePayment = async (paymobMethod: "card" | "wallet" = "card") => {
     if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫");
     if(!paymentForm.managerName || !paymentForm.email || !paymentForm.phone) return alert("يرجى إكمال جميع البيانات للدفع.");
     setIsInitiatingPay(true);
@@ -423,16 +423,20 @@ export default function Page() {
        const currentSettings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh;
        const priceInEgp = (currentSettings as any).price || (mainAppTab === 'elite_cup' ? 1000 : 500);
 
-       const res = await fetch('/api/paymob/initiate', {
+       const endpoint = paymobMethod === "wallet" ? "/api/paymob/wallet" : "/api/paymob/initiate";
+       const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...paymentForm, tournament: mainAppTab, price: priceInEgp })
+          body: JSON.stringify({ ...paymentForm, tournament: mainAppTab, price: priceInEgp, paymobMethod })
        });
-       const data = await res.json();
-       if(data.url) {
-          window.location.href = data.url; 
+       const data = await res.json().catch(() => ({}));
+       const redirectUrl = data.url || data.checkoutUrl || data.redirectUrl;
+       if(res.ok && redirectUrl) {
+          window.location.href = redirectUrl;
+       } else if (res.ok && data.message) {
+          alert(data.message);
        } else {
-          alert("حدث خطأ في تجهيز صفحة الدفع. " + (data.message || ""));
+          alert("حدث خطأ في تجهيز صفحة الدفع. " + (data.message || data.error || ""));
        }
     } catch (e) {
        alert("خطأ في الاتصال بالسيرفر.");
@@ -602,18 +606,20 @@ export default function Page() {
           imageUrl: item.imageUrl || ""
         }));
 
-        if (checkoutForm.paymentMethod === "paymob") {
+        if (checkoutForm.paymentMethod === "paymob" || checkoutForm.paymentMethod === "paymob_card" || checkoutForm.paymentMethod === "paymob_wallet") {
           const orderRef = await addDoc(collection(db, "orders"), {
             customer: { ...checkoutForm, receiptImage: "", receiptImageFile: null, receiptImagePreview: "" },
             items: orderItems,
             total: cartTotal,
-            paymentMethod: "paymob",
+            paymentMethod: checkoutForm.paymentMethod,
+            paymobMethod: checkoutForm.paymentMethod === "paymob_wallet" ? "wallet" : "card",
             paymentStatus: "pending_payment",
             status: "في انتظار الدفع",
             createdAt: new Date().toISOString()
           });
 
-          const response = await fetch("/api/paymob/create-intention", {
+          const isWalletPayment = checkoutForm.paymentMethod === "paymob_wallet";
+          const response = await fetch(isWalletPayment ? "/api/paymob/wallet" : "/api/paymob/create-intention", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -626,12 +632,14 @@ export default function Page() {
               },
               items: orderItems,
               total: cartTotal,
-              notes: checkoutForm.notes || ""
+              notes: checkoutForm.notes || "",
+              paymobMethod: isWalletPayment ? "wallet" : "card"
             })
           });
 
           const data = await response.json().catch(() => ({}));
-          if (!response.ok || !data.checkoutUrl) {
+          const checkoutUrl = data.checkoutUrl || data.url || data.redirectUrl;
+          if (!response.ok || !checkoutUrl) {
             await updateDoc(doc(db, "orders", orderRef.id), {
               paymentStatus: "payment_init_failed",
               status: "فشل إنشاء رابط الدفع",
@@ -669,7 +677,7 @@ export default function Page() {
         }); 
         alert("✅ تم إرسال الطلب بنجاح!");
         setCartItems([]);
-        setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
+        setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "paymob_card", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
     } catch(e:any) {
       console.error("Submit order error:", e);
       alert(e?.message || "حدث خطأ أثناء إرسال الطلب.");
@@ -1386,8 +1394,12 @@ export default function Page() {
                           <div className="space-y-4 animate-in fade-in">
                              <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
                              <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                             <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "دفع الاشتراك فودافون كاش 💳"}</Button>
+                             <Input type="tel" placeholder="رقم الموبايل" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                               <Button onClick={() => handleInitiatePayment("card")} disabled={isInitiatingPay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بالكارت البنكي 💳"}</Button>
+                               <Button onClick={() => handleInitiatePayment("wallet")} disabled={isInitiatingPay} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بمحفظة إلكترونية 📱"}</Button>
+                             </div>
+                             <p className="text-xs text-gray-400 text-center font-bold">المحفظة الإلكترونية تشمل Vodafone Cash / Orange Cash / Etisalat Cash / We Pay حسب تفعيل Paymob.</p>
                              <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-emerald-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                           </div>
                         ) : (
@@ -1747,8 +1759,12 @@ export default function Page() {
                        <div className="space-y-4 animate-in fade-in">
                           <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12" />
                           <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                          <Input type="tel" placeholder="رقم الموبايل (المسجل بمحفظة الكاش)" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
-                          <Button onClick={handleInitiatePayment} disabled={isInitiatingPay} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-6 text-xl shadow-lg mt-4">{isInitiatingPay ? <Loader2 className="animate-spin h-6 w-6" /> : "دفع اشتراك النخبة فودافون كاش 💳"}</Button>
+                          <Input type="tel" placeholder="رقم الموبايل" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                            <Button onClick={() => handleInitiatePayment("card")} disabled={isInitiatingPay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بالكارت البنكي 💳"}</Button>
+                            <Button onClick={() => handleInitiatePayment("wallet")} disabled={isInitiatingPay} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بمحفظة إلكترونية 📱"}</Button>
+                          </div>
+                          <p className="text-xs text-gray-400 text-center font-bold">المحفظة الإلكترونية تشمل Vodafone Cash / Orange Cash / Etisalat Cash / We Pay حسب تفعيل Paymob.</p>
                           <div className="text-center pt-2"><button onClick={() => setShowPaymentForm(false)} className="text-indigo-400 underline font-bold text-sm">لدي الرقم السري الفعلي؟ الدخول مباشرة</button></div>
                        </div>
                     ) : (
@@ -1857,12 +1873,13 @@ export default function Page() {
                     <Input placeholder="رقم الهاتف" value={checkoutForm.phone} onChange={e => setCheckoutForm((p:any) => ({ ...p, phone: e.target.value }))} className="bg-[#0a1428] border-white/10 text-white font-bold h-12" />
                     <textarea placeholder="العنوان أو ملاحظات الاستلام" value={checkoutForm.address} onChange={e => setCheckoutForm((p:any) => ({ ...p, address: e.target.value }))} className="w-full min-h-24 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
                     <select value={checkoutForm.paymentMethod} onChange={e => setCheckoutForm((p:any) => ({ ...p, paymentMethod: e.target.value }))} className="w-full h-12 rounded-xl bg-[#0a1428] border border-white/10 text-white font-black px-3 outline-none focus:border-yellow-400">
-                      <option value="paymob">دفع إلكتروني آمن - Paymob</option>
+                      <option value="paymob_card">دفع إلكتروني بالكارت البنكي</option>
+                      <option value="paymob_wallet">دفع إلكتروني بمحفظة إلكترونية</option>
                       <option value="cash">الدفع عند الاستلام</option>
                       <option value="wallet">محفظة / تحويل يدوي</option>
                       <option value="bank">تحويل بنكي يدوي</option>
                     </select>
-                    {checkoutForm.paymentMethod !== "cash" && checkoutForm.paymentMethod !== "paymob" && (
+                    {checkoutForm.paymentMethod !== "cash" && checkoutForm.paymentMethod !== "paymob" && checkoutForm.paymentMethod !== "paymob_card" && checkoutForm.paymentMethod !== "paymob_wallet" && (
                       <div className="space-y-3 bg-[#0a1428]/70 border border-white/10 rounded-2xl p-3">
                         <Input placeholder="رقم العملية أو التحويل" value={checkoutForm.transactionRef} onChange={e => setCheckoutForm((p:any) => ({ ...p, transactionRef: e.target.value }))} className="bg-[#13213a] border-white/10 text-white font-bold h-12" />
                         <label className="block cursor-pointer rounded-xl border border-dashed border-yellow-400/40 p-3 text-center text-yellow-300 font-black">
@@ -1874,7 +1891,7 @@ export default function Page() {
                     )}
                     <textarea placeholder="ملاحظات إضافية اختيارية" value={checkoutForm.notes} onChange={e => setCheckoutForm((p:any) => ({ ...p, notes: e.target.value }))} className="w-full min-h-20 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
                     <Button onClick={submitOrder} disabled={isUploading || cartItems.length === 0} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl py-6 text-lg disabled:opacity-60">
-                      {isUploading ? "جاري تنفيذ الطلب..." : checkoutForm.paymentMethod === "paymob" ? "الدفع الآن عبر Paymob 💳" : "إرسال الطلب للإدارة ✅"}
+                      {isUploading ? "جاري تنفيذ الطلب..." : (checkoutForm.paymentMethod === "paymob" || checkoutForm.paymentMethod === "paymob_card" || checkoutForm.paymentMethod === "paymob_wallet") ? "الدفع الآن عبر Paymob 💳" : "إرسال الطلب للإدارة ✅"}
                     </Button>
                   </div>
                 </CardContent>
