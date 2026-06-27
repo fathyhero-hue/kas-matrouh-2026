@@ -1217,19 +1217,26 @@ export default function AdminPage() {
               <div className="overflow-x-auto rounded-xl border border-white/5">
                 <table className="w-full text-right text-white text-sm min-w-[900px]">
                   <thead className="bg-[#060e1e]">
-                    <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "الدفع", "الإيصال", "الحالة"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
+                    <tr>{["الطلب", "العميل", "المنتجات", "الإجمالي", "طريقة الدفع", "حالة الدفع", "الإيصال / Paymob", "حالة الطلب"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {ordersList.length === 0 ? (
-                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500 font-bold">لا توجد طلبات حالية</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500 font-bold">لا توجد طلبات حالية</td></tr>
                     ) : ordersList.map(order => (
                       <tr key={order.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
                         <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs font-black text-gray-300">{order.id.slice(-6).toUpperCase()}</span><div className="text-xs text-gray-500 mt-1">{order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-EG') : "—"}</div></td>
                         <td className="px-4 py-3 font-bold">{order.customer?.name}<br /><span className="text-cyan-400 text-xs" dir="ltr">{order.customer?.phone}</span></td>
                         <td className="px-4 py-3 text-sm text-gray-300">{order.items?.map((item: any, i: number) => <div key={i}>{item.title || item.name} (x{item.qty})</div>)}</td>
                         <td className="px-4 py-3 font-black text-yellow-400">{Number(order.total || 0).toLocaleString("ar-EG")} ج.م</td>
-                        <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs">{order.paymentMethod === "cash" ? "الدفع عند الاستلام" : order.paymentMethod}</span></td>
-                        <td className="px-4 py-3">{order.customer?.receiptImage ? <a href={order.customer.receiptImage} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline text-xs">عرض</a> : "—"}</td>
+                        <td className="px-4 py-3"><span className="bg-[#0f1c35] border border-white/10 px-2 py-1 rounded-lg text-xs">{order.paymentMethod === "cash" ? "الدفع عند الاستلام" : order.paymentMethod === "paymob" ? "Paymob" : order.paymentMethod}</span></td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-lg text-xs font-black border ${order.paymentStatus === "paid" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : order.paymentStatus === "failed" || order.paymentStatus === "payment_init_failed" ? "bg-red-500/15 text-red-300 border-red-500/30" : order.paymentStatus === "pending_payment" ? "bg-yellow-500/15 text-yellow-300 border-yellow-500/30" : "bg-white/5 text-gray-300 border-white/10"}`}>
+                            {order.paymentStatus === "paid" ? "مدفوع" : order.paymentStatus === "pending_payment" ? "بانتظار الدفع" : order.paymentStatus === "failed" ? "فشل الدفع" : order.paymentStatus === "payment_init_failed" ? "فشل إنشاء الدفع" : order.paymentStatus === "cash_on_delivery" ? "دفع عند الاستلام" : order.paymentStatus === "manual_review" ? "مراجعة يدوية" : order.paymentStatus || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {order.customer?.receiptImage ? <a href={order.customer.receiptImage} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline text-xs">عرض الإيصال</a> : order.paymobTransactionId ? <span className="text-emerald-300 text-xs font-bold" dir="ltr">#{order.paymobTransactionId}</span> : order.paymobCheckoutUrl ? <a href={order.paymobCheckoutUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-300 underline text-xs">رابط الدفع</a> : "—"}
+                        </td>
                         <td className="px-4 py-3">
                           <select value={order.status || "طلب جديد"} onChange={async (e) => await updateDoc(doc(db, "orders", order.id), { status: e.target.value })} className="bg-[#0a1428] border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs font-bold outline-none cursor-pointer">
                             {["طلب جديد", "قيد التأكيد", "قيد التجهيز", "تم الشحن", "تم التسليم", "ملغي"].map(s => <option key={s}>{s}</option>)}

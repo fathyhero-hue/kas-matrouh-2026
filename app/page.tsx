@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Clock, Trophy, Target, Shield, ShieldAlert, Zap, BellRing, Play, Star, Search, Gift, Maximize, Minimize, Activity, Users, Calendar, Archive, CheckCircle2, BellOff, ClipboardList, Lock, Unlock, Phone, RefreshCw, Camera, Upload, Ban } from "lucide-react";
 import { TEAM_NAMES } from "@/data/tournament";
-import { collection, onSnapshot, doc, setDoc, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 
@@ -590,12 +590,91 @@ export default function Page() {
   const handleReceiptImageUpload = (file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) return alert("صورة فقط"); const previewUrl = URL.createObjectURL(file); setCheckoutForm((p:any) => ({ ...p, receiptImagePreview: previewUrl, receiptImageFile: file, receiptFileName: file.name })); };
   
   const submitOrder = async () => { 
-    if (cartItems.length === 0) return alert("السلة فارغة"); if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إكمال البيانات"); setIsUploading(true);
+    if (cartItems.length === 0) return alert("السلة فارغة");
+    if (!checkoutForm.name.trim() || !checkoutForm.phone.trim() || !checkoutForm.address.trim()) return alert("يرجى إكمال البيانات");
+    setIsUploading(true);
     try {
-        let receiptUrl = ""; if (checkoutForm.receiptImageFile) { const rRef = ref(storage, `receipts/order_${Date.now()}`); await uploadBytes(rRef, checkoutForm.receiptImageFile); receiptUrl = await getDownloadURL(rRef); }
-        await addDoc(collection(db, "orders"), { customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" }, items: cartItems.map(item => ({ id: item.id, title: item.title || item.name || "منتج رياضي", price: Number(item.price) || 0, qty: Number(item.qty) || 1, imageUrl: item.imageUrl || "" })), total: cartTotal, paymentMethod: checkoutForm.paymentMethod, status: "طلب جديد", createdAt: new Date().toISOString() }); 
-        alert("✅ تم إرسال الطلب بنجاح!"); setCartItems([]); setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
-    } catch(e) { alert("حدث خطأ."); } setIsUploading(false);
+        const orderItems = cartItems.map(item => ({
+          id: item.id,
+          title: item.title || item.name || "منتج رياضي",
+          price: Number(item.price) || 0,
+          qty: Number(item.qty) || 1,
+          imageUrl: item.imageUrl || ""
+        }));
+
+        if (checkoutForm.paymentMethod === "paymob") {
+          const orderRef = await addDoc(collection(db, "orders"), {
+            customer: { ...checkoutForm, receiptImage: "", receiptImageFile: null, receiptImagePreview: "" },
+            items: orderItems,
+            total: cartTotal,
+            paymentMethod: "paymob",
+            paymentStatus: "pending_payment",
+            status: "في انتظار الدفع",
+            createdAt: new Date().toISOString()
+          });
+
+          const response = await fetch("/api/paymob/create-intention", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: orderRef.id,
+              customer: {
+                name: checkoutForm.name,
+                phone: checkoutForm.phone,
+                address: checkoutForm.address,
+                email: checkoutForm.email || "customer@matrouhcup.online"
+              },
+              items: orderItems,
+              total: cartTotal,
+              notes: checkoutForm.notes || ""
+            })
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.checkoutUrl) {
+            await updateDoc(doc(db, "orders", orderRef.id), {
+              paymentStatus: "payment_init_failed",
+              status: "فشل إنشاء رابط الدفع",
+              paymobError: data?.error || "Paymob request failed",
+              updatedAt: new Date().toISOString()
+            });
+            throw new Error(data?.error || "تعذر إنشاء رابط الدفع");
+          }
+
+          await updateDoc(doc(db, "orders", orderRef.id), {
+            paymobIntentionId: data.intentionId || "",
+            paymobClientSecret: data.clientSecret || "",
+            paymobCheckoutUrl: data.checkoutUrl,
+            updatedAt: new Date().toISOString()
+          });
+
+          window.location.href = data.checkoutUrl;
+          return;
+        }
+
+        let receiptUrl = "";
+        if (checkoutForm.receiptImageFile) {
+          const rRef = ref(storage, `receipts/order_${Date.now()}`);
+          await uploadBytes(rRef, checkoutForm.receiptImageFile);
+          receiptUrl = await getDownloadURL(rRef);
+        }
+        await addDoc(collection(db, "orders"), {
+          customer: { ...checkoutForm, receiptImage: receiptUrl, receiptImageFile: null, receiptImagePreview: "" },
+          items: orderItems,
+          total: cartTotal,
+          paymentMethod: checkoutForm.paymentMethod,
+          paymentStatus: checkoutForm.paymentMethod === "cash" ? "cash_on_delivery" : "manual_review",
+          status: "طلب جديد",
+          createdAt: new Date().toISOString()
+        }); 
+        alert("✅ تم إرسال الطلب بنجاح!");
+        setCartItems([]);
+        setCheckoutForm({ name: "", phone: "", address: "", paymentMethod: "cash", transactionRef: "", receiptImagePreview: "", receiptImageFile: null, receiptFileName: "", notes: "" }); 
+    } catch(e:any) {
+      console.error("Submit order error:", e);
+      alert(e?.message || "حدث خطأ أثناء إرسال الطلب.");
+    }
+    setIsUploading(false);
   };
 
   if (loading) return <div className="min-h-screen bg-[#0a1428] flex items-center justify-center flex-col gap-4"><Loader2 className="h-16 w-16 animate-spin text-yellow-400" /><p className="text-white font-bold animate-pulse">جاري تحميل البيانات...</p></div>;
@@ -1778,11 +1857,12 @@ export default function Page() {
                     <Input placeholder="رقم الهاتف" value={checkoutForm.phone} onChange={e => setCheckoutForm((p:any) => ({ ...p, phone: e.target.value }))} className="bg-[#0a1428] border-white/10 text-white font-bold h-12" />
                     <textarea placeholder="العنوان أو ملاحظات الاستلام" value={checkoutForm.address} onChange={e => setCheckoutForm((p:any) => ({ ...p, address: e.target.value }))} className="w-full min-h-24 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
                     <select value={checkoutForm.paymentMethod} onChange={e => setCheckoutForm((p:any) => ({ ...p, paymentMethod: e.target.value }))} className="w-full h-12 rounded-xl bg-[#0a1428] border border-white/10 text-white font-black px-3 outline-none focus:border-yellow-400">
+                      <option value="paymob">دفع إلكتروني آمن - Paymob</option>
                       <option value="cash">الدفع عند الاستلام</option>
-                      <option value="wallet">محفظة / تحويل</option>
-                      <option value="bank">تحويل بنكي</option>
+                      <option value="wallet">محفظة / تحويل يدوي</option>
+                      <option value="bank">تحويل بنكي يدوي</option>
                     </select>
-                    {checkoutForm.paymentMethod !== "cash" && (
+                    {checkoutForm.paymentMethod !== "cash" && checkoutForm.paymentMethod !== "paymob" && (
                       <div className="space-y-3 bg-[#0a1428]/70 border border-white/10 rounded-2xl p-3">
                         <Input placeholder="رقم العملية أو التحويل" value={checkoutForm.transactionRef} onChange={e => setCheckoutForm((p:any) => ({ ...p, transactionRef: e.target.value }))} className="bg-[#13213a] border-white/10 text-white font-bold h-12" />
                         <label className="block cursor-pointer rounded-xl border border-dashed border-yellow-400/40 p-3 text-center text-yellow-300 font-black">
@@ -1794,7 +1874,7 @@ export default function Page() {
                     )}
                     <textarea placeholder="ملاحظات إضافية اختيارية" value={checkoutForm.notes} onChange={e => setCheckoutForm((p:any) => ({ ...p, notes: e.target.value }))} className="w-full min-h-20 rounded-xl bg-[#0a1428] border border-white/10 text-white font-bold p-3 outline-none focus:border-yellow-400" />
                     <Button onClick={submitOrder} disabled={isUploading || cartItems.length === 0} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-2xl py-6 text-lg disabled:opacity-60">
-                      {isUploading ? "جاري إرسال الطلب..." : "إرسال الطلب للإدارة ✅"}
+                      {isUploading ? "جاري تنفيذ الطلب..." : checkoutForm.paymentMethod === "paymob" ? "الدفع الآن عبر Paymob 💳" : "إرسال الطلب للإدارة ✅"}
                     </Button>
                   </div>
                 </CardContent>

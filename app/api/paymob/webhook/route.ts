@@ -1,106 +1,110 @@
-import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-const EMAIL_USER = "fathyhero66@gmail.com"; 
-const EMAIL_PASS = "gxor rjql gwyn sbls";
+export const runtime = "nodejs";
 
-// 🎙️ دالة لإرسال الإيميل بشكل موحد نستخدمها في الـ GET والـ POST
-async function sendPasswordEmail(email: string, managerName: string, tournament: string) {
-  try {
-    // جلب الباسورد السري من قاعدة البيانات
-    const settingsDoc = tournament === 'elite_cup' ? 'registration_elite' : 'registration_matrouh';
-    const docRef = doc(db, "settings", settingsDoc);
-    const docSnap = await getDoc(docRef);
-    
-    let passwordToSent = "لم يتم تحديد باسورد في الإدارة بعد";
-    let tournamentName = tournament === 'elite_cup' ? 'كأس النخبة' : 'كأس مطروح';
-
-    if (docSnap.exists() && docSnap.data().password) {
-      passwordToSent = docSnap.data().password;
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: EMAIL_USER, pass: EMAIL_PASS }
-    });
-
-    // إرسال الإيميل العربي الاحترافي
-    await transporter.sendMail({
-      from: `"منصة مطروح الرياضية" <${EMAIL_USER}>`,
-      to: email,
-      subject: `🔒 الرقم السري لتسجيل قائمة بطولة ${tournamentName}`,
-      html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; text-align: center; background-color: #0a1428; padding: 30px; color: #ffffff; border-radius: 20px;">
-          <h2 style="color: #facc15; font-size: 26px; margin-bottom: 5px;">أهلاً بك كابتن ${managerName}! ⚽</h2>
-          <p style="color: #67e8f9; font-size: 16px;">لقد تم تأكيد الاشتراك بنجاح في <strong>${tournamentName}</strong>.</p>
-          
-          <div style="background-color: #13213a; border: 2px solid #2563eb; padding: 25px; border-radius: 15px; margin: 25px 0;">
-             <p style="font-size: 16px; color: #ffffff; margin: 0 0 10px 0;">الرقم السري المخصص لتسجيل فريقك هو:</p>
-             <h1 style="color: #facc15; font-size: 36px; letter-spacing: 2px; margin: 0; font-weight: 900;">${passwordToSent}</h1>
-          </div>
-          
-          <p style="font-size: 14px; color: #9ca3af;">يرجى التوجه فوراً للمنصة والدخول إلى "قوائم الفرق" -> "تسجيل فريق جديد"، ثم إدخال هذا الرقم السري لفتح استمارة التسكين ورفع صور اللاعبين الأوراق الرسمية.</p>
-          <hr style="border: none; border-top: 1px solid #1e2a4a; margin: 20px 0;" />
-          <p style="font-size: 13px; color: #fa5252;">إدارة المنصة: فتحي هيرو 🦅</p>
-        </div>
-      `
-    });
-    return true;
-  } catch (err) {
-    console.error("Email Sender Error:", err);
-    return false;
-  }
+function deepGet(obj: any, path: string) {
+  return path.split(".").reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
 }
 
-// 🟩 1. استقبال الـ GET Request (وهو حل مشكلة شاشة الـ 405 بالصورة)
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const success = searchParams.get('success');
-    
-    // إذا كانت بيموب تؤكد أن الدفع نجح عبر الرابط
-    if (success === 'true') {
-      const email = searchParams.get('billing_data.email') || "";
-      const firstName = searchParams.get('billing_data.first_name') || "المسئول";
-      const merchantOrderId = searchParams.get('merchant_order_id') || "";
-      const tournament = merchantOrderId.split('_')[0] || "matrouh_cup";
-
-      if (email) {
-        await sendPasswordEmail(email, firstName, tournament);
-      }
-    }
-
-    // بعد الانتهاء، نحوله تلقائياً لصفحة النجاح العربي الفخمة اللي صممناها!
-    return NextResponse.redirect(new URL('/paymob-success', req.url));
-
-  } catch (error) {
-    console.error("Webhook GET Error:", error);
-    return NextResponse.json({ message: "Internal Error" }, { status: 500 });
-  }
+function stringifyForHmac(value: any) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return String(value);
 }
 
-// 🟦 2. استقبال الـ POST Request (Callback في الخلفية لتأكيد البيانات)
-export async function POST(req: Request) {
+function getPaymobObject(body: any) {
+  return body?.obj || body?.transaction || body;
+}
+
+function extractOrderId(body: any, req: NextRequest) {
+  const obj = getPaymobObject(body);
+  return (
+    req.nextUrl.searchParams.get("orderId") ||
+    body?.orderId ||
+    body?.extras?.orderId ||
+    obj?.extras?.orderId ||
+    obj?.special_reference ||
+    obj?.merchant_order_id ||
+    obj?.order?.merchant_order_id ||
+    ""
+  );
+}
+
+function verifyHmacIfPossible(body: any, req: NextRequest) {
+  const hmacSecret = process.env.PAYMOB_HMAC_SECRET;
+  const provided = req.nextUrl.searchParams.get("hmac") || body?.hmac || body?.obj?.hmac;
+  if (!hmacSecret || !provided) return { checked: false, valid: true };
+
+  const obj = getPaymobObject(body);
+  const fields = [
+    "amount_cents",
+    "created_at",
+    "currency",
+    "error_occured",
+    "has_parent_transaction",
+    "id",
+    "integration_id",
+    "is_3d_secure",
+    "is_auth",
+    "is_capture",
+    "is_refunded",
+    "is_standalone_payment",
+    "is_voided",
+    "order.id",
+    "owner",
+    "pending",
+    "source_data.pan",
+    "source_data.sub_type",
+    "source_data.type",
+    "success",
+  ];
+
+  const message = fields.map((f) => stringifyForHmac(deepGet(obj, f))).join("");
+  const computed = crypto.createHmac("sha512", hmacSecret).update(message).digest("hex");
+  return { checked: true, valid: computed === String(provided) };
+}
+
+export async function GET(req: NextRequest) {
+  return handleCallback(req, Object.fromEntries(req.nextUrl.searchParams.entries()));
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  return handleCallback(req, body);
+}
+
+async function handleCallback(req: NextRequest, body: any) {
   try {
-    const body = await req.json();
-    const { obj } = body;
-
-    if (obj && obj.success === true) {
-      const email = obj.order.billing_data.email;
-      const managerName = obj.order.billing_data.first_name;
-      const merchantOrderId = obj.order.merchant_order_id || "";
-      const tournament = merchantOrderId.split('_')[0] || "matrouh_cup";
-
-      if (email) {
-        await sendPasswordEmail(email, managerName, tournament);
-      }
+    const hmac = verifyHmacIfPossible(body, req);
+    if (hmac.checked && !hmac.valid) {
+      return NextResponse.json({ ok: false, error: "Invalid Paymob HMAC" }, { status: 401 });
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Webhook POST Error:", error);
-    return NextResponse.json({ success: false }, { status: 500 });
+    const obj = getPaymobObject(body);
+    const orderId = String(extractOrderId(body, req));
+    const successRaw = obj?.success ?? body?.success ?? req.nextUrl.searchParams.get("success");
+    const success = successRaw === true || successRaw === "true" || successRaw === "1";
+    const pendingRaw = obj?.pending ?? body?.pending ?? req.nextUrl.searchParams.get("pending");
+    const pending = pendingRaw === true || pendingRaw === "true" || pendingRaw === "1";
+    const transactionId = String(obj?.id || body?.id || req.nextUrl.searchParams.get("id") || "");
+
+    if (orderId) {
+      await updateDoc(doc(db, "orders", orderId), {
+        paymentStatus: success ? "paid" : pending ? "pending_payment" : "failed",
+        status: success ? "تم الدفع" : pending ? "في انتظار الدفع" : "فشل الدفع",
+        paymobTransactionId: transactionId,
+        paymobCallback: body,
+        paidAt: success ? new Date().toISOString() : null,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    return NextResponse.json({ ok: true, orderId, success, pending, transactionId });
+  } catch (error: any) {
+    console.error("Paymob webhook error:", error);
+    return NextResponse.json({ ok: false, error: error?.message || "Webhook error" }, { status: 500 });
   }
 }
