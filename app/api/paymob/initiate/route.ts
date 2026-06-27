@@ -1,87 +1,190 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-// 🛑 تم إضافة رقم الـ Integration ID الخاص بالمحافظ الإلكترونية بنجاح
-const PAYMOB_API_KEY = "ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRFMk1EZ3lPQ3dpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS5xRGRkVmlLSnlTMV9oNUxDSlZ4WEtNSFdyV21IenJqWHNzUDZXbWpoUGNDcnZCRVVfQTlVVG1IeC1zU0o3MXE0Zm1YazFlOFZkRG9PQTBXbkJDaVk2Zw==";
-const INTEGRATION_ID = "5670563"; // رقم المحافظ الإلكترونية الخاص بك
-const AMOUNT_CENTS = 50000; // مثال: 500 جنيه (المبلغ مضروب في 100)
+export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+const paymobBaseUrl = () => (process.env.PAYMOB_BASE_URL || "https://accept.paymob.com").replace(/\/$/, "");
+const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || "https://matrouhcup.online").replace(/\/$/, "");
+
+function parsePaymentMethods() {
+  const raw =
+    process.env.PAYMOB_INTEGRATION_IDS ||
+    [process.env.PAYMOB_CARD_INTEGRATION_ID, process.env.PAYMOB_WALLET_INTEGRATION_ID].filter(Boolean).join(",");
+
+  return String(raw || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : v;
+    });
+}
+
+function toAmountCents(amount: any) {
+  const pounds = Number(amount || 0);
+  return Math.max(0, Math.round(pounds * 100));
+}
+
+function splitArabicName(name?: string) {
+  const parts = String(name || "مسئول الفريق").trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "مسئول",
+    lastName: parts.slice(1).join(" ") || "الفريق",
+  };
+}
+
+function tournamentLabel(tournament: string) {
+  if (tournament === "elite_cup") return "بطولة كأس النخبة";
+  if (tournament === "matrouh_cup") return "كأس مطروح";
+  return "مطروح الرياضية";
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { managerName, email, phone, tournament } = body;
+    const secretKey = process.env.PAYMOB_SECRET_KEY;
+    const publicKey = process.env.PAYMOB_PUBLIC_KEY;
+    const paymentMethods = parsePaymentMethods();
 
-    // 1. تسجيل الدخول لبيموب والحصول على الـ Token
-    const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: PAYMOB_API_KEY })
-    });
-    const authData = await authRes.json();
-    const token = authData.token;
-
-    // 2. تسجيل الطلب (Order)
-    const orderRes = await fetch('https://accept.paymob.com/api/ecommerce/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auth_token: token,
-        delivery_needed: "false",
-        amount_cents: AMOUNT_CENTS,
-        currency: "EGP",
-        merchant_order_id: `${tournament}_${Date.now()}`,
-        items: []
-      })
-    });
-    const orderData = await orderRes.json();
-    const orderId = orderData.id;
-
-    // 3. إصدار مفتاح الدفع (Payment Key)
-    const paymentKeyRes = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auth_token: token,
-        amount_cents: AMOUNT_CENTS,
-        expiration: 3600,
-        order_id: orderId,
-        billing_data: {
-          apartment: "NA", email: email, floor: "NA", first_name: managerName,
-          street: "NA", building: "NA", phone_number: phone, shipping_method: "NA",
-          postal_code: "NA", city: "Matrouh", country: "EG", last_name: "Manager",
-          state: "NA"
-        },
-        currency: "EGP",
-        integration_id: INTEGRATION_ID
-      })
-    });
-    const paymentKeyData = await paymentKeyRes.json();
-    const paymentToken = paymentKeyData.token;
-
-    // 4. طلب رابط الدفع المباشر الخاص بالمحافظ الإلكترونية (فودافون كاش)
-    const walletRes = await fetch('https://accept.paymob.com/api/acceptance/payments/pay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source: {
-          identifier: phone, // رقم الهاتف الذي سيقوم بالدفع
-          subtype: "WALLET"
-        },
-        payment_token: paymentToken
-      })
-    });
-    const walletData = await walletRes.json();
-
-    // الرابط المباشر لصفحة فودافون كاش والمحافظ
-    const redirectUrl = walletData.iframe_redirection_url;
-
-    if (redirectUrl) {
-      return NextResponse.json({ url: redirectUrl });
-    } else {
-      return NextResponse.json({ message: "فشل في إنشاء رابط محفظة الدفع." }, { status: 400 });
+    if (!secretKey || !publicKey || paymentMethods.length === 0) {
+      return NextResponse.json(
+        { message: "Paymob غير مكتمل. أضف PAYMOB_SECRET_KEY و PAYMOB_PUBLIC_KEY و PAYMOB_INTEGRATION_IDS." },
+        { status: 500 }
+      );
     }
 
-  } catch (error) {
-    console.error("Payment Error:", error);
-    return NextResponse.json({ message: "حدث خطأ أثناء الاتصال بالدفع." }, { status: 500 });
+    const body = await req.json().catch(() => ({}));
+    const tournament = String(body.tournament || "matrouh_cup");
+    const price = Number(body.price || 0);
+    const amount = toAmountCents(price);
+    const managerName = String(body.managerName || "").trim();
+    const email = String(body.email || "customer@matrouhcup.online").trim();
+    const phone = String(body.phone || "01000000000").replace(/\s+/g, "");
+
+    if (!managerName || !phone || amount <= 0) {
+      return NextResponse.json({ message: "بيانات الدفع غير مكتملة." }, { status: 400 });
+    }
+
+    const orderId = `${tournament}_${Date.now()}`;
+    const { firstName, lastName } = splitArabicName(managerName);
+
+    await setDoc(doc(db, "orders", orderId), {
+      id: orderId,
+      type: "tournament_registration",
+      tournament,
+      tournamentLabel: tournamentLabel(tournament),
+      customer: {
+        name: managerName,
+        managerName,
+        email,
+        phone,
+      },
+      items: [
+        {
+          id: tournament,
+          title: `اشتراك ${tournamentLabel(tournament)}`,
+          price,
+          qty: 1,
+        },
+      ],
+      total: price,
+      paymentMethod: "paymob",
+      paymentStatus: "pending_payment",
+      status: "في انتظار الدفع",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const payload = {
+      amount,
+      currency: "EGP",
+      payment_methods: paymentMethods,
+      special_reference: orderId,
+      expiration: Number(process.env.PAYMOB_INTENTION_EXPIRATION || 3600),
+      notification_url: `${siteUrl()}/api/paymob/webhook`,
+      redirection_url: `${siteUrl()}/payment/result?orderId=${encodeURIComponent(orderId)}`,
+      items: [
+        {
+          name: `اشتراك ${tournamentLabel(tournament)}`.slice(0, 120),
+          amount,
+          description: `رسوم تسجيل ${tournamentLabel(tournament)}`.slice(0, 255),
+          quantity: 1,
+        },
+      ],
+      billing_data: {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone_number: phone,
+        apartment: "NA",
+        floor: "NA",
+        street: "Matrouh",
+        building: "NA",
+        city: "Matrouh",
+        country: "EG",
+        state: "Matrouh",
+      },
+      extras: {
+        orderId,
+        source: "matrouhcup-registration",
+        tournament,
+      },
+    };
+
+    const paymobRes = await fetch(`${paymobBaseUrl()}/v1/intention/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Token ${secretKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await paymobRes.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+
+    if (!paymobRes.ok) {
+      await setDoc(
+        doc(db, "orders", orderId),
+        {
+          paymentStatus: "payment_init_failed",
+          status: "فشل إنشاء رابط الدفع",
+          paymobError: data,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      return NextResponse.json({ message: data?.detail || data?.message || "فشل إنشاء عملية الدفع في Paymob.", details: data }, { status: paymobRes.status });
+    }
+
+    const clientSecret = data.client_secret || data.clientSecret;
+    if (!clientSecret) {
+      return NextResponse.json({ message: "Paymob لم يرجع client_secret.", details: data }, { status: 502 });
+    }
+
+    const url = `${paymobBaseUrl()}/unifiedcheckout/?publicKey=${encodeURIComponent(publicKey)}&clientSecret=${encodeURIComponent(clientSecret)}`;
+
+    await setDoc(
+      doc(db, "orders", orderId),
+      {
+        paymobIntentionId: data.id || "",
+        paymobClientSecret: clientSecret,
+        paymobCheckoutUrl: url,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+
+    return NextResponse.json({ ok: true, url, checkoutUrl: url, orderId });
+  } catch (error: any) {
+    console.error("Paymob initiate error:", error);
+    return NextResponse.json({ message: error?.message || "حدث خطأ أثناء تجهيز الدفع." }, { status: 500 });
   }
 }
