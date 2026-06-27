@@ -175,6 +175,9 @@ const DEFAULT_TOURNAMENT_LINEUP = {
 
 export default function Page() {
   const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop' | 'settings'>('matrouh_cup');
+  useEffect(() => {
+    if (mainAppTab === 'mathani_cup') setMainAppTab('matrouh_cup');
+  }, [mainAppTab]);
   const [activeMathaniTab, setActiveMathaniTab] = useState<'standings' | 'bracket' | 'upcoming' | 'results' | 'stats' | 'scorers' | 'banned'>('standings');
   const [cupEdition, setCupEdition] = useState<'edition_3' | 'edition_4'>('edition_3');
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth'); 
@@ -251,16 +254,15 @@ export default function Page() {
       if ("Notification" in window) setNotificationPermission(Notification.permission);
 
       const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
-      const isSecureOrigin =
-        window.location.protocol === "https:" ||
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
+      const isOneSignalAllowedOrigin =
+        window.location.origin === "https://matrouhcup.online" ||
+        window.location.hostname === "matrouhcup.online";
 
-      if (!oneSignalAppId) {
+      if (!oneSignalAppId && isOneSignalAllowedOrigin) {
         console.error("Missing NEXT_PUBLIC_ONESIGNAL_APP_ID");
       }
 
-      if (oneSignalAppId && isSecureOrigin && !(window as any).__oneSignalInitialized) {
+      if (oneSignalAppId && isOneSignalAllowedOrigin && !(window as any).__oneSignalInitialized) {
         (window as any).__oneSignalInitialized = true;
         (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
 
@@ -294,50 +296,59 @@ export default function Page() {
     else if (mainAppTab === 'elite_cup') { suffix = "_elite"; }
     else if (mainAppTab === 'mathani_cup') { suffix = "_mathani"; }
 
-    const unsubMatches = onSnapshot(collection(db, `matches${suffix}`), (snap) => { setMatches(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))); setLoading(false); });
-    const unsubGoals = onSnapshot(collection(db, `goals${suffix}`), (snap) => setGoalEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubCards = onSnapshot(collection(db, `cards${suffix}`), (snap) => setCardEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubArchivedCards = onSnapshot(collection(db, `archived_cards${suffix}`), (snap) => setArchivedCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubMedia = onSnapshot(collection(db, `media${suffix}`), (snap) => setMediaItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubMotm = onSnapshot(collection(db, `motm${suffix}`), (snap) => setMotmList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubPreds = onSnapshot(collection(db, `predictions${suffix}`), (snap) => setPredictionsList(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
-    const unsubForms = onSnapshot(collection(db, `formations${suffix}`), (snap) => setFormationsList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubRosters = onSnapshot(collection(db, `team_rosters${suffix}`), (snap) => setRostersList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubProducts = onSnapshot(collection(db, "shop_products"), (snap) => setProductsList(
-      snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
+    const listenToCollection = (name: string, onData: (docs: any[]) => void) => {
+      return onSnapshot(
+        collection(db, name),
+        (snap) => onData(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+        (error) => {
+          console.error(`Firestore listener error in collection: ${name}`, error);
+          setLoading(false);
+        }
+      );
+    };
+
+    const listenToDoc = (collectionName: string, docId: string, onData: (data: any | null) => void) => {
+      return onSnapshot(
+        doc(db, collectionName, docId),
+        (snap) => onData(snap.exists() ? snap.data() : null),
+        (error) => {
+          console.error(`Firestore listener error in document: ${collectionName}/${docId}`, error);
+          setLoading(false);
+        }
+      );
+    };
+
+    const unsubMatches = listenToCollection(`matches${suffix}`, (docs) => { setMatches(docs); setLoading(false); });
+    const unsubGoals = listenToCollection(`goals${suffix}`, (docs) => setGoalEvents(docs));
+    const unsubCards = listenToCollection(`cards${suffix}`, (docs) => setCardEvents(docs));
+    const unsubArchivedCards = listenToCollection(`archived_cards${suffix}`, (docs) => setArchivedCards(docs));
+    const unsubMedia = listenToCollection(`media${suffix}`, (docs) => setMediaItems(docs));
+    const unsubMotm = listenToCollection(`motm${suffix}`, (docs) => setMotmList(docs));
+    const unsubPreds = listenToCollection(`predictions${suffix}`, (docs) => setPredictionsList(docs.sort((a:any, b:any) => b.timestamp?.localeCompare(a.timestamp) || 0)));
+    const unsubForms = listenToCollection(`formations${suffix}`, (docs) => setFormationsList(docs));
+    const unsubRosters = listenToCollection(`team_rosters${suffix}`, (docs) => setRostersList(docs));
+    const unsubProducts = listenToCollection("shop_products", (docs) => setProductsList(
+      docs
         .filter((p:any) => p.isActive !== false)
         .sort((a:any,b:any) => (Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999)) || String(a.title || a.name || "").localeCompare(String(b.title || b.name || ""), "ar"))
     ));
-    const unsubTicker = onSnapshot(doc(db, "settings", "ticker"), (snap) => setTickerText(snap.data()?.text || "مطروح الرياضية..."));
-    
-    const unsubBanned = onSnapshot(collection(db, "banned_entities"), (snap) => setBannedEntities(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubRestricted = onSnapshot(collection(db, "restricted_players"), (snap) => setRestrictedPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    
-    const unsubMathaniGroups = onSnapshot(doc(db, "settings", "mathani_groups"), (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.groups && Array.isArray(data.groups)) {
-                setMathaniGroups(data.groups);
-            } else {
-                const arr = Array(8).fill([]);
-                for (let i = 0; i < 8; i++) {
-                    if (data[`group${i}`]) arr[i] = data[`group${i}`];
-                    else if (data[`group${i + 1}`]) arr[i] = data[`group${i + 1}`];
-                }
-                setMathaniGroups(arr);
-            }
-        } else {
-            setMathaniGroups(Array(8).fill([]));
-        }
+    const unsubTicker = listenToDoc("settings", "ticker", (data) => setTickerText(data?.text || "مطروح الرياضية..."));
+    const unsubBanned = listenToCollection("banned_entities", (docs) => setBannedEntities(docs));
+    const unsubRestricted = listenToCollection("restricted_players", (docs) => setRestrictedPlayers(docs));
+
+    // تم تعطيل تحميل إعدادات بطولة المثاني من الصفحة الرئيسية بعد حذف التبويب.
+    const unsubMathaniGroups = () => {};
+
+    const unsubTournamentLineup = listenToDoc(`tournament_lineup${suffix}`, "current", (data) => {
+      setCustomTournamentLineup(data || null);
     });
 
-    const unsubTournamentLineup = onSnapshot(doc(db, `tournament_lineup${suffix}`, "current"), (snap) => {
-      if (snap.exists()) { setCustomTournamentLineup(snap.data()); } else { setCustomTournamentLineup(null); }
+    const unsubRegMatrouh = listenToDoc("settings", "registration_matrouh", (data) => {
+      if(data){ setRegSettingsMatrouh({ deadline: data.deadline, password: data.password, price: data.price || 500 }); }
     });
-
-    const unsubRegMatrouh = onSnapshot(doc(db, "settings", "registration_matrouh"), (docSnap) => { if(docSnap.exists()){ setRegSettingsMatrouh({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 500 }); } });
-    const unsubRegElite = onSnapshot(doc(db, "settings", "registration_elite"), (docSnap) => { if(docSnap.exists()){ setRegSettingsElite({ deadline: docSnap.data().deadline, password: docSnap.data().password, price: docSnap.data().price || 1000 }); } });
+    const unsubRegElite = listenToDoc("settings", "registration_elite", (data) => {
+      if(data){ setRegSettingsElite({ deadline: data.deadline, password: data.password, price: data.price || 1000 }); }
+    });
 
     const clockTimer = setInterval(() => setTime(new Date()), 1000);
     return () => { unsubMatches(); unsubGoals(); unsubCards(); unsubArchivedCards(); unsubMedia(); unsubMotm(); unsubPreds(); unsubForms(); unsubRosters(); unsubProducts(); unsubTicker(); unsubBanned(); unsubRestricted(); unsubMathaniGroups(); unsubTournamentLineup(); unsubRegMatrouh(); unsubRegElite(); clearInterval(clockTimer); };
@@ -362,6 +373,15 @@ export default function Page() {
     if (Notification.permission === "denied") {
       setNotificationPermission("denied");
       alert("الإشعارات مرفوضة من إعدادات المتصفح. افتح إعدادات الموقع واسمح بالإشعارات ثم جرب مرة أخرى.");
+      return;
+    }
+
+    const isOneSignalAllowedOrigin =
+      window.location.origin === "https://matrouhcup.online" ||
+      window.location.hostname === "matrouhcup.online";
+
+    if (!isOneSignalAllowedOrigin) {
+      alert("الإشعارات تعمل على رابط الموقع الرسمي فقط: https://matrouhcup.online");
       return;
     }
 
@@ -693,7 +713,6 @@ export default function Page() {
           <div className="bg-[#13213a] p-2 rounded-2xl border border-yellow-400/30 inline-flex shadow-xl gap-2 w-max min-w-full sm:min-w-0 sm:w-auto">
             <button onClick={() => setMainAppTab('matrouh_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'matrouh_cup' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏆 كأس مطروح</button>
             <button onClick={() => setMainAppTab('elite_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'elite_cup' ? 'bg-indigo-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🏅 بطولة كأس النخبة</button>
-            <button onClick={() => setMainAppTab('mathani_cup')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'mathani_cup' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>⚽ بطولة المثاني 2026</button>
             <button onClick={() => setMainAppTab('shop')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'shop' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>🛒 المتجر</button>
             <button onClick={() => setMainAppTab('settings')} className={`flex-1 py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-lg font-black transition-all ${mainAppTab === 'settings' ? 'bg-gray-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>⚙️ الإعدادات</button>
           </div>

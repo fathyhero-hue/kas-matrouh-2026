@@ -209,6 +209,12 @@ export default function AdminPage() {
   const [isAuth, setIsAuth] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [mainAppTab, setMainAppTab] = useState<'matrouh_cup' | 'elite_cup' | 'mathani_cup' | 'shop'>('matrouh_cup');
+  useEffect(() => {
+    if (mainAppTab === 'mathani_cup') {
+      setMainAppTab('matrouh_cup');
+      setActiveTab('champion');
+    }
+  }, [mainAppTab]);
   const [cupEdition, setCupEdition] = useState<'edition_3' | 'edition_4'>('edition_3');
   const [activeTournament, setActiveTournament] = useState<'youth' | 'juniors'>('youth');
   const [activeTab, setActiveTab] = useState("champion");
@@ -1061,7 +1067,6 @@ export default function AdminPage() {
             {[
               { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
               { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
-              { key: 'mathani_cup', label: '⚽ بطولة المثاني', active: 'bg-emerald-500 text-white' },
               { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
             ].map(tab => (
               <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
@@ -1076,7 +1081,6 @@ export default function AdminPage() {
           {[
             { key: 'matrouh_cup', label: '🏆 كأس مطروح', active: 'bg-yellow-400 text-black' },
             { key: 'elite_cup', label: '🏅 النخبة', active: 'bg-indigo-600 text-white' },
-            { key: 'mathani_cup', label: '⚽ بطولة المثاني', active: 'bg-emerald-500 text-white' },
             { key: 'shop', label: '🛒 المتجر', active: 'bg-orange-500 text-white' },
           ].map(tab => (
             <button key={tab.key} onClick={() => { setMainAppTab(tab.key as any); setActiveTab(tab.key === 'mathani_cup' ? 'mathani_groups' : 'champion'); }}
