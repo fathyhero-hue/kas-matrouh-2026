@@ -486,15 +486,28 @@ export default function Page() {
       const q = query(
         collection(db, "orders"),
         where("accessPassword", "==", code),
-        where("tournament", "==", mainAppTab),
-        limit(5)
+        limit(10)
       );
       const snap = await getDocs(q);
       const paidOrder = snap.docs
         .map((d) => ({ id: d.id, ...d.data() } as any))
-        .find((o) => o.paymentStatus === "paid" || o.rosterAccessActive === true || o.status === "تم الدفع" || o.status === "مدفوع");
+        .find((o) => {
+          const orderTournament = String(o.tournament || o.tournamentId || "");
+          const sameTournament =
+            orderTournament === mainAppTab ||
+            (mainAppTab === "elite_cup" && (orderTournament.includes("elite") || String(o.tournamentLabel || "").includes("النخبة")));
+          const hasAccess =
+            o.paymentStatus === "paid" ||
+            o.paymentStatus === "manual_access" ||
+            o.rosterAccessActive === true ||
+            o.adminManualAccess === true ||
+            o.status === "تم الدفع" ||
+            o.status === "مدفوع" ||
+            o.status === "رقم سري من الإدارة";
+          return sameTournament && hasAccess;
+        });
 
-      if(!paidOrder) return alert("❌ الرقم السري غير صحيح أو لم يتم تأكيد الدفع بعد.");
+      if(!paidOrder) return alert("❌ الرقم السري غير صحيح أو غير مفعل لهذه البطولة.");
 
       unlockRosterForm({
         managerName: paidOrder?.customer?.managerName || paidOrder?.customer?.name,

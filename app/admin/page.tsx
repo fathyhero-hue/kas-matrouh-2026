@@ -222,6 +222,13 @@ export default function AdminPage() {
 
   const [eliteTeams, setEliteTeams] = useState<any[]>([]);
   const [eliteTeamForm, setEliteTeamForm] = useState({ name: "", logoUrl: "" });
+  const [manualEliteAccessForm, setManualEliteAccessForm] = useState({
+    managerName: "",
+    phone: "",
+    teamName: "",
+    password: "",
+    note: "",
+  });
 
   const [mathaniGroups, setMathaniGroups] = useState<string[][]>(Array.from({ length: 8 }, () => ["", "", "", ""]));
 
@@ -793,6 +800,66 @@ export default function AdminPage() {
   const addEliteTeam = async () => { if (!eliteTeamForm.name.trim()) return alert("أدخل اسم الفريق"); await addDoc(collection(db, "elite_teams"), eliteTeamForm); alert("تم إضافة الفريق للنخبة"); setEliteTeamForm({ name: "", logoUrl: "" }); };
   const deleteEliteTeam = async (id: string) => { if (confirm("حذف هذا الفريق؟")) await deleteDoc(doc(db, "elite_teams", id)); };
 
+  const generateEliteAccessPassword = () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setManualEliteAccessForm(prev => ({ ...prev, password: code }));
+  };
+
+  const createManualEliteAccess = async () => {
+    const managerName = manualEliteAccessForm.managerName.trim();
+    const phone = manualEliteAccessForm.phone.trim();
+    const accessPassword = manualEliteAccessForm.password.trim();
+    if (!managerName) return alert("اكتب اسم مسؤول الفريق");
+    if (!phone) return alert("اكتب رقم الموبايل");
+    if (!accessPassword) return alert("اكتب الرقم السري أو اضغط توليد تلقائي");
+
+    const now = new Date().toISOString();
+    await addDoc(collection(db, "orders"), {
+      type: "tournament_registration",
+      tournament: "elite_cup",
+      tournamentLabel: "بطولة كأس النخبة",
+      source: "admin_manual_access",
+      paymentMethod: "manual_admin",
+      paymobMethod: "manual_admin",
+      paymentStatus: "manual_access",
+      status: "رقم سري من الإدارة",
+      total: 0,
+      currency: "EGP",
+      accessPassword,
+      rosterAccessPassword: accessPassword,
+      rosterAccessActive: true,
+      adminManualAccess: true,
+      managerName,
+      phone,
+      teamName: manualEliteAccessForm.teamName.trim(),
+      note: manualEliteAccessForm.note.trim(),
+      customer: {
+        name: managerName,
+        managerName,
+        phone,
+        teamName: manualEliteAccessForm.teamName.trim(),
+      },
+      items: [{
+        id: "elite_manual_access",
+        title: "رقم سري إداري لتسجيل فريق النخبة",
+        name: "رقم سري إداري لتسجيل فريق النخبة",
+        price: 0,
+        quantity: 1,
+      }],
+      createdAt: now,
+      updatedAt: now,
+      paidAt: now,
+    });
+    alert("تم إنشاء الرقم السري وفتح تسجيل فريق النخبة ✅");
+    setManualEliteAccessForm({ managerName: "", phone: "", teamName: "", password: "", note: "" });
+  };
+
+  const deleteElitePaymentOrder = async (id: string) => {
+    if (!confirm("هل تريد حذف هذه المعاملة نهائيًا من لوحة الإدارة؟")) return;
+    await deleteDoc(doc(db, "orders", id));
+    alert("تم حذف المعاملة");
+  };
+
   const saveMathaniGroups = async () => {
     try {
       const groupsObject: Record<string, any> = {};
@@ -974,6 +1041,7 @@ export default function AdminPage() {
     if (value === "payment_init_failed") return "فشل إنشاء الدفع";
     if (value === "cash_on_delivery") return "دفع عند الاستلام";
     if (value === "manual_review") return "مراجعة يدوية";
+    if (value === "manual_access") return "رقم سري من الإدارة";
     return value || "—";
   };
 
@@ -982,6 +1050,7 @@ export default function AdminPage() {
     if (value === "paid") return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
     if (value === "pending_payment") return "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
     if (value === "failed" || value === "payment_init_failed") return "bg-red-500/15 text-red-300 border-red-500/30";
+    if (value === "manual_access") return "bg-indigo-500/15 text-indigo-200 border-indigo-500/30";
     return "bg-white/5 text-gray-300 border-white/10";
   };
 
@@ -990,6 +1059,7 @@ export default function AdminPage() {
     if (method === "paymob_wallet" || method === "wallet_direct_api" || method === "paymob_wallet_direct") return "محفظة إلكترونية";
     if (method === "paymob_card" || method === "card" || method === "paymob") return "كارت بنكي";
     if (method === "cash") return "كاش";
+    if (method === "manual_admin") return "رقم سري إداري";
     return method || "—";
   };
 
@@ -1397,18 +1467,35 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                <SectionCard title="إنشاء رقم سري يدوي لتسجيل فريق النخبة" icon="🔐" color="yellow">
+                  <div className="mb-4 rounded-2xl border border-indigo-400/20 bg-indigo-500/10 p-4 text-sm text-indigo-100 font-bold leading-7">
+                    استخدم هذا الجزء لإرسال رقم سري لأي مسؤول فريق وفتح استمارة تسجيل النخبة له، حتى لو لم يدفع إلكترونيًا. الرقم سيظهر أيضًا ضمن معاملات التسجيل كمعاملة إدارية.
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <input value={manualEliteAccessForm.managerName} onChange={e => setManualEliteAccessForm({ ...manualEliteAccessForm, managerName: e.target.value })} placeholder="اسم مسؤول الفريق" className={inputCls} />
+                    <input value={manualEliteAccessForm.phone} onChange={e => setManualEliteAccessForm({ ...manualEliteAccessForm, phone: e.target.value })} placeholder="رقم الموبايل" className={inputCls} dir="ltr" />
+                    <input value={manualEliteAccessForm.teamName} onChange={e => setManualEliteAccessForm({ ...manualEliteAccessForm, teamName: e.target.value })} placeholder="اسم الفريق اختياري" className={inputCls} />
+                    <input value={manualEliteAccessForm.password} onChange={e => setManualEliteAccessForm({ ...manualEliteAccessForm, password: e.target.value })} placeholder="الرقم السري" className={`${inputCls} text-center font-black text-yellow-300 tracking-widest`} dir="ltr" />
+                    <div className="flex gap-2">
+                      <Btn onClick={generateEliteAccessPassword} variant="primary" size="md" className="flex-1">توليد</Btn>
+                      <Btn onClick={createManualEliteAccess} variant="emerald" size="md" className="flex-1">حفظ</Btn>
+                    </div>
+                  </div>
+                  <textarea value={manualEliteAccessForm.note} onChange={e => setManualEliteAccessForm({ ...manualEliteAccessForm, note: e.target.value })} placeholder="ملاحظة داخلية اختيارية" className={`${inputCls} mt-3 min-h-[80px]`} />
+                </SectionCard>
+
                 <SectionCard title="مدفوعات تسجيل بطولة النخبة" icon="💳" color="indigo">
                   <div className="mb-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4 text-sm text-yellow-100 font-bold leading-7">
-                    هنا تظهر بيانات كل مسؤول فريق دفع رسوم بطولة النخبة، وحالة الدفع، ورقم Paymob، والرقم السري الذي يفتح له تسجيل قائمة الفريق.
+                    هنا تظهر بيانات كل مسؤول فريق دفع رسوم بطولة النخبة، وحالة الدفع، ورقم Paymob، والرقم السري الذي يفتح له تسجيل قائمة الفريق. ويمكن حذف أي معاملة من زر الحذف في آخر الصف.
                   </div>
                   <div className="overflow-x-auto rounded-xl border border-white/5">
-                    <table className="w-full text-right text-white text-sm min-w-[1150px]">
+                    <table className="w-full text-right text-white text-sm min-w-[1300px]">
                       <thead className="bg-[#060e1e]">
-                        <tr>{["الطلب", "مسؤول الفريق", "رقم الموبايل", "المبلغ", "وسيلة الدفع", "حالة الدفع", "الرقم السري", "Paymob", "فتح التسجيل", "التاريخ"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
+                        <tr>{["الطلب", "مسؤول الفريق", "رقم الموبايل", "المبلغ", "وسيلة الدفع", "حالة الدفع", "الرقم السري", "Paymob", "فتح التسجيل", "التاريخ", "إجراءات"].map(h => <th key={h} className="px-4 py-3 text-gray-400 font-bold border-b border-white/5">{h}</th>)}</tr>
                       </thead>
                       <tbody>
                         {elitePaymentOrders.length === 0 ? (
-                          <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-500 font-bold">لا توجد مدفوعات تسجيل لبطولة النخبة حتى الآن</td></tr>
+                          <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-500 font-bold">لا توجد مدفوعات تسجيل لبطولة النخبة حتى الآن</td></tr>
                         ) : elitePaymentOrders.map((order: any) => {
                           const accessPassword = String(order.accessPassword || order.rosterAccessPassword || "");
                           const isPaid = order.paymentStatus === "paid" || order.rosterAccessActive === true;
@@ -1420,6 +1507,8 @@ export default function AdminPage() {
                               </td>
                               <td className="px-4 py-3 font-bold">
                                 {order.customer?.managerName || order.customer?.name || order.managerName || "—"}
+                                {(order.teamName || order.customer?.teamName) && <div className="text-[11px] text-indigo-300 mt-1">الفريق: {order.teamName || order.customer?.teamName}</div>}
+                                {order.note && <div className="text-[11px] text-gray-400 mt-1 max-w-[220px] break-words">ملاحظة: {order.note}</div>}
                                 {order.customer?.email && <div className="text-[11px] text-gray-500 mt-1" dir="ltr">{order.customer.email}</div>}
                               </td>
                               <td className="px-4 py-3"><span className="text-cyan-300 font-bold" dir="ltr">{order.customer?.phone || order.phone || "—"}</span></td>
@@ -1450,6 +1539,11 @@ export default function AdminPage() {
                               <td className="px-4 py-3 text-xs text-gray-400 leading-6">
                                 <div>إنشاء: {formatPaymentDate(order.createdAt)}</div>
                                 <div>دفع: {formatPaymentDate(order.paidAt)}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Btn onClick={() => deleteElitePaymentOrder(order.id)} variant="danger" size="sm">
+                                  <Trash2 className="w-3 h-3" /> حذف
+                                </Btn>
                               </td>
                             </tr>
                           );
