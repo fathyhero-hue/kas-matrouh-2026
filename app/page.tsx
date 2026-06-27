@@ -223,7 +223,7 @@ export default function Page() {
 
   const [rosterViewMode, setRosterViewMode] = useState<'list' | 'register'>('list');
   const [showPaymentForm, setShowPaymentForm] = useState(true);
-  const [paymentForm, setPaymentForm] = useState({ managerName: "", email: "", phone: "" });
+  const [paymentForm, setPaymentForm] = useState({ managerName: "", phone: "" });
   const [isInitiatingPay, setIsInitiatingPay] = useState(false);
   const [rosterAccessPassword, setRosterAccessPassword] = useState("");
   const [unlockedRoster, setUnlockedRoster] = useState<string | null>(null);
@@ -417,7 +417,7 @@ export default function Page() {
 
   const handleInitiatePayment = async (paymobMethod: "card" | "wallet" = "card") => {
     if(!checkRegistrationOpen()) return alert("عذراً، لقد انتهى موعد التسجيل في البطولة. 🚫");
-    if(!paymentForm.managerName || !paymentForm.email || !paymentForm.phone) return alert("يرجى إكمال جميع البيانات للدفع.");
+    if(!paymentForm.managerName || !paymentForm.phone) return alert("يرجى إدخال الاسم ورقم الموبايل للدفع.");
     setIsInitiatingPay(true);
     try {
        const currentSettings = mainAppTab === 'elite_cup' ? regSettingsElite : regSettingsMatrouh;
@@ -1422,7 +1422,6 @@ export default function Page() {
                         {showPaymentForm ? (
                           <div className="space-y-4 animate-in fade-in">
                              <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12" />
-                             <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                              <Input type="tel" placeholder="رقم الموبايل" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-emerald-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                                <Button onClick={() => handleInitiatePayment("card")} disabled={isInitiatingPay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بالكارت البنكي 💳"}</Button>
@@ -1787,7 +1786,6 @@ export default function Page() {
                     {showPaymentForm ? (
                        <div className="space-y-4 animate-in fade-in">
                           <Input placeholder="الاسم الثلاثي للمسئول" value={paymentForm.managerName} onChange={e => setPaymentForm(p=>({...p, managerName: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12" />
-                          <Input type="email" placeholder="البريد الإلكتروني لارسال الباسورد" value={paymentForm.email} onChange={e => setPaymentForm(p=>({...p, email: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                           <Input type="tel" placeholder="رقم الموبايل" value={paymentForm.phone} onChange={e => setPaymentForm(p=>({...p, phone: e.target.value}))} className="bg-[#1e2a4a] border-indigo-500/50 text-white font-bold h-12 text-right" dir="ltr" />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                             <Button onClick={() => handleInitiatePayment("card")} disabled={isInitiatingPay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 text-lg shadow-lg">{isInitiatingPay ? <Loader2 className="animate-spin h-5 w-5" /> : "الدفع بالكارت البنكي 💳"}</Button>
