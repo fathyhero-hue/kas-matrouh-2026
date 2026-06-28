@@ -1145,6 +1145,7 @@ export default function Page() {
             border-top: 1px solid rgba(17,24,39,.10);
             padding-top: .7mm;
             background: rgba(255,255,255,.92);
+            direction: ltr;
           }
           .qr {
             width: 8.5mm;
@@ -1154,6 +1155,7 @@ export default function Page() {
           }
           .barcode-wrap {
             min-width: 0;
+            direction: ltr;
           }
           .barcode {
             height: 3mm;
