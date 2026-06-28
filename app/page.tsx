@@ -868,15 +868,17 @@ export default function Page() {
 
             <div class="data-col">
               <div class="data-body">
-                <div class="label">الاسم</div>
-                <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
+                <div class="name-block">
+                  <div class="label">الاسم</div>
+                  <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
+                </div>
 
-                <div class="grid">
-                  <div><div class="label tiny">الصفة</div><div class="value purple">${safeText(roleText)}</div></div>
-                  <div><div class="label tiny">الفريق</div><div class="value green">${safeText(r.teamName || "لاعب حر")}</div></div>
-                  <div><div class="label tiny">تاريخ الميلاد</div><div class="value">${safeText(r.birthDate || "—")}</div></div>
-                  <div><div class="label tiny">تاريخ التسجيل</div><div class="value">${safeText(r.registrationDate || new Date().toISOString().slice(0, 10))}</div></div>
-                  <div class="span2"><div class="label tiny">الرقم القومي</div><div class="value ltr">${safeText(r.nationalId || "—")}</div></div>
+                <div class="info-list">
+                  <div class="info-row"><span class="info-label">الصفة</span><span class="info-value purple">${safeText(roleText)}</span></div>
+                  <div class="info-row"><span class="info-label">الفريق</span><span class="info-value green">${safeText(r.teamName || "لاعب حر")}</span></div>
+                  <div class="info-row"><span class="info-label">تاريخ الميلاد</span><span class="info-value ltr">${safeText(r.birthDate || "—")}</span></div>
+                  <div class="info-row"><span class="info-label">تاريخ التسجيل</span><span class="info-value ltr">${safeText(r.registrationDate || new Date().toISOString().slice(0, 10))}</span></div>
+                  <div class="info-row"><span class="info-label">الرقم القومي</span><span class="info-value ltr">${safeText(r.nationalId || "—")}</span></div>
                 </div>
               </div>
 
@@ -978,7 +980,7 @@ export default function Page() {
             justify-content: space-between;
             align-items: flex-start;
             gap: 2mm;
-            height: 13mm;
+            height: 12mm;
             flex-shrink: 0;
           }
           .brand {
@@ -993,7 +995,7 @@ export default function Page() {
             border-radius: 50%;
           }
           .brand-title {
-            font-size: 10pt;
+            font-size: 9.5pt;
             font-weight: 900;
             color: #4b1690;
             line-height: 1;
@@ -1023,20 +1025,20 @@ export default function Page() {
             overflow: hidden;
           }
           .main {
-            height: calc(100% - 13mm);
+            height: calc(100% - 12mm);
             display: flex;
             gap: 2mm;
             overflow: hidden;
           }
           .photo-col {
-            width: 23mm;
+            width: 21mm;
             flex-shrink: 0;
             text-align: center;
           }
           .photo-box {
-            width: 21mm;
-            height: 27mm;
-            border-radius: 3.5mm;
+            width: 19mm;
+            height: 24mm;
+            border-radius: 3.2mm;
             overflow: hidden;
             border: 1.5px solid rgba(75,22,144,.2);
             background: #e5e7eb;
@@ -1074,13 +1076,16 @@ export default function Page() {
             height: 100%;
             position: relative;
             overflow: hidden;
-            padding-bottom: 11mm;
-            font-size: 6.8pt;
+            padding-bottom: 10.5mm;
+            font-size: 6.4pt;
             font-weight: 800;
           }
           .data-body {
-            height: calc(100% - 11mm);
+            height: calc(100% - 10.5mm);
             overflow: hidden;
+          }
+          .name-block {
+            margin-bottom: .7mm;
           }
           .label {
             color: #666;
@@ -1090,45 +1095,61 @@ export default function Page() {
           }
           .label.tiny { font-size: 4.7pt; }
           .name {
-            font-size: 9.3pt;
+            font-size: 8.4pt;
             line-height: 1.15;
             font-weight: 900;
             border-bottom: 1px solid #e5e7eb;
-            padding-bottom: .5mm;
+            padding-bottom: .4mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
           }
-          .grid {
+          .info-list {
+            display: flex;
+            flex-direction: column;
+            gap: .55mm;
+          }
+          .info-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: .8mm 2mm;
-            margin-top: 1mm;
-            line-height: 1.15;
+            grid-template-columns: 18mm 1fr;
+            gap: 1.2mm;
+            align-items: baseline;
+            border-bottom: 1px solid rgba(229,231,235,.72);
+            padding-bottom: .25mm;
+            min-height: 3.2mm;
           }
-          .span2 { grid-column: span 2; }
-          .value {
+          .info-label {
+            color: #666;
+            font-size: 4.8pt;
             font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+          }
+          .info-value {
+            font-size: 6.8pt;
+            font-weight: 900;
+            line-height: 1.1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-align: right;
           }
           .purple { color: #4b1690; }
           .green { color: #0f766e; }
-          .ltr { direction: ltr; text-align: right; }
+          .ltr { direction: ltr; unicode-bidi: plaintext; text-align: right; }
           .bottom {
             position: absolute;
             left: 0;
             right: 0;
             bottom: 0;
-            height: 10mm;
+            height: 9.5mm;
             display: grid;
-            grid-template-columns: 1fr 9mm;
-            gap: 1.5mm;
+            grid-template-columns: 1fr 8.5mm;
+            gap: 1.3mm;
             align-items: end;
             border-top: 1px solid #eee;
-            padding-top: 1mm;
-            background: rgba(255,255,255,.88);
+            padding-top: .8mm;
+            background: rgba(255,255,255,.92);
           }
           .barcode {
             height: 3mm;
@@ -1143,8 +1164,8 @@ export default function Page() {
             margin-top: .4mm;
           }
           .qr {
-            width: 9mm;
-            height: 9mm;
+            width: 8.5mm;
+            height: 8.5mm;
             background: white;
             border: 1px solid #e5e7eb;
           }
