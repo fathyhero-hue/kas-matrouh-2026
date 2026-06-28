@@ -1233,6 +1233,79 @@ export default function AdminPage() {
     printWindow.document.close();
   };
 
+
+  const convertLogoToTransparentPng = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+
+        img.onload = () => {
+          try {
+            const maxSize = 900;
+            const ratio = Math.min(1, maxSize / Math.max(img.width || maxSize, img.height || maxSize));
+
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round((img.width || maxSize) * ratio));
+            canvas.height = Math.max(1, Math.round((img.height || maxSize) * ratio));
+
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            if (!ctx) throw new Error("تعذر تجهيز صورة الشعار");
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+
+              const isWhite = r > 242 && g > 242 && b > 242;
+              const isLightGray = r > 228 && g > 228 && b > 228 && Math.abs(r - g) < 14 && Math.abs(g - b) < 14;
+
+              if (isWhite || isLightGray) {
+                data[i + 3] = 0;
+              }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(objectUrl);
+
+              if (!blob) {
+                reject(new Error("تعذر تحويل الشعار إلى PNG"));
+                return;
+              }
+
+              const cleanBaseName = String(file.name || "tournament_logo")
+                .replace(/\.[^.]+$/, "")
+                .replace(/[^\w\u0600-\u06FF-]+/g, "_");
+
+              resolve(new File([blob], `${cleanBaseName || "tournament_logo"}.png`, { type: "image/png" }));
+            }, "image/png", 1);
+          } catch (err) {
+            URL.revokeObjectURL(objectUrl);
+            reject(err);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("تعذر قراءة صورة الشعار"));
+        };
+
+        img.src = objectUrl;
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+
   const uploadPlayerTournamentLogo = async (file?: File, tournamentId?: string) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return alert("اختر صورة صحيحة للشعار");
