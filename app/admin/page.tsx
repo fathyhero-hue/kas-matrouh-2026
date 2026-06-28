@@ -842,15 +842,17 @@ export default function AdminPage() {
               </div>
 
               <div class="data-col">
-                <div class="label">الاسم</div>
-                <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
+                <div class="data-body">
+                  <div class="label">الاسم</div>
+                  <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
 
-                <div class="grid">
+                  <div class="grid">
                   <div><div class="label tiny">الصفة</div><div class="value purple">${safeText(roleText)}</div></div>
                   <div><div class="label tiny">الفريق</div><div class="value green">${safeText(r.teamName || "لاعب حر")}</div></div>
                   <div><div class="label tiny">تاريخ الميلاد</div><div class="value">${safeText(r.birthDate || "—")}</div></div>
                   <div><div class="label tiny">تاريخ التسجيل</div><div class="value">${safeText(r.registrationDate || String(r.createdAt || "").slice(0, 10) || "—")}</div></div>
-                  <div class="span2"><div class="label tiny">الرقم القومي</div><div class="value ltr">${safeText(r.nationalId || "—")}</div></div>
+                    <div class="span2"><div class="label tiny">الرقم القومي</div><div class="value ltr">${safeText(r.nationalId || "—")}</div></div>
+                  </div>
                 </div>
 
                 <div class="bottom">
@@ -952,7 +954,8 @@ export default function AdminPage() {
             justify-content: space-between;
             align-items: flex-start;
             gap: 2mm;
-            margin-bottom: 1mm;
+            height: 13mm;
+            margin-bottom: 0;
             flex-shrink: 0;
           }
           .brand {
@@ -997,10 +1000,9 @@ export default function AdminPage() {
             overflow: hidden;
           }
           .main {
+            height: calc(100% - 13mm);
             display: flex;
             gap: 2mm;
-            flex: 1;
-            min-height: 0;
             overflow: hidden;
           }
           .photo-col {
@@ -1046,12 +1048,16 @@ export default function AdminPage() {
           .data-col {
             flex: 1;
             min-width: 0;
+            height: 100%;
+            position: relative;
             overflow: hidden;
+            padding-bottom: 11mm;
             font-size: 6.8pt;
             font-weight: 800;
-            position: relative;
-            height: 100%;
-            padding-bottom: 12mm;
+          }
+          .data-body {
+            height: calc(100% - 11mm);
+            overflow: hidden;
           }
           .label {
             color: #666;
@@ -1092,6 +1098,7 @@ export default function AdminPage() {
             left: 0;
             right: 0;
             bottom: 0;
+            height: 10mm;
             display: grid;
             grid-template-columns: 1fr 9mm;
             gap: 1.5mm;
@@ -1099,7 +1106,7 @@ export default function AdminPage() {
             border-top: 1px solid #eee;
             margin-top: 0;
             padding-top: 1mm;
-            background: rgba(255,255,255,.86);
+            background: rgba(255,255,255,.88);
           }
           .barcode {
             height: 3mm;
@@ -1208,6 +1215,72 @@ export default function AdminPage() {
       </html>
     `);
     printWindow.document.close();
+  };
+
+
+  const convertLogoToTransparentPng = async (file: File): Promise<File> => {
+    // تحويل أي لوجو مرفوع إلى PNG ومحاولة إزالة الخلفية البيضاء/الفاتحة.
+    // هذا يمنع خطأ TypeScript ويحافظ على رفع اللوجو من لوحة الإدارة.
+    return new Promise((resolve, reject) => {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const maxSize = 900;
+            const ratio = Math.min(1, maxSize / Math.max(img.width || maxSize, img.height || maxSize));
+            canvas.width = Math.max(1, Math.round((img.width || maxSize) * ratio));
+            canvas.height = Math.max(1, Math.round((img.height || maxSize) * ratio));
+
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            if (!ctx) throw new Error("تعذر تجهيز الصورة");
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+
+              // إزالة الخلفيات البيضاء والفاتحة جدًا، مع الحفاظ على تفاصيل اللوجو.
+              const isNearWhite = r > 238 && g > 238 && b > 238;
+              const isLightGray = r > 225 && g > 225 && b > 225 && Math.abs(r - g) < 12 && Math.abs(g - b) < 12;
+
+              if (isNearWhite || isLightGray) {
+                data[i + 3] = 0;
+              }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(objectUrl);
+              if (!blob) return reject(new Error("تعذر تحويل اللوجو إلى PNG"));
+              const cleanName = String(file.name || "tournament_logo")
+                .replace(/\.[^.]+$/, "")
+                .replace(/[^\w\u0600-\u06FF-]+/g, "_");
+              resolve(new File([blob], `${cleanName}.png`, { type: "image/png" }));
+            }, "image/png", 1);
+          } catch (err) {
+            URL.revokeObjectURL(objectUrl);
+            reject(err);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("تعذر قراءة صورة اللوجو"));
+        };
+        img.src = objectUrl;
+      } catch (err) {
+        reject(err);
+      }
+    });
   };
 
   const uploadPlayerTournamentLogo = async (file?: File, tournamentId?: string) => {

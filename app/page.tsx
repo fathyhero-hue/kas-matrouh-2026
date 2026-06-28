@@ -813,9 +813,423 @@ export default function Page() {
 
   const downloadPlayerCardsPdf = async () => {
     if (typeof window === "undefined") return;
-    // نستخدم نظام الطباعة الأصلي في المتصفح لتجنب خطأ html2canvas مع ألوان CSS الحديثة مثل lab/oklch.
-    // من نافذة الطباعة اختر: Save as PDF / حفظ كـ PDF.
-    window.print();
+
+    const r:any = currentPlayerCardPreview;
+    const safeText = (value:any) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+    const serial = r.serialNumber || "MTR-PREVIEW";
+    const roleText = r.roleLabel || (r.role === "manager" ? "مدير فني" : "لاعب");
+    const cardType = r.role === "manager" ? "بطاقة مدير فني" : "بطاقة لاعب";
+    const logo = safeText(r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO || "/tournament-logos/matrouh-sports.png");
+    const tournamentLogo = safeText(r.tournamentLogoUrl || "/tournament-logos/matrouh-sports.png");
+    const photo = safeText(r.photoUrl || "");
+    const cropX = Number(r.cropX || 50);
+    const cropY = Number(r.cropY || 50);
+    const zoom = Number(r.zoom || 1);
+    const qrData = encodeURIComponent(r.qrPayload || JSON.stringify({
+      serial,
+      name: r.fullName || r.playerName || "",
+      tournament: r.tournamentName || "",
+      role: roleText,
+    }));
+
+    const frontHtml = `
+      <div class="id-card front-card">
+        <div class="bar"></div>
+        <div class="soft-bg"></div>
+        <div class="front-content">
+          <div class="head">
+            <div class="brand">
+              <img src="${logo}" class="brand-logo" />
+              <div>
+                <div class="brand-title">مطروح الرياضية</div>
+                <div class="brand-sub">بطاقة تعريف معتمدة</div>
+              </div>
+            </div>
+            <div class="tournament-box">
+              <img src="${tournamentLogo}" class="tournament-logo" />
+              <div class="tournament-name">${safeText(r.tournamentName || "بطولة رياضية")}</div>
+            </div>
+          </div>
+
+          <div class="main">
+            <div class="photo-col">
+              <div class="photo-box">
+                ${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;object-position:${cropX}% ${cropY}%;transform:scale(${zoom});" />` : `<div class="photo-placeholder">مكان الصورة</div>`}
+              </div>
+              <div class="role-badge">${safeText(roleText)}</div>
+              <div class="serial-small">${safeText(serial)}</div>
+            </div>
+
+            <div class="data-col">
+              <div class="data-body">
+                <div class="label">الاسم</div>
+                <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
+
+                <div class="grid">
+                  <div><div class="label tiny">الصفة</div><div class="value purple">${safeText(roleText)}</div></div>
+                  <div><div class="label tiny">الفريق</div><div class="value green">${safeText(r.teamName || "لاعب حر")}</div></div>
+                  <div><div class="label tiny">تاريخ الميلاد</div><div class="value">${safeText(r.birthDate || "—")}</div></div>
+                  <div><div class="label tiny">تاريخ التسجيل</div><div class="value">${safeText(r.registrationDate || new Date().toISOString().slice(0, 10))}</div></div>
+                  <div class="span2"><div class="label tiny">الرقم القومي</div><div class="value ltr">${safeText(r.nationalId || "—")}</div></div>
+                </div>
+              </div>
+
+              <div class="bottom">
+                <div class="barcode-wrap">
+                  <div class="barcode"></div>
+                  <div class="serial-line">${safeText(serial)}</div>
+                </div>
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" class="qr" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const backHtml = `
+      <div class="id-card back-card">
+        <div class="back-gradient"></div>
+        <div class="back-watermark"><img src="${logo}" /></div>
+        <div class="back-content">
+          <div class="back-logo-frame"><img src="${logo}" class="back-logo" /></div>
+          <div class="back-title">${safeText(r.tournamentName || "بطولة رياضية")}</div>
+          <div class="back-card-type">${safeText(cardType)}</div>
+        </div>
+      </div>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+    if (!printWindow) return alert("المتصفح منع فتح نافذة الطباعة. اسمح بالـ Pop-ups ثم حاول مرة أخرى.");
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>كارت المشارك</title>
+        <style>
+          @page { size: A4; margin: 10mm; }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          body {
+            margin: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: Cairo, Tahoma, Arial, sans-serif;
+          }
+          .sheet {
+            display: grid;
+            grid-template-columns: repeat(2, 85.6mm);
+            gap: 8mm;
+            align-items: start;
+            justify-content: center;
+          }
+          .id-card {
+            width: 85.6mm;
+            height: 53.98mm;
+            border-radius: 5mm;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #d5d5d5;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          .front-card {
+            background: #ffffff;
+            color: #111827;
+          }
+          .soft-bg {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(84,28,162,.10), rgba(13,148,136,.04) 44%, rgba(245,158,11,.08));
+          }
+          .bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2mm;
+            background: linear-gradient(90deg, #4b1690, #1da1f2, #22c55e);
+            z-index: 2;
+          }
+          .front-content {
+            position: relative;
+            z-index: 3;
+            height: 100%;
+            padding: 3mm;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2mm;
+            height: 13mm;
+            flex-shrink: 0;
+          }
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 1.5mm;
+          }
+          .brand-logo {
+            width: 10mm;
+            height: 10mm;
+            object-fit: contain;
+            border-radius: 50%;
+          }
+          .brand-title {
+            font-size: 10pt;
+            font-weight: 900;
+            color: #4b1690;
+            line-height: 1;
+          }
+          .brand-sub {
+            font-size: 6pt;
+            color: #555;
+            font-weight: 700;
+            margin-top: 1mm;
+          }
+          .tournament-box {
+            width: 23mm;
+            text-align: center;
+          }
+          .tournament-logo {
+            width: 12mm;
+            height: 12mm;
+            object-fit: contain;
+            filter: drop-shadow(0 1.4mm 2.4mm rgba(0,0,0,.25));
+          }
+          .tournament-name {
+            font-size: 5.2pt;
+            color: #555;
+            font-weight: 900;
+            line-height: 1.1;
+            max-height: 8mm;
+            overflow: hidden;
+          }
+          .main {
+            height: calc(100% - 13mm);
+            display: flex;
+            gap: 2mm;
+            overflow: hidden;
+          }
+          .photo-col {
+            width: 23mm;
+            flex-shrink: 0;
+            text-align: center;
+          }
+          .photo-box {
+            width: 21mm;
+            height: 27mm;
+            border-radius: 3.5mm;
+            overflow: hidden;
+            border: 1.5px solid rgba(75,22,144,.2);
+            background: #e5e7eb;
+            margin: 0 auto;
+          }
+          .photo-placeholder {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 7pt;
+            font-weight: 800;
+          }
+          .role-badge {
+            display: inline-block;
+            margin-top: 1mm;
+            padding: .7mm 2mm;
+            border-radius: 100px;
+            color: white;
+            font-size: 6pt;
+            font-weight: 900;
+            background: linear-gradient(90deg, #4b1690, #1da1f2);
+          }
+          .serial-small {
+            direction: ltr;
+            margin-top: .5mm;
+            font-size: 4.5pt;
+            color: #555;
+            font-weight: 900;
+          }
+          .data-col {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            padding-bottom: 11mm;
+            font-size: 6.8pt;
+            font-weight: 800;
+          }
+          .data-body {
+            height: calc(100% - 11mm);
+            overflow: hidden;
+          }
+          .label {
+            color: #666;
+            font-size: 5.2pt;
+            font-weight: 900;
+            line-height: 1;
+          }
+          .label.tiny { font-size: 4.7pt; }
+          .name {
+            font-size: 9.3pt;
+            line-height: 1.15;
+            font-weight: 900;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: .5mm;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .8mm 2mm;
+            margin-top: 1mm;
+            line-height: 1.15;
+          }
+          .span2 { grid-column: span 2; }
+          .value {
+            font-weight: 900;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .purple { color: #4b1690; }
+          .green { color: #0f766e; }
+          .ltr { direction: ltr; text-align: right; }
+          .bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 10mm;
+            display: grid;
+            grid-template-columns: 1fr 9mm;
+            gap: 1.5mm;
+            align-items: end;
+            border-top: 1px solid #eee;
+            padding-top: 1mm;
+            background: rgba(255,255,255,.88);
+          }
+          .barcode {
+            height: 3mm;
+            background: repeating-linear-gradient(90deg, #111 0 1px, transparent 1px 3px, #111 3px 5px, transparent 5px 8px, #111 8px 9px, transparent 9px 12px);
+          }
+          .serial-line {
+            direction: ltr;
+            text-align: center;
+            font-size: 4.8pt;
+            color: #444;
+            font-weight: 900;
+            margin-top: .4mm;
+          }
+          .qr {
+            width: 9mm;
+            height: 9mm;
+            background: white;
+            border: 1px solid #e5e7eb;
+          }
+          .back-card {
+            color: #ffffff;
+            border: 1px solid rgba(75,22,144,.24);
+            background: #35115f;
+          }
+          .back-gradient {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #35115f 0%, #4b1690 45%, #1d4ed8 82%, #16a34a 100%);
+          }
+          .back-watermark {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: .14;
+          }
+          .back-watermark img {
+            width: 65%;
+            height: 65%;
+            object-fit: contain;
+          }
+          .back-content {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 7mm;
+          }
+          .back-logo-frame {
+            width: 19mm;
+            height: 19mm;
+            border-radius: 999px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.25);
+            padding: 1.5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 5mm 12mm rgba(0,0,0,.22);
+          }
+          .back-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+          .back-title {
+            margin-top: 4mm;
+            font-size: 15pt;
+            line-height: 1.15;
+            font-weight: 900;
+            color: #ffffff;
+            max-width: 70mm;
+          }
+          .back-card-type {
+            margin-top: 2mm;
+            color: #fde047;
+            font-size: 11pt;
+            font-weight: 900;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="sheet">${frontHtml}${backHtml}</div>
+        <script>
+          window.onload = function () {
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const printPlayerCard = downloadPlayerCardsPdf;
