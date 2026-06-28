@@ -791,6 +791,55 @@ export default function AdminPage() {
     document.head.appendChild(script);
   });
 
+
+  const sanitizeForHtml2Canvas = (root: HTMLElement) => {
+    const unsupportedColor = /\b(oklch|oklab|lab|lch|color-mix)\(/i;
+    const touched: Array<[HTMLElement, string, string]> = [];
+    const nodes = [root, ...Array.from(root.querySelectorAll("*"))] as HTMLElement[];
+    const props = [
+      "color",
+      "background",
+      "backgroundColor",
+      "borderColor",
+      "borderTopColor",
+      "borderRightColor",
+      "borderBottomColor",
+      "borderLeftColor",
+      "outlineColor",
+      "boxShadow",
+      "textShadow",
+      "textDecorationColor",
+      "fill",
+      "stroke",
+    ];
+
+    const safeValue = (prop: string) => {
+      if (prop === "color") return "#111827";
+      if (prop === "fill" || prop === "stroke") return "currentColor";
+      if (prop === "boxShadow" || prop === "textShadow") return "none";
+      if (prop.toLowerCase().includes("border") || prop === "outlineColor") return "rgba(17, 24, 39, 0.16)";
+      return "transparent";
+    };
+
+    nodes.forEach((el) => {
+      const computed = window.getComputedStyle(el);
+      props.forEach((prop) => {
+        const value = computed.getPropertyValue(prop);
+        if (value && unsupportedColor.test(value)) {
+          touched.push([el, prop, el.style.getPropertyValue(prop)]);
+          el.style.setProperty(prop, safeValue(prop), "important");
+        }
+      });
+    });
+
+    return () => {
+      touched.forEach(([el, prop, oldValue]) => {
+        if (oldValue) el.style.setProperty(prop, oldValue);
+        else el.style.removeProperty(prop);
+      });
+    };
+  };
+
   const exportPlayerRegistrationsA4Pdf = async () => {
     if (!playerRegistrations.length) return alert("لا توجد كروت للتصدير");
     try {
@@ -856,7 +905,14 @@ export default function AdminPage() {
             </div>
           </div>
         `;
-        const canvas = await html2canvas(temp.firstElementChild, { scale: 3, useCORS: true, allowTaint: true, backgroundColor: null, logging: false });
+        const exportNode = temp.firstElementChild as HTMLElement;
+        const restoreCanvasStyles = sanitizeForHtml2Canvas(exportNode);
+        let canvas: HTMLCanvasElement;
+        try {
+          canvas = await html2canvas(exportNode, { scale: 3, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false });
+        } finally {
+          restoreCanvasStyles();
+        }
         pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", x, y, cardW, cardH, undefined, "FAST");
         col += 1;
         if (col >= 2) { col = 0; row += 1; x = marginX; y += cardH + gapY; } else { x += cardW + gapX; }
