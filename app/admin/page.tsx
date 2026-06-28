@@ -16,7 +16,6 @@ import { TEAM_NAMES } from "@/data/tournament";
 
 const ADMIN_PASSWORD = "hero123";
 const PLAYER_CARD_BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
-const PLAYER_CARD_SIGNATURE_IMAGE = "/tournament-logos/signature-fathy-hero.svg";
 
 const GROUP_ROUND = "دور المجموعات";
 const MATHANI_KNOCKOUT_ROUNDS = ["دور الـ 16", "دور الستة عشر", "دور الثمانية", "دور الـ 8", "دور الـ 4", "نصف النهائي", "النهائي"];
@@ -822,36 +821,35 @@ export default function AdminPage() {
           <div style="width:430px;height:271px;border-radius:22px;overflow:hidden;background:white;color:#111827;position:relative;font-family:Cairo,Tajawal,Arial,sans-serif;border:1px solid #d5d5d5;">
             <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(84,28,162,.10),rgba(13,148,136,.04) 44%,rgba(245,158,11,.08));"></div>
             <div style="position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#4b1690,#1da1f2,#22c55e);"></div>
-            <div style="position:relative;z-index:2;padding:16px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;direction:rtl;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div style="position:relative;z-index:2;padding:12px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;direction:rtl;overflow:hidden;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;flex-shrink:0;">
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <img src="${r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:48px;height:48px;object-fit:contain;border-radius:50%;" />
-                  <div><div style="font-size:16px;font-weight:900;color:#4b1690;">مطروح الرياضية</div><div style="font-size:9px;color:#666;font-weight:700;">بطاقة تعريف معتمدة</div></div>
+                  <img src="${r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:40px;height:40px;object-fit:contain;border-radius:50%;" />
+                  <div><div style="font-size:14px;font-weight:900;color:#4b1690;">مطروح الرياضية</div><div style="font-size:8px;color:#666;font-weight:700;">بطاقة تعريف معتمدة</div></div>
                 </div>
-                <img src="${r.tournamentLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:56px;height:56px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));" />
+                <img src="${r.tournamentLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));" />
               </div>
-              <div style="display:flex;gap:12px;flex:1;min-height:0;">
-                <div style="width:102px;text-align:center;">
+              <div style="display:flex;gap:8px;flex:1;min-height:0;overflow:hidden;">
+                <div style="width:90px;text-align:center;flex-shrink:0;">
                   <div style="width:94px;height:121px;border-radius:18px;overflow:hidden;border:2px solid rgba(75,22,144,.2);background:#e5e7eb;">
                     ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;height:100%;object-fit:cover;object-position:${Number(r.cropX || 50)}% ${Number(r.cropY || 50)}%;transform:scale(${Number(r.zoom || 1)});" />` : `<div style="font-size:12px;color:#777;display:flex;align-items:center;justify-content:center;height:100%;">صورة</div>`}
                   </div>
-                  <div style="margin-top:6px;font-size:10px;color:white;font-weight:900;background:linear-gradient(90deg,#4b1690,#1da1f2);border-radius:999px;padding:3px 8px;">${roleText}</div>
-                  <div dir="ltr" style="font-size:7px;color:#555;font-weight:900;margin-top:3px;">${serial}</div>
+                  <div style="margin-top:4px;font-size:8px;color:white;font-weight:900;background:linear-gradient(90deg,#4b1690,#1da1f2);border-radius:999px;padding:2px 7px;">${roleText}</div>
+                  <div dir="ltr" style="font-size:6px;color:#555;font-weight:900;margin-top:2px;">${serial}</div>
                 </div>
-                <div style="flex:1;font-size:11px;font-weight:800;">
-                  <div style="color:#777;font-size:9px;">الاسم</div>
-                  <div style="font-size:16px;font-weight:900;border-bottom:1px solid #e5e7eb;padding-bottom:2px;">${r.fullName || r.playerName || "—"}</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px;">
-                    <div><div style="color:#777;font-size:8px;">الصفة</div><div style="color:#4b1690;">${roleText}</div></div>
-                    <div><div style="color:#777;font-size:8px;">الفريق</div><div style="color:#0f766e;">${r.teamName || "لاعب حر"}</div></div>
-                    <div><div style="color:#777;font-size:8px;">تاريخ الميلاد</div><div>${r.birthDate || "—"}</div></div>
-                    <div><div style="color:#777;font-size:8px;">تاريخ التسجيل</div><div>${r.registrationDate || String(r.createdAt || "").slice(0,10)}</div></div>
-                    <div style="grid-column:span 2;"><div style="color:#777;font-size:8px;">الرقم القومي</div><div dir="ltr">${r.nationalId || "—"}</div></div>
+                <div style="flex:1;font-size:9px;font-weight:800;min-width:0;overflow:hidden;">
+                  <div style="color:#777;font-size:7px;line-height:1;">الاسم</div>
+                  <div style="font-size:13px;font-weight:900;border-bottom:1px solid #e5e7eb;padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.fullName || r.playerName || "—"}</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:4px;line-height:1.15;">
+                    <div><div style="color:#777;font-size:7px;line-height:1;">الصفة</div><div style="color:#4b1690;">${roleText}</div></div>
+                    <div><div style="color:#777;font-size:7px;line-height:1;">الفريق</div><div style="color:#0f766e;">${r.teamName || "لاعب حر"}</div></div>
+                    <div><div style="color:#777;font-size:7px;line-height:1;">تاريخ الميلاد</div><div>${r.birthDate || "—"}</div></div>
+                    <div><div style="color:#777;font-size:7px;line-height:1;">تاريخ التسجيل</div><div>${r.registrationDate || String(r.createdAt || "").slice(0,10)}</div></div>
+                    <div style="grid-column:span 2;"><div style="color:#777;font-size:7px;line-height:1;">الرقم القومي</div><div dir="ltr">${r.nationalId || "—"}</div></div>
                   </div>
-                  <div style="display:grid;grid-template-columns:62px 1fr 48px;gap:8px;align-items:end;border-top:1px solid #eee;margin-top:8px;padding-top:6px;">
-                    <div style="width:58px;height:58px;border-radius:50%;border:2px solid #dc2626;color:#b91c1c;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;font-weight:900;line-height:1.1;">مطروح<br/>معتمد<br/><span style="font-size:7px">OFFICIAL</span></div>
-                    <div><div style="text-align:center;font-size:10px;color:#555;font-weight:900;">يعتمد</div><img src="${r.signatureImageUrl || PLAYER_CARD_SIGNATURE_IMAGE}" style="height:32px;max-width:130px;object-fit:contain;display:block;margin:auto;opacity:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.2));" /><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 3px,#111 3px 5px,transparent 5px 8px);"></div><div dir="ltr" style="font-size:7px;text-align:center;">${serial}</div></div>
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" style="width:48px;height:48px;" />
+                  <div style="display:grid;grid-template-columns:1fr 40px;gap:6px;align-items:end;border-top:1px solid #eee;margin-top:4px;padding-top:4px;">
+                    <div><div style="display:flex;align-items:end;justify-content:center;"><div style="width:100%;min-width:120px;"><div style="height:14px;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 3px,#111 3px 5px,transparent 5px 8px,#111 8px 9px,transparent 9px 12px);"></div><div dir="ltr" style="font-size:6px;text-align:center;line-height:1;margin-top:2px;">${serial}</div></div></div></div>
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" style="width:39px;height:39px;" />
                   </div>
                 </div>
               </div>
