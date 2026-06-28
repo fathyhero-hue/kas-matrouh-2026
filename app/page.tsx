@@ -811,126 +811,11 @@ export default function Page() {
     document.head.appendChild(script);
   });
 
-
-  const sanitizeForHtml2Canvas = (root: HTMLElement) => {
-    const unsupportedColor = /\b(oklch|oklab|lab|lch|color-mix)\(/i;
-    const touched: Array<[HTMLElement, string, string]> = [];
-    const nodes = [root, ...Array.from(root.querySelectorAll("*"))] as HTMLElement[];
-    const props = [
-      "color",
-      "background",
-      "backgroundColor",
-      "borderColor",
-      "borderTopColor",
-      "borderRightColor",
-      "borderBottomColor",
-      "borderLeftColor",
-      "outlineColor",
-      "boxShadow",
-      "textShadow",
-      "textDecorationColor",
-      "fill",
-      "stroke",
-    ];
-
-    const safeValue = (prop: string) => {
-      if (prop === "color") return "#111827";
-      if (prop === "fill" || prop === "stroke") return "currentColor";
-      if (prop === "boxShadow" || prop === "textShadow") return "none";
-      if (prop.toLowerCase().includes("border") || prop === "outlineColor") return "rgba(17, 24, 39, 0.16)";
-      return "transparent";
-    };
-
-    nodes.forEach((el) => {
-      const computed = window.getComputedStyle(el);
-      props.forEach((prop) => {
-        const value = computed.getPropertyValue(prop);
-        if (value && unsupportedColor.test(value)) {
-          touched.push([el, prop, el.style.getPropertyValue(prop)]);
-          el.style.setProperty(prop, safeValue(prop), "important");
-        }
-      });
-    });
-
-    return () => {
-      touched.forEach(([el, prop, oldValue]) => {
-        if (oldValue) el.style.setProperty(prop, oldValue);
-        else el.style.removeProperty(prop);
-      });
-    };
-  };
-
   const downloadPlayerCardsPdf = async () => {
     if (typeof window === "undefined") return;
-    const zone = document.getElementById("player-card-print-zone");
-    if (!zone) return alert("الكارت غير جاهز للتصدير");
-    const cardElements = Array.from(zone.querySelectorAll(".id-card-print")) as HTMLElement[];
-    if (!cardElements.length) return alert("لا توجد كروت للتصدير");
-
-    try {
-      await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
-      await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-
-      const html2canvas = (window as any).html2canvas;
-      const jsPDF = (window as any).jspdf?.jsPDF;
-      if (!html2canvas || !jsPDF) throw new Error("مكتبات PDF لم يتم تحميلها");
-
-      const pdf = new jsPDF("p", "mm", "a4");
-      const marginX = 12;
-      const marginY = 12;
-      const gapX = 9;
-      const gapY = 8;
-      const cardW = 85.6;
-      const cardH = 53.98;
-      let x = marginX;
-      let y = marginY;
-      let col = 0;
-      let row = 0;
-
-      for (let i = 0; i < cardElements.length; i++) {
-        const restoreCanvasStyles = sanitizeForHtml2Canvas(cardElements[i]);
-        let canvas: HTMLCanvasElement;
-        try {
-          canvas = await html2canvas(cardElements[i], {
-            scale: 3,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#ffffff",
-            logging: false,
-          });
-        } finally {
-          restoreCanvasStyles();
-        }
-        const imgData = canvas.toDataURL("image/png", 1.0);
-        pdf.addImage(imgData, "PNG", x, y, cardW, cardH, undefined, "FAST");
-
-        col += 1;
-        if (col >= 2) {
-          col = 0;
-          row += 1;
-          x = marginX;
-          y += cardH + gapY;
-        } else {
-          x += cardW + gapX;
-        }
-
-        if (row >= 4 && i < cardElements.length - 1) {
-          pdf.addPage();
-          x = marginX;
-          y = marginY;
-          col = 0;
-          row = 0;
-        }
-      }
-
-      const safeName = String(currentPlayerCardPreview.fullName || currentPlayerCardPreview.tournamentName || "player-card")
-        .replace(/[^\w\u0600-\u06FF-]+/g, "_")
-        .slice(0, 60);
-      pdf.save(`${safeName || "player-card"}_${currentPlayerCardPreview.serialNumber || "card"}.pdf`);
-    } catch (e:any) {
-      console.error(e);
-      alert(e?.message || "تعذر إنشاء ملف PDF. تأكد من اتصال الإنترنت ثم حاول مرة أخرى.");
-    }
+    // نستخدم نظام الطباعة الأصلي في المتصفح لتجنب خطأ html2canvas مع ألوان CSS الحديثة مثل lab/oklch.
+    // من نافذة الطباعة اختر: Save as PDF / حفظ كـ PDF.
+    window.print();
   };
 
   const printPlayerCard = downloadPlayerCardsPdf;
@@ -2158,12 +2043,73 @@ export default function Page() {
               @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap');
               .player-cards-ui, #player-card-print-zone { font-family: ${PLAYER_CARD_FONT_FAMILY}; }
               @media print {
+                @page { size: A4 portrait; margin: 8mm; }
+
+                html, body, body * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+
                 body * { visibility: hidden !important; }
-                #player-card-print-zone, #player-card-print-zone * { visibility: visible !important; }
-                #player-card-print-zone { position: absolute !important; inset: 0 !important; width: 100% !important; background: white !important; padding: 8mm !important; }
+
+                #player-card-print-zone,
+                #player-card-print-zone * {
+                  visibility: visible !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+
+                #player-card-print-zone {
+                  position: absolute !important;
+                  inset: 0 !important;
+                  width: 100% !important;
+                  background: #ffffff !important;
+                  padding: 8mm !important;
+                }
+
                 .no-print { display: none !important; }
-                .print-card-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8mm !important; align-items: start !important; justify-items: center !important; }
-                .id-card-print { width: 85.6mm !important; height: 53.98mm !important; break-inside: avoid !important; }
+
+                .print-card-grid {
+                  display: grid !important;
+                  grid-template-columns: 85.6mm 85.6mm !important;
+                  gap: 8mm !important;
+                  align-items: start !important;
+                  justify-content: center !important;
+                  justify-items: center !important;
+                }
+
+                .id-card-print {
+                  width: 85.6mm !important;
+                  height: 53.98mm !important;
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                  overflow: hidden !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+
+                .id-card-print * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
+                }
+
+                .id-card-print .absolute.bottom-0 {
+                  visibility: visible !important;
+                  display: grid !important;
+                }
+
+                .id-card-print:nth-child(1) {
+                  background: #ffffff !important;
+                }
+
+                .id-card-print:nth-child(2) {
+                  background: linear-gradient(135deg,#35115f 0%,#4b1690 45%,#1d4ed8 82%,#16a34a 100%) !important;
+                  color: #ffffff !important;
+                }
               }
             `}</style>
 
@@ -2279,7 +2225,7 @@ export default function Page() {
                     <Button onClick={savePlayerCardRegistration} disabled={isSavingPlayerCard} className="bg-cyan-400 hover:bg-cyan-300 text-black font-black rounded-2xl py-6">
                       {isSavingPlayerCard ? <Loader2 className="animate-spin" /> : "حفظ وتجهيز الكارت"}
                     </Button>
-                    <Button onClick={printPlayerCard} className="bg-yellow-400 hover:bg-yellow-300 text-black font-black rounded-2xl py-6">تحميل PDF جاهز للطباعة 📄</Button>
+                    <Button onClick={printPlayerCard} className="bg-yellow-400 hover:bg-yellow-300 text-black font-black rounded-2xl py-6">حفظ PDF / طباعة 📄</Button>
                   </div>
                   {lastPlayerCard && <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 p-3 text-sm font-bold">آخر كارت محفوظ: {(lastPlayerCard.fullName || lastPlayerCard.playerName)} — {lastPlayerCard.tournamentName}</div>}
                 </CardContent>
@@ -2327,8 +2273,8 @@ export default function Page() {
                           <div className="mt-0.5 text-[6px] text-slate-600 font-black leading-none" dir="ltr">{currentPlayerCardPreview.serialNumber}</div>
                         </div>
 
-                        <div className="flex-1 min-w-0 flex flex-col justify-between overflow-hidden">
-                          <div className="space-y-0.5 text-right overflow-hidden">
+                        <div className="flex-1 min-w-0 flex flex-col justify-start overflow-hidden relative">
+                          <div className="space-y-0.5 text-right overflow-hidden pb-[46px]">
                             <div>
                               <div className="text-[7px] text-gray-500 font-black leading-none">الاسم</div>
                               <div className="text-[13px] leading-tight font-black text-[#111827] border-b border-[#e6e6e6] pb-0.5 min-h-[18px] truncate">{currentPlayerCardPreview.fullName || '................'}</div>
@@ -2357,17 +2303,17 @@ export default function Page() {
                             </div>
                           </div>
 
-                          <div className="pt-1 grid grid-cols-[1fr_42px] items-end gap-1.5 border-t border-[#ececec] mt-1 shrink-0">
+                          <div className="absolute bottom-0 left-0 right-0 pt-1 grid grid-cols-[1fr_42px] items-end gap-1.5 border-t border-[#ececec] bg-white/80">
                             <div className="text-center min-w-0">
                               <div className="flex items-end justify-center">
                                 <div className="w-full min-w-[120px]">
-                                  <div className="h-[14px] rounded-sm overflow-hidden bg-[repeating-linear-gradient(90deg,#111_0_1px,transparent_1px_3px,#111_3px_5px,transparent_5px_8px,#111_8px_9px,transparent_9px_12px)]"></div>
+                                  <div className="h-[12px] rounded-sm overflow-hidden bg-[repeating-linear-gradient(90deg,#111_0_1px,transparent_1px_3px,#111_3px_5px,transparent_5px_8px,#111_8px_9px,transparent_9px_12px)]"></div>
                                   <div className="text-[6px] text-slate-700 font-black mt-0.5 leading-none" dir="ltr">{currentPlayerCardPreview.serialNumber}</div>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="w-[39px] h-[39px] rounded-md bg-white border border-slate-200 p-0.5 overflow-hidden shrink-0">
+                            <div className="w-[36px] h-[36px] rounded-md bg-white border border-slate-200 p-0.5 overflow-hidden shrink-0">
                               <img src={`https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${encodeURIComponent(currentPlayerCardPreview.qrPayload || currentPlayerCardPreview.serialNumber || "MTR")}`} alt="QR Code" className="w-full h-full object-contain" />
                             </div>
                           </div>

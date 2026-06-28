@@ -791,187 +791,424 @@ export default function AdminPage() {
     document.head.appendChild(script);
   });
 
-
-  const sanitizeForHtml2Canvas = (root: HTMLElement) => {
-    const unsupportedColor = /\b(oklch|oklab|lab|lch|color-mix)\(/i;
-    const touched: Array<[HTMLElement, string, string]> = [];
-    const nodes = [root, ...Array.from(root.querySelectorAll("*"))] as HTMLElement[];
-    const props = [
-      "color",
-      "background",
-      "backgroundColor",
-      "borderColor",
-      "borderTopColor",
-      "borderRightColor",
-      "borderBottomColor",
-      "borderLeftColor",
-      "outlineColor",
-      "boxShadow",
-      "textShadow",
-      "textDecorationColor",
-      "fill",
-      "stroke",
-    ];
-
-    const safeValue = (prop: string) => {
-      if (prop === "color") return "#111827";
-      if (prop === "fill" || prop === "stroke") return "currentColor";
-      if (prop === "boxShadow" || prop === "textShadow") return "none";
-      if (prop.toLowerCase().includes("border") || prop === "outlineColor") return "rgba(17, 24, 39, 0.16)";
-      return "transparent";
-    };
-
-    nodes.forEach((el) => {
-      const computed = window.getComputedStyle(el);
-      props.forEach((prop) => {
-        const value = computed.getPropertyValue(prop);
-        if (value && unsupportedColor.test(value)) {
-          touched.push([el, prop, el.style.getPropertyValue(prop)]);
-          el.style.setProperty(prop, safeValue(prop), "important");
-        }
-      });
-    });
-
-    return () => {
-      touched.forEach(([el, prop, oldValue]) => {
-        if (oldValue) el.style.setProperty(prop, oldValue);
-        else el.style.removeProperty(prop);
-      });
-    };
-  };
-
   const exportPlayerRegistrationsA4Pdf = async () => {
+    if (typeof window === "undefined") return;
     if (!playerRegistrations.length) return alert("لا توجد كروت للتصدير");
-    try {
-      await loadPdfScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
-      await loadPdfScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-      const html2canvas = (window as any).html2canvas;
-      const jsPDF = (window as any).jspdf?.jsPDF;
-      if (!html2canvas || !jsPDF) throw new Error("مكتبات PDF لم يتم تحميلها");
 
-      const temp = document.createElement("div");
-      temp.style.position = "fixed";
-      temp.style.left = "-10000px";
-      temp.style.top = "0";
-      temp.style.width = "430px";
-      temp.style.background = "#fff";
-      document.body.appendChild(temp);
+    const safeText = (value:any) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const cardW = 85.6, cardH = 53.98, marginX = 12, marginY = 12, gapX = 9, gapY = 8;
-      let x = marginX, y = marginY, col = 0, row = 0;
+    const cardsHtml = playerRegistrations.map((r:any, i:number) => {
+      const serial = r.serialNumber || `MTR-${String(i + 1).padStart(4, "0")}`;
+      const roleText = r.roleLabel || (r.role === "manager" ? "مدير فني" : "لاعب");
+      const qrData = encodeURIComponent(r.qrPayload || JSON.stringify({ serial, name: r.fullName || r.playerName || "", tournament: r.tournamentName || "" }));
+      const logo = safeText(r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO || "/tournament-logos/matrouh-sports.png");
+      const tournamentLogo = safeText(r.tournamentLogoUrl || "/tournament-logos/matrouh-sports.png");
+      const photo = safeText(r.photoUrl || "");
+      const cropX = Number(r.cropX || 50);
+      const cropY = Number(r.cropY || 50);
+      const zoom = Number(r.zoom || 1);
 
-      for (let i = 0; i < playerRegistrations.length; i++) {
-        const r:any = playerRegistrations[i];
-        const serial = r.serialNumber || `MTR-${String(i + 1).padStart(4, "0")}`;
-        const roleText = r.roleLabel || (r.role === "manager" ? "مدير فني" : "لاعب");
-        const qrData = encodeURIComponent(r.qrPayload || JSON.stringify({ serial, name: r.fullName || r.playerName || "", tournament: r.tournamentName || "" }));
-        temp.innerHTML = `
-          <div style="width:430px;height:271px;border-radius:22px;overflow:hidden;background:white;color:#111827;position:relative;font-family:Cairo,Tajawal,Arial,sans-serif;border:1px solid #d5d5d5;">
-            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(84,28,162,.10),rgba(13,148,136,.04) 44%,rgba(245,158,11,.08));"></div>
-            <div style="position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#4b1690,#1da1f2,#22c55e);"></div>
-            <div style="position:relative;z-index:2;padding:12px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;direction:rtl;overflow:hidden;">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;flex-shrink:0;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <img src="${r.brandLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:40px;height:40px;object-fit:contain;border-radius:50%;" />
-                  <div><div style="font-size:14px;font-weight:900;color:#4b1690;">مطروح الرياضية</div><div style="font-size:8px;color:#666;font-weight:700;">بطاقة تعريف معتمدة</div></div>
+      return `
+        <div class="id-card front-card">
+          <div class="bar"></div>
+          <div class="soft-bg"></div>
+          <div class="front-content">
+            <div class="head">
+              <div class="brand">
+                <img src="${logo}" class="brand-logo" />
+                <div>
+                  <div class="brand-title">مطروح الرياضية</div>
+                  <div class="brand-sub">بطاقة تعريف معتمدة</div>
                 </div>
-                <img src="${r.tournamentLogoUrl || PLAYER_CARD_BRAND_LOGO}" style="width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));" />
               </div>
-              <div style="display:flex;gap:8px;flex:1;min-height:0;overflow:hidden;">
-                <div style="width:90px;text-align:center;flex-shrink:0;">
-                  <div style="width:94px;height:121px;border-radius:18px;overflow:hidden;border:2px solid rgba(75,22,144,.2);background:#e5e7eb;">
-                    ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;height:100%;object-fit:cover;object-position:${Number(r.cropX || 50)}% ${Number(r.cropY || 50)}%;transform:scale(${Number(r.zoom || 1)});" />` : `<div style="font-size:12px;color:#777;display:flex;align-items:center;justify-content:center;height:100%;">صورة</div>`}
-                  </div>
-                  <div style="margin-top:4px;font-size:8px;color:white;font-weight:900;background:linear-gradient(90deg,#4b1690,#1da1f2);border-radius:999px;padding:2px 7px;">${roleText}</div>
-                  <div dir="ltr" style="font-size:6px;color:#555;font-weight:900;margin-top:2px;">${serial}</div>
+              <div class="tournament-box">
+                <img src="${tournamentLogo}" class="tournament-logo" />
+                <div class="tournament-name">${safeText(r.tournamentName || "بطولة رياضية")}</div>
+              </div>
+            </div>
+
+            <div class="main">
+              <div class="photo-col">
+                <div class="photo-box">
+                  ${photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;object-position:${cropX}% ${cropY}%;transform:scale(${zoom});" />` : `<div class="photo-placeholder">صورة</div>`}
                 </div>
-                <div style="flex:1;font-size:9px;font-weight:800;min-width:0;overflow:hidden;">
-                  <div style="color:#777;font-size:7px;line-height:1;">الاسم</div>
-                  <div style="font-size:13px;font-weight:900;border-bottom:1px solid #e5e7eb;padding-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.fullName || r.playerName || "—"}</div>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:4px;line-height:1.15;">
-                    <div><div style="color:#777;font-size:7px;line-height:1;">الصفة</div><div style="color:#4b1690;">${roleText}</div></div>
-                    <div><div style="color:#777;font-size:7px;line-height:1;">الفريق</div><div style="color:#0f766e;">${r.teamName || "لاعب حر"}</div></div>
-                    <div><div style="color:#777;font-size:7px;line-height:1;">تاريخ الميلاد</div><div>${r.birthDate || "—"}</div></div>
-                    <div><div style="color:#777;font-size:7px;line-height:1;">تاريخ التسجيل</div><div>${r.registrationDate || String(r.createdAt || "").slice(0,10)}</div></div>
-                    <div style="grid-column:span 2;"><div style="color:#777;font-size:7px;line-height:1;">الرقم القومي</div><div dir="ltr">${r.nationalId || "—"}</div></div>
+                <div class="role-badge">${safeText(roleText)}</div>
+                <div class="serial-small">${safeText(serial)}</div>
+              </div>
+
+              <div class="data-col">
+                <div class="label">الاسم</div>
+                <div class="name">${safeText(r.fullName || r.playerName || "—")}</div>
+
+                <div class="grid">
+                  <div><div class="label tiny">الصفة</div><div class="value purple">${safeText(roleText)}</div></div>
+                  <div><div class="label tiny">الفريق</div><div class="value green">${safeText(r.teamName || "لاعب حر")}</div></div>
+                  <div><div class="label tiny">تاريخ الميلاد</div><div class="value">${safeText(r.birthDate || "—")}</div></div>
+                  <div><div class="label tiny">تاريخ التسجيل</div><div class="value">${safeText(r.registrationDate || String(r.createdAt || "").slice(0, 10) || "—")}</div></div>
+                  <div class="span2"><div class="label tiny">الرقم القومي</div><div class="value ltr">${safeText(r.nationalId || "—")}</div></div>
+                </div>
+
+                <div class="bottom">
+                  <div class="barcode-wrap">
+                    <div class="barcode"></div>
+                    <div class="serial-line">${safeText(serial)}</div>
                   </div>
-                  <div style="display:grid;grid-template-columns:1fr 40px;gap:6px;align-items:end;border-top:1px solid #eee;margin-top:4px;padding-top:4px;">
-                    <div><div style="display:flex;align-items:end;justify-content:center;"><div style="width:100%;min-width:120px;"><div style="height:14px;background:repeating-linear-gradient(90deg,#111 0 1px,transparent 1px 3px,#111 3px 5px,transparent 5px 8px,#111 8px 9px,transparent 9px 12px);"></div><div dir="ltr" style="font-size:6px;text-align:center;line-height:1;margin-top:2px;">${serial}</div></div></div></div>
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" style="width:39px;height:39px;" />
-                  </div>
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${qrData}" class="qr" />
                 </div>
               </div>
             </div>
           </div>
-        `;
-        const exportNode = temp.firstElementChild as HTMLElement;
-        const restoreCanvasStyles = sanitizeForHtml2Canvas(exportNode);
-        let canvas: HTMLCanvasElement;
-        try {
-          canvas = await html2canvas(exportNode, { scale: 3, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false });
-        } finally {
-          restoreCanvasStyles();
-        }
-        pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", x, y, cardW, cardH, undefined, "FAST");
-        col += 1;
-        if (col >= 2) { col = 0; row += 1; x = marginX; y += cardH + gapY; } else { x += cardW + gapX; }
-        if (row >= 4 && i < playerRegistrations.length - 1) { pdf.addPage(); x = marginX; y = marginY; col = 0; row = 0; }
-      }
-      document.body.removeChild(temp);
-      pdf.save(`player-cards-a4-${new Date().toISOString().slice(0,10)}.pdf`);
-    } catch(e:any) {
-      console.error(e);
-      alert(e?.message || "تعذر تصدير PDF");
-    }
-  };
+        </div>
+ 
+        <div class="id-card back-card">
+          <div class="back-gradient"></div>
+          <div class="back-watermark"><img src="${logo}" /></div>
+          <div class="back-content">
+            <div class="back-logo-frame"><img src="${logo}" class="back-logo" /></div>
+            <div class="back-title">${safeText(r.tournamentName || "بطولة رياضية")}</div>
+            <div class="back-card-type">${roleText === "مدير فني" ? "بطاقة مدير فني" : "بطاقة لاعب"}</div>
+          </div>
+        </div>
+      `;    }).join("");
 
-  const convertLogoToTransparentPng = (file: File) => new Promise<File>((resolve) => {
-    if (typeof window === "undefined") return resolve(file);
-    const imageUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) return resolve(file);
-        ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = data.data;
-        for (let i = 0; i < pixels.length; i += 4) {
-          const r = pixels[i];
-          const g = pixels[i + 1];
-          const b = pixels[i + 2];
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const nearWhite = r > 238 && g > 238 && b > 238;
-          const paleBackground = max > 232 && (max - min) < 18;
-          if (nearWhite || paleBackground) {
-            pixels[i + 3] = 0;
-          } else if (r > 220 && g > 220 && b > 220) {
-            pixels[i + 3] = Math.round(pixels[i + 3] * 0.25);
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+    if (!printWindow) return alert("المتصفح منع فتح نافذة الطباعة. اسمح بالـ Pop-ups ثم حاول مرة أخرى.");
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>كروت اللاعبين</title>
+        <style>
+          @page { size: A4; margin: 10mm; }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
-        }
-        ctx.putImageData(data, 0, 0);
-        canvas.toBlob((blob) => {
-          URL.revokeObjectURL(imageUrl);
-          if (!blob) return resolve(file);
-          const baseName = String(file.name || "tournament_logo").replace(/\.[^.]+$/, "").replace(/[^\w\u0600-\u06FF-]+/g, "_");
-          resolve(new File([blob], `${baseName || "tournament_logo"}.png`, { type: "image/png" }));
-        }, "image/png");
-      } catch {
-        URL.revokeObjectURL(imageUrl);
-        resolve(file);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(imageUrl);
-      resolve(file);
-    };
-    img.src = imageUrl;
-  });
+          body {
+            margin: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: Cairo, Tahoma, Arial, sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .sheet {
+            display: grid;
+            grid-template-columns: repeat(2, 85.6mm);
+            gap: 8mm 8mm;
+            align-items: start;
+            justify-content: center;
+          }
+          .id-card {
+            width: 85.6mm;
+            height: 53.98mm;
+            border-radius: 5mm;
+            overflow: hidden;
+            background: #ffffff;
+            color: #111827;
+            position: relative;
+            border: 1px solid #d5d5d5;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          .soft-bg {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(84,28,162,.10), rgba(13,148,136,.04) 44%, rgba(245,158,11,.08));
+          }
+          .bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2mm;
+            background: linear-gradient(90deg, #4b1690, #1da1f2, #22c55e);
+            z-index: 2;
+          }
+          .front-content {
+            position: relative;
+            z-index: 3;
+            padding: 3mm;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+          }
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 1.5mm;
+          }
+          .brand-logo {
+            width: 10mm;
+            height: 10mm;
+            object-fit: contain;
+            border-radius: 50%;
+          }
+          .brand-title {
+            font-size: 10pt;
+            font-weight: 900;
+            color: #4b1690;
+            line-height: 1;
+          }
+          .brand-sub {
+            font-size: 6pt;
+            color: #555;
+            font-weight: 700;
+            margin-top: 1mm;
+          }
+          .tournament-box {
+            width: 23mm;
+            text-align: center;
+          }
+          .tournament-logo {
+            width: 12mm;
+            height: 12mm;
+            object-fit: contain;
+            filter: drop-shadow(0 1.4mm 2.4mm rgba(0,0,0,.25));
+          }
+          .tournament-name {
+            font-size: 5.2pt;
+            color: #555;
+            font-weight: 900;
+            line-height: 1.1;
+            max-height: 8mm;
+            overflow: hidden;
+          }
+          .main {
+            display: flex;
+            gap: 2mm;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+          }
+          .photo-col {
+            width: 23mm;
+            flex-shrink: 0;
+            text-align: center;
+          }
+          .photo-box {
+            width: 21mm;
+            height: 27mm;
+            border-radius: 3.5mm;
+            overflow: hidden;
+            border: 1.5px solid rgba(75,22,144,.2);
+            background: #e5e7eb;
+            margin: 0 auto;
+          }
+          .photo-placeholder {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 7pt;
+            font-weight: 800;
+          }
+          .role-badge {
+            display: inline-block;
+            margin-top: 1mm;
+            padding: .7mm 2mm;
+            border-radius: 100px;
+            color: white;
+            font-size: 6pt;
+            font-weight: 900;
+            background: linear-gradient(90deg, #4b1690, #1da1f2);
+          }
+          .serial-small {
+            direction: ltr;
+            margin-top: .5mm;
+            font-size: 4.5pt;
+            color: #555;
+            font-weight: 900;
+          }
+          .data-col {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            font-size: 6.8pt;
+            font-weight: 800;
+            position: relative;
+            height: 100%;
+            padding-bottom: 12mm;
+          }
+          .label {
+            color: #666;
+            font-size: 5.2pt;
+            font-weight: 900;
+            line-height: 1;
+          }
+          .label.tiny { font-size: 4.7pt; }
+          .name {
+            font-size: 9.3pt;
+            line-height: 1.15;
+            font-weight: 900;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: .5mm;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .8mm 2mm;
+            margin-top: 1mm;
+            line-height: 1.15;
+          }
+          .span2 { grid-column: span 2; }
+          .value {
+            font-weight: 900;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .purple { color: #4b1690; }
+          .green { color: #0f766e; }
+          .ltr { direction: ltr; text-align: right; }
+          .bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: grid;
+            grid-template-columns: 1fr 9mm;
+            gap: 1.5mm;
+            align-items: end;
+            border-top: 1px solid #eee;
+            margin-top: 0;
+            padding-top: 1mm;
+            background: rgba(255,255,255,.86);
+          }
+          .barcode {
+            height: 3mm;
+            background: repeating-linear-gradient(90deg, #111 0 1px, transparent 1px 3px, #111 3px 5px, transparent 5px 8px, #111 8px 9px, transparent 9px 12px);
+          }
+          .serial-line {
+            direction: ltr;
+            text-align: center;
+            font-size: 4.8pt;
+            color: #444;
+            font-weight: 900;
+            margin-top: .4mm;
+          }
+          .qr {
+            width: 9mm;
+            height: 9mm;
+            background: white;
+            border: 1px solid #e5e7eb;
+          }
+          .back-card {
+            color: #ffffff;
+            border: 1px solid rgba(75,22,144,.24);
+            background: #35115f;
+          }
+          .back-gradient {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #35115f 0%, #4b1690 45%, #1d4ed8 82%, #16a34a 100%);
+          }
+          .back-watermark {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: .14;
+          }
+          .back-watermark img {
+            width: 65%;
+            height: 65%;
+            object-fit: contain;
+          }
+          .back-content {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 7mm;
+          }
+          .back-logo-frame {
+            width: 19mm;
+            height: 19mm;
+            border-radius: 999px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.25);
+            padding: 1.5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 5mm 12mm rgba(0,0,0,.22);
+          }
+          .back-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 999px;
+          }
+          .back-title {
+            margin-top: 4mm;
+            max-width: 65mm;
+            font-size: 15pt;
+            line-height: 1.1;
+            font-weight: 900;
+            color: #ffffff;
+          }
+          .back-card-type {
+            margin-top: 2.5mm;
+            font-size: 10.5pt;
+            line-height: 1.1;
+            font-weight: 900;
+            color: #ffe45c;
+          }
+          @media print {
+            body { background: #ffffff; }
+            .sheet { page-break-after: auto; }
+            .back-card, .back-card * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="sheet">${cardsHtml}</div>
+        <script>
+          window.onload = function () {
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   const uploadPlayerTournamentLogo = async (file?: File, tournamentId?: string) => {
     if (!file) return;
