@@ -30,12 +30,14 @@ export function RostersManager({
   registrationKey,
   initialSettings,
   maxPlayers,
+  allowCreate = true,
 }: {
   bracketId: string;
   initialRosters: Roster[];
   registrationKey?: string;
   initialSettings: { deadline: string; password: string; price: number } | null;
   maxPlayers: number;
+  allowCreate?: boolean;
 }) {
   const [rosters, setRosters] = useState<Roster[]>(initialRosters);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -198,12 +200,14 @@ export function RostersManager({
 
       <div className="flex items-center justify-between">
         <h2 className="text-h3 font-black">قوائم الفرق ({rosters.length})</h2>
-        <button onClick={() => setCreating((v) => !v)} className="flex items-center gap-1.5 rounded-full bg-accent-blue/15 px-3 py-1.5 text-caption font-black text-accent-blue">
-          <Plus className="h-3.5 w-3.5" /> إضافة فريق
-        </button>
+        {allowCreate && (
+          <button onClick={() => setCreating((v) => !v)} className="flex items-center gap-1.5 rounded-full bg-accent-blue/15 px-3 py-1.5 text-caption font-black text-accent-blue">
+            <Plus className="h-3.5 w-3.5" /> إضافة فريق
+          </button>
+        )}
       </div>
 
-      {creating && (
+      {allowCreate && creating && (
         <div className="flex gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
           <input value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="اسم الفريق الجديد" className={inputCls} />
           <button onClick={createRoster} className="shrink-0 rounded-xl bg-primary px-4 py-2 text-caption font-black text-primary-foreground">إضافة</button>

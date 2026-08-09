@@ -1,8 +1,22 @@
 import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
+import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { RostersManager } from "@/components/admin/rosters-manager";
 import { BannedListManager } from "@/components/admin/banned-list-manager";
+import { EliteTeamsStatus } from "@/components/admin/elite-teams-status";
+
+function normalizeTeamName(name: string): string {
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/أ|إ|آ/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .toLowerCase();
+}
+
+const STATUS_PRIORITY: Record<string, number> = { paid: 3, manual_access: 3, pending_payment: 2, failed: 1, payment_init_failed: 1 };
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +52,36 @@ export default async function AdminRostersPage({
 
   const { data: banned } = await supabase.from("banned_entities").select("*").order("name", { ascending: true });
 
+  let eliteTeams: { name: string; order: any; roster: { is_submitted: boolean; playerCount: number } | null }[] | null = null;
+  if (slug === "elite-cup") {
+    const { data: eliteOrders } = await supabase
+      .from("orders")
+      .select("id, team_name, payment_status, manager_name, phone, access_password, admin_manual_access")
+      .eq("tournament", "elite_cup")
+      .eq("type", "tournament_registration");
+
+    const bestOrderByTeam = new Map<string, any>();
+    for (const o of eliteOrders || []) {
+      const key = normalizeTeamName(o.team_name || "");
+      if (!key) continue;
+      const current = bestOrderByTeam.get(key);
+      if (!current || (STATUS_PRIORITY[o.payment_status || ""] || 0) > (STATUS_PRIORITY[current.payment_status || ""] || 0)) {
+        bestOrderByTeam.set(key, o);
+      }
+    }
+
+    const rosterByTeam = new Map<string, { is_submitted: boolean; playerCount: number }>();
+    for (const r of (rosters || []) as any[]) {
+      rosterByTeam.set(normalizeTeamName(r.team_name || ""), { is_submitted: r.is_submitted, playerCount: (r.roster_players || []).filter((p: any) => p.name?.trim()).length });
+    }
+
+    eliteTeams = ELITE_CUP_ELIGIBLE_TEAMS.map((name) => ({
+      name,
+      order: bestOrderByTeam.get(normalizeTeamName(name)) || null,
+      roster: rosterByTeam.get(normalizeTeamName(name)) || null,
+    }));
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -68,6 +112,8 @@ export default async function AdminRostersPage({
         </Link>
       </div>
 
+      {eliteTeams && <EliteTeamsStatus teams={eliteTeams} price={Number(settings?.price || 1500)} />}
+
       {!bracketId ? (
         <div className="rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا يوجد براكيت مطابق لهذه البطولة/النسخة.</div>
       ) : (
@@ -77,6 +123,7 @@ export default async function AdminRostersPage({
           registrationKey={registrationKey}
           initialSettings={settings as any}
           maxPlayers={MAX_PLAYERS[slug] || 12}
+          allowCreate={slug !== "elite-cup"}
         />
       )}
 

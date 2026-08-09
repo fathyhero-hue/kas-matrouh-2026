@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { ensureEliteTeamRoster } from "@/lib/paymob/elite-roster-sync";
 
 export const runtime = "nodejs";
 
@@ -121,6 +122,10 @@ async function handleCallback(req: NextRequest, body: any) {
         ...(success ? { access_password: accessPassword, roster_access_password: accessPassword, roster_access_active: true } : {}),
       })
       .eq("id", order.id);
+
+    if (success && order.tournament === "elite_cup" && order.type === "tournament_registration" && order.team_name) {
+      await ensureEliteTeamRoster(supabase, { teamName: order.team_name, managerName: order.manager_name, phone: order.phone });
+    }
 
     return NextResponse.json({ ok: true, orderId: order.id, success, pending, transactionId, accessPassword: success ? accessPassword : "" });
   } catch (error: any) {
