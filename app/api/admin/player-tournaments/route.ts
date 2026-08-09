@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
     let logoUrl = String(form.get("existing_logo_url") || "");
 
     if (logoFile && logoFile.size > 0) {
-      const safeName = name.replace(/[^\w؀-ۿ-]+/g, "_").slice(0, 40);
+      // Supabase Storage rejects non-ASCII keys, so the (Arabic) name can't be part of the path.
       const ext = logoFile.type.split("/")[1] || "png";
-      const path = `${Date.now()}_${safeName}.${ext}`;
+      const path = `${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("tournament-logos").upload(path, logoFile, { contentType: logoFile.type, upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("tournament-logos").getPublicUrl(path);

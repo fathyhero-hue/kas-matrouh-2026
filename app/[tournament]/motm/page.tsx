@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Star } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
@@ -25,8 +26,7 @@ export default async function MotmPage({ params, searchParams }: TournamentPageP
       {rows.map((m) => (
         <div key={m.id} className="rounded-2xl bg-card p-4 text-center ring-1 ring-white/10">
           {m.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={m.image_url} alt={m.player} className="mx-auto h-20 w-20 rounded-full object-cover" />
+            <Image src={m.image_url} alt={m.player} width={80} height={80} className="mx-auto h-20 w-20 rounded-full object-cover" />
           ) : (
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
               <Star className="h-8 w-8 text-accent-orange" />

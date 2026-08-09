@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { PlayCircle, Newspaper } from "lucide-react";
 
 export type NewsItem = {
@@ -30,8 +31,7 @@ export function NewsSection({ items }: { items: NewsItem[] }) {
           >
             <div className="relative aspect-video w-full bg-secondary">
               {item.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.image_url} alt={item.title || ""} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                <Image src={item.image_url} alt={item.title || ""} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform group-hover:scale-105" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center">
                   <Newspaper className="h-8 w-8 text-muted-foreground" />

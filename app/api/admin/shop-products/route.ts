@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
     let imageUrl = String(form.get("existing_image_url") || "");
 
     if (imageFile && imageFile.size > 0) {
-      const safeTitle = title.replace(/[^\w؀-ۿ-]+/g, "_").slice(0, 40);
+      // Supabase Storage rejects non-ASCII keys, so the (Arabic) title can't be part of the path.
       const ext = imageFile.type.split("/")[1] || "jpg";
-      const path = `${Date.now()}_${safeTitle}.${ext}`;
+      const path = `${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("shop-product-images").upload(path, imageFile, { contentType: imageFile.type, upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("shop-product-images").getPublicUrl(path);

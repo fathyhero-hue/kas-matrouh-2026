@@ -21,7 +21,7 @@ const STATUS_PRIORITY: Record<string, number> = { paid: 3, manual_access: 3, pen
 export const dynamic = "force-dynamic";
 
 const REGISTRATION_KEY: Record<string, string> = { "matrouh-cup": "matrouh", "elite-cup": "elite" };
-const MAX_PLAYERS: Record<string, number> = { "elite-cup": 10 };
+const MAX_PLAYERS: Record<string, number> = { "elite-cup": 11 };
 
 export default async function AdminRostersPage({
   searchParams,

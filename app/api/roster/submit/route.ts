@@ -24,11 +24,14 @@ export async function POST(req: NextRequest) {
     const teamName = String(form.get("teamName") || "").trim();
     const managerName = String(form.get("managerName") || "");
     const managerPhone = String(form.get("managerPhone") || "");
-    const logoUrl = String(form.get("logoUrl") || "");
+    const logoFile = form.get("logo") as File | null;
     const players = JSON.parse(String(form.get("players") || "[]")) as Array<{ name: string; number: string }>;
 
     if (!teamName || !managerName.trim() || !managerPhone.trim() || !players.length) {
       return NextResponse.json({ error: "بيانات القائمة غير مكتملة." }, { status: 400 });
+    }
+    if (logoFile && logoFile.size > MAX_PHOTO_BYTES) {
+      return NextResponse.json({ error: "حجم شعار الفريق كبير جداً (أقصى حد 2 ميجا)." }, { status: 400 });
     }
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
@@ -73,6 +76,8 @@ export async function POST(req: NextRequest) {
       .toLowerCase();
     const slug = teamName.trim().replace(/\s+/g, "_").replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 80) || "team";
 
+    // Create/update the roster row first so we have an ASCII-safe id (UUID) to
+    // key storage paths on — Supabase Storage rejects non-ASCII (Arabic) keys.
     const { data: roster, error: rosterErr } = await supabase
       .from("team_rosters")
       .upsert(
@@ -83,7 +88,6 @@ export async function POST(req: NextRequest) {
           team_slug: slug,
           manager_name: managerName,
           manager_phone: managerPhone,
-          logo_url: logoUrl || null,
           is_submitted: true,
           updated_at: new Date().toISOString(),
         },
@@ -98,6 +102,17 @@ export async function POST(req: NextRequest) {
     }
     const rosterId = roster.id as string;
 
+    if (logoFile) {
+      const path = `${rosterId}/logo_${Date.now()}`;
+      const { error } = await supabase.storage.from("roster-photos").upload(path, logoFile, { contentType: logoFile.type, upsert: true });
+      if (!error) {
+        const { data: signed } = await supabase.storage.from("roster-photos").createSignedUrl(path, 60 * 60 * 24 * 365);
+        if (signed?.signedUrl) await supabase.from("team_rosters").update({ logo_url: signed.signedUrl }).eq("id", rosterId);
+      } else {
+        console.error("Roster logo upload failed:", error);
+      }
+    }
+
     const playerRows: any[] = [];
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
@@ -106,20 +121,24 @@ export async function POST(req: NextRequest) {
 
       const personalFile = form.get(`player_${i}_personal`) as File | null;
       if (personalFile) {
-        const path = `${normalizedId}/player_${i}_personal_${Date.now()}`;
+        const path = `${rosterId}/player_${i}_personal_${Date.now()}`;
         const { error } = await supabase.storage.from("roster-photos").upload(path, personalFile, { contentType: personalFile.type, upsert: true });
         if (!error) {
           const { data: signed } = await supabase.storage.from("roster-photos").createSignedUrl(path, 60 * 60 * 24 * 365);
-          personalUrl = signed?.signedUrl || path;
+          personalUrl = signed?.signedUrl || "";
+        } else {
+          console.error(`Player ${i} personal photo upload failed:`, error);
         }
       }
       const idFile = form.get(`player_${i}_id`) as File | null;
       if (idFile) {
-        const path = `${normalizedId}/player_${i}_id_${Date.now()}`;
+        const path = `${rosterId}/player_${i}_id_${Date.now()}`;
         const { error } = await supabase.storage.from("roster-photos").upload(path, idFile, { contentType: idFile.type, upsert: true });
         if (!error) {
           const { data: signed } = await supabase.storage.from("roster-photos").createSignedUrl(path, 60 * 60 * 24 * 365);
-          idUrl = signed?.signedUrl || path;
+          idUrl = signed?.signedUrl || "";
+        } else {
+          console.error(`Player ${i} id photo upload failed:`, error);
         }
       }
 

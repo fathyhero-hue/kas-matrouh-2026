@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Shield, User } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition } from "@/lib/sport/tournaments";
@@ -41,8 +42,7 @@ export default async function RosterDetailPage({ params, searchParams }: PagePro
     <div>
       <div className="mb-6 flex items-center gap-4">
         {roster.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={roster.logo_url} alt={roster.team_name} className="h-16 w-16 rounded-full object-contain" />
+          <Image src={roster.logo_url} alt={roster.team_name} width={64} height={64} className="h-16 w-16 rounded-full object-contain" />
         ) : (
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
             <Shield className="h-8 w-8 text-muted-foreground" />
@@ -61,8 +61,7 @@ export default async function RosterDetailPage({ params, searchParams }: PagePro
           {players.map((p: any, i: number) => (
             <div key={i} className="rounded-2xl bg-card p-3 text-center ring-1 ring-white/10">
               {p.personal_image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.personal_image_url} alt={p.name} className="mx-auto h-16 w-16 rounded-full object-cover" />
+                <Image src={p.personal_image_url} alt={p.name} width={64} height={64} className="mx-auto h-16 w-16 rounded-full object-cover" />
               ) : (
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
                   <User className="h-7 w-7 text-muted-foreground" />

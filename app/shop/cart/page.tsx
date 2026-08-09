@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/shop/cart-context";
 import { EmptyState } from "@/components/sport/empty-state";
@@ -22,8 +23,7 @@ export default function CartPage() {
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-white/10">
               {item.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.imageUrl} alt={item.title} className="h-16 w-16 rounded-xl object-cover" />
+                <Image src={item.imageUrl} alt={item.title} width={64} height={64} className="h-16 w-16 rounded-xl object-cover" />
               ) : (
                 <div className="h-16 w-16 rounded-xl bg-secondary" />
               )}

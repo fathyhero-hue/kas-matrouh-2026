@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const SPONSORS = [
   { name: "الفهد للديكور", src: "/alfahd.png" },
   { name: "أحمد عبدالعاطي المحامي", src: "/abdelaty.png" },
@@ -23,8 +25,7 @@ export function SponsorsMarquee() {
                 key={s.name + i}
                 className="flex h-20 w-40 shrink-0 items-center justify-center rounded-2xl bg-card ring-1 ring-white/10 transition-all hover:ring-accent-blue/40"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.src} alt={s.name} className="max-h-10 w-auto object-contain opacity-75 grayscale transition-all hover:opacity-100 hover:grayscale-0" />
+                <Image src={s.src} alt={s.name} width={120} height={40} className="max-h-10 w-auto object-contain opacity-75 grayscale transition-all hover:opacity-100 hover:grayscale-0" />
               </div>
             ))}
           </div>

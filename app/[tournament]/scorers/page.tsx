@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Trophy } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
@@ -26,8 +27,7 @@ export default async function ScorersPage({ params, searchParams }: TournamentPa
         <div key={g.id} className="flex items-center gap-3 border-b border-white/5 px-4 py-3 last:border-0">
           <span className="w-6 text-center text-caption font-bold text-muted-foreground">{i + 1}</span>
           {g.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={g.image_url} alt={g.player} className="h-10 w-10 rounded-full object-cover" />
+            <Image src={g.image_url} alt={g.player} width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-caption font-bold">{g.player?.[0]}</div>
           )}

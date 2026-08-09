@@ -32,11 +32,14 @@ export async function POST(req: NextRequest) {
     let photoUrl = String(form.get("existingPhotoUrl") || "");
     const photoFile = form.get("photo") as File | null;
     if (photoFile) {
-      const safeName = `${Date.now()}_${fullName.replace(/[^\w؀-ۿ-]+/g, "_")}.jpg`;
+      // Supabase Storage rejects non-ASCII keys, so the (Arabic) name can't be part of the path.
+      const safeName = `${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("player-registration-photos").upload(safeName, photoFile, { contentType: photoFile.type, upsert: true });
       if (!error) {
         const { data } = supabase.storage.from("player-registration-photos").getPublicUrl(safeName);
         photoUrl = data.publicUrl;
+      } else {
+        console.error("Player registration photo upload failed:", error);
       }
     }
 

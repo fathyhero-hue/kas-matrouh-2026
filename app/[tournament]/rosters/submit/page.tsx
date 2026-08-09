@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/sport/empty-state";
 import { RosterSubmitForm } from "@/components/roster/roster-submit-form";
 
 const MAX_PLAYERS: Record<string, number> = {
-  "elite-cup": 10,
+  "elite-cup": 11,
 };
 
 const SUPPORTS_SUBMISSION = new Set(["matrouh-cup", "elite-cup"]);

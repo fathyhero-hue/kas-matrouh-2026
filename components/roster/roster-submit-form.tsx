@@ -25,7 +25,8 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
   const [teamName, setTeamName] = useState("");
   const [managerName, setManagerName] = useState("");
   const [managerPhone, setManagerPhone] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
   const [players, setPlayers] = useState<PlayerRow[]>(() => emptyPlayers(maxPlayers));
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,6 +54,14 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     setPlayers((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
+  const handleLogoFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("اختار صورة صحيحة");
+    if (file.size > 2 * 1024 * 1024) return toast.error("حجم الصورة كبير (أقصى 2 ميجا)");
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
   const handlePlayerFile = (index: number, field: "personal" | "id", file?: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("اختار صورة صحيحة");
@@ -78,7 +87,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       fd.set("teamName", teamName.trim());
       fd.set("managerName", managerName.trim());
       fd.set("managerPhone", managerPhone.trim());
-      fd.set("logoUrl", logoUrl.trim());
+      if (logoFile) fd.set("logo", logoFile);
       fd.set("players", JSON.stringify(players.map((p) => ({ name: p.name.trim(), number: p.number.trim() }))));
       players.forEach((p, i) => {
         if (p.personalFile) fd.set(`player_${i}_personal`, p.personalFile);
@@ -158,13 +167,16 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
         dir="ltr"
         className="h-12 w-full rounded-xl bg-card px-4 text-body font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue"
       />
-      <input
-        value={logoUrl}
-        onChange={(e) => setLogoUrl(e.target.value)}
-        placeholder="رابط شعار الفريق (اختياري)"
-        dir="ltr"
-        className="h-12 w-full rounded-xl bg-card px-4 text-body font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue"
-      />
+      <label className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-card px-4 text-body font-bold text-muted-foreground ring-1 ring-white/10 hover:text-foreground">
+        {logoPreview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoPreview} alt="" className="h-8 w-8 rounded-full object-cover" />
+        ) : (
+          <Camera className="h-4 w-4" />
+        )}
+        {logoPreview ? "تم اختيار شعار الفريق ✓" : "رفع شعار الفريق (اختياري)"}
+        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
+      </label>
 
       <div className="space-y-3">
         <div className="text-caption font-black text-muted-foreground">قائمة اللاعبين ({players.length})</div>

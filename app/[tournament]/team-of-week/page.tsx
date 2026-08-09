@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
@@ -33,8 +34,7 @@ export default async function TeamOfWeekPage({ params, searchParams }: Tournamen
         {players.map((p: any) => (
           <div key={p.id} className="rounded-2xl bg-card p-3 text-center ring-1 ring-white/10">
             {p.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.image_url} alt={p.name} className="mx-auto h-16 w-16 rounded-full object-cover" />
+              <Image src={p.image_url} alt={p.name} width={64} height={64} className="mx-auto h-16 w-16 rounded-full object-cover" />
             ) : (
               <div className="mx-auto h-16 w-16 rounded-full bg-secondary" />
             )}
@@ -45,8 +45,7 @@ export default async function TeamOfWeekPage({ params, searchParams }: Tournamen
         {latest.coach_name && (
           <div className="rounded-2xl bg-primary/10 p-3 text-center ring-1 ring-primary/30">
             {latest.coach_image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={latest.coach_image_url} alt={latest.coach_name} className="mx-auto h-16 w-16 rounded-full object-cover" />
+              <Image src={latest.coach_image_url} alt={latest.coach_name} width={64} height={64} className="mx-auto h-16 w-16 rounded-full object-cover" />
             ) : (
               <div className="mx-auto h-16 w-16 rounded-full bg-secondary" />
             )}

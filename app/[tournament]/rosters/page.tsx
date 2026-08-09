@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Shield, CheckCircle2, ClipboardList, Trophy } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -65,8 +66,7 @@ export default async function RostersPage({ params, searchParams }: TournamentPa
             className="flex items-center gap-3 rounded-2xl bg-card p-4 ring-1 ring-white/10 transition-colors hover:ring-accent-blue/50"
           >
             {r.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={r.logo_url} alt={r.team_name} className="h-12 w-12 rounded-full object-contain" />
+              <Image src={r.logo_url} alt={r.team_name} width={48} height={48} className="h-12 w-12 rounded-full object-contain" />
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
                 <Shield className="h-6 w-6 text-muted-foreground" />

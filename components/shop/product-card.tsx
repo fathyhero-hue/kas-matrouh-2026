@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { toast } from "sonner";
 import { ShoppingCart, Package } from "lucide-react";
 import { useCart } from "@/lib/shop/cart-context";
@@ -28,8 +29,7 @@ export function ProductCard({ product }: { product: Product }) {
     <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-white/10">
       <div className="relative aspect-square w-full bg-secondary">
         {product.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.image_url} alt={title} className="h-full w-full object-cover" />
+          <Image src={product.image_url} alt={title} fill sizes="(max-width: 768px) 50vw, 25vw" className="object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <Package className="h-10 w-10 text-muted-foreground" />
