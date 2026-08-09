@@ -41,3 +41,12 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# claude code local settings
+.claude/
+
+# stray local archives
+*.zip
+
+.vercel
+.env*

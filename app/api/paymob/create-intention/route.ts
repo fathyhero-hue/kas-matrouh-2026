@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -37,18 +38,10 @@ function getSelectedPaymentMethods(method?: string) {
   const cardId = process.env.PAYMOB_CARD_INTEGRATION_ID;
   const walletId = process.env.PAYMOB_WALLET_INTEGRATION_ID;
 
-  if (selectedMethod === "wallet" && walletId) {
-    return normalizeIntegrationIds(walletId);
-  }
+  if (selectedMethod === "wallet" && walletId) return normalizeIntegrationIds(walletId);
+  if (selectedMethod === "card" && cardId) return normalizeIntegrationIds(cardId);
 
-  if (selectedMethod === "card" && cardId) {
-    return normalizeIntegrationIds(cardId);
-  }
-
-  const raw =
-    process.env.PAYMOB_INTEGRATION_IDS ||
-    [cardId, walletId].filter(Boolean).join(",");
-
+  const raw = process.env.PAYMOB_INTEGRATION_IDS || [cardId, walletId].filter(Boolean).join(",");
   return normalizeIntegrationIds(raw);
 }
 
@@ -59,10 +52,11 @@ function toAmountCents(amount: any) {
 
 function splitArabicName(name?: string) {
   const parts = String(name || "عميل مطروح").trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName: parts[0] || "عميل",
-    lastName: parts.slice(1).join(" ") || "مطروح",
-  };
+  return { firstName: parts[0] || "عميل", lastName: parts.slice(1).join(" ") || "مطروح" };
+}
+
+function generateAccessPassword() {
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export async function POST(req: NextRequest) {
@@ -74,21 +68,17 @@ export async function POST(req: NextRequest) {
 
     if (!secretKey || !publicKey || paymentMethods.length === 0) {
       return NextResponse.json(
-        {
-          error:
-            "Paymob غير مكتمل. أضف PAYMOB_SECRET_KEY و PAYMOB_PUBLIC_KEY و PAYMOB_CARD_INTEGRATION_ID و PAYMOB_WALLET_INTEGRATION_ID في .env.local وعلى Vercel.",
-        },
+        { error: "Paymob غير مكتمل. أضف PAYMOB_SECRET_KEY و PAYMOB_PUBLIC_KEY و PAYMOB_CARD_INTEGRATION_ID و PAYMOB_WALLET_INTEGRATION_ID." },
         { status: 500 }
       );
     }
 
-    const orderId = String(body.orderId || "");
     const customer: PaymobCustomer = body.customer || {};
     const items: PaymobItem[] = Array.isArray(body.items) ? body.items : [];
     const total = Number(body.total || 0);
     const amount = toAmountCents(total);
 
-    if (!orderId || amount <= 0 || items.length === 0) {
+    if (amount <= 0 || items.length === 0) {
       return NextResponse.json({ error: "بيانات الطلب غير مكتملة." }, { status: 400 });
     }
 
@@ -96,6 +86,50 @@ export async function POST(req: NextRequest) {
     const phone = String(customer.phone || "01000000000").replace(/\s+/g, "");
     const email = String(customer.email || "customer@matrouhcup.online");
     const address = String(customer.address || "Matrouh");
+    const accessPassword = generateAccessPassword();
+
+    // Create the order server-side (service role — clients cannot write to `orders` directly).
+    const supabase = createServiceRoleClient();
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        type: "shop_order",
+        source: "matrouhcup-shop",
+        customer_name: customer.name || null,
+        customer_email: email,
+        customer_phone: phone,
+        customer_address: address,
+        customer_raw: customer,
+        total,
+        currency: "EGP",
+        payment_method: "paymob",
+        paymob_method: String(body.paymobMethod || body.paymentMethodType || "all"),
+        payment_status: "pending_payment",
+        status_label: "في انتظار الدفع",
+        access_password: accessPassword,
+        roster_access_password: accessPassword,
+        roster_access_active: false,
+        note: body.notes || null,
+      })
+      .select("id")
+      .single();
+
+    if (orderErr || !order) {
+      console.error("Order insert failed:", orderErr);
+      return NextResponse.json({ error: "فشل إنشاء الطلب." }, { status: 500 });
+    }
+
+    const orderId = order.id as string;
+    await supabase.from("order_items").insert(
+      items.map((item) => ({
+        order_id: orderId,
+        item_ref_id: item.id || null,
+        title: item.title || item.name || "منتج رياضي",
+        price: Number(item.price || 0),
+        qty: Number(item.qty || 1),
+        image_url: item.imageUrl || null,
+      }))
+    );
 
     const payload = {
       amount,
@@ -125,20 +159,12 @@ export async function POST(req: NextRequest) {
         country: "EG",
         state: "Matrouh",
       },
-      extras: {
-        orderId,
-        source: "matrouhcup-shop",
-        notes: body.notes || "",
-        paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
-      },
+      extras: { orderId, source: "matrouhcup-shop", notes: body.notes || "", paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all") },
     };
 
     const paymobRes = await fetch(`${paymobBaseUrl()}/v1/intention/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${secretKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Token ${secretKey}` },
       body: JSON.stringify(payload),
     });
 
@@ -152,10 +178,8 @@ export async function POST(req: NextRequest) {
 
     if (!paymobRes.ok) {
       console.error("Paymob create intention failed:", data);
-      return NextResponse.json(
-        { error: data?.detail || data?.message || "فشل إنشاء عملية الدفع في Paymob.", details: data },
-        { status: paymobRes.status }
-      );
+      await supabase.from("orders").update({ payment_status: "payment_init_failed", status_label: "فشل إنشاء رابط الدفع", paymob_error: data }).eq("id", orderId);
+      return NextResponse.json({ error: data?.detail || data?.message || "فشل إنشاء عملية الدفع في Paymob.", details: data }, { status: paymobRes.status });
     }
 
     const clientSecret = data.client_secret || data.clientSecret;
@@ -163,14 +187,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Paymob لم يرجع client_secret.", details: data }, { status: 502 });
     }
 
+    await supabase.from("orders").update({ paymob_intention_id: data.id || "", paymob_client_secret: clientSecret }).eq("id", orderId);
+
     const checkoutUrl = `${paymobBaseUrl()}/unifiedcheckout/?publicKey=${encodeURIComponent(publicKey)}&clientSecret=${encodeURIComponent(clientSecret)}`;
 
     return NextResponse.json({
       ok: true,
       checkoutUrl,
       clientSecret,
+      orderId,
       intentionId: data.id || "",
-      intentionOrderId: data.intention_order_id || "",
       specialReference: data.special_reference || orderId,
       rawStatus: data.status || "",
     });

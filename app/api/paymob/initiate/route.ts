@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -26,19 +25,9 @@ function getSelectedPaymentMethods(method?: string) {
   const selectedMethod = String(method || "").toLowerCase();
   const cardId = process.env.PAYMOB_CARD_INTEGRATION_ID;
   const walletId = process.env.PAYMOB_WALLET_INTEGRATION_ID;
-
-  if (selectedMethod === "wallet" && walletId) {
-    return normalizeIntegrationIds(walletId);
-  }
-
-  if (selectedMethod === "card" && cardId) {
-    return normalizeIntegrationIds(cardId);
-  }
-
-  const raw =
-    process.env.PAYMOB_INTEGRATION_IDS ||
-    [cardId, walletId].filter(Boolean).join(",");
-
+  if (selectedMethod === "wallet" && walletId) return normalizeIntegrationIds(walletId);
+  if (selectedMethod === "card" && cardId) return normalizeIntegrationIds(cardId);
+  const raw = process.env.PAYMOB_INTEGRATION_IDS || [cardId, walletId].filter(Boolean).join(",");
   return normalizeIntegrationIds(raw);
 }
 
@@ -49,10 +38,7 @@ function toAmountCents(amount: any) {
 
 function splitArabicName(name?: string) {
   const parts = String(name || "مسئول الفريق").trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName: parts[0] || "مسئول",
-    lastName: parts.slice(1).join(" ") || "الفريق",
-  };
+  return { firstName: parts[0] || "مسئول", lastName: parts.slice(1).join(" ") || "الفريق" };
 }
 
 function tournamentLabel(tournament: string) {
@@ -86,39 +72,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "بيانات الدفع غير مكتملة." }, { status: 400 });
     }
 
-    const orderId = `${tournament}_${Date.now()}`;
-    const accessPassword = generateAccessPassword();
     const { firstName, lastName } = splitArabicName(managerName);
+    const accessPassword = generateAccessPassword();
 
-    await setDoc(doc(db, "orders", orderId), {
-      id: orderId,
-      type: "tournament_registration",
-      tournament,
-      tournamentLabel: tournamentLabel(tournament),
-      customer: {
-        name: managerName,
-        managerName,
-        email,
+    const supabase = createServiceRoleClient();
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({
+        type: "tournament_registration",
+        tournament,
+        tournament_label: tournamentLabel(tournament),
+        customer_name: managerName,
+        customer_manager_name: managerName,
+        customer_email: email,
+        customer_phone: phone,
+        manager_name: managerName,
         phone,
-      },
-      items: [
-        {
-          id: tournament,
-          title: `اشتراك ${tournamentLabel(tournament)}`,
-          price,
-          qty: 1,
-        },
-      ],
-      total: price,
-      paymentMethod: "paymob",
-      paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
-      paymentStatus: "pending_payment",
-      status: "في انتظار الدفع",
-      accessPassword,
-      rosterAccessPassword: accessPassword,
-      rosterAccessActive: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+        total: price,
+        currency: "EGP",
+        payment_method: "paymob",
+        paymob_method: String(body.paymobMethod || body.paymentMethodType || "all"),
+        payment_status: "pending_payment",
+        status_label: "في انتظار الدفع",
+        access_password: accessPassword,
+        roster_access_password: accessPassword,
+        roster_access_active: false,
+      })
+      .select("id")
+      .single();
+
+    if (orderErr || !order) {
+      console.error("Order insert failed:", orderErr);
+      return NextResponse.json({ message: "فشل إنشاء الطلب." }, { status: 500 });
+    }
+    const orderId = order.id as string;
+
+    await supabase.from("order_items").insert({
+      order_id: orderId,
+      title: `اشتراك ${tournamentLabel(tournament)}`,
+      price,
+      qty: 1,
     });
 
     const payload = {
@@ -150,20 +143,12 @@ export async function POST(req: NextRequest) {
         country: "EG",
         state: "Matrouh",
       },
-      extras: {
-        orderId,
-        source: "matrouhcup-registration",
-        tournament,
-        paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all"),
-      },
+      extras: { orderId, source: "matrouhcup-registration", tournament, paymobMethod: String(body.paymobMethod || body.paymentMethodType || "all") },
     };
 
     const paymobRes = await fetch(`${paymobBaseUrl()}/v1/intention/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${secretKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Token ${secretKey}` },
       body: JSON.stringify(payload),
     });
 
@@ -176,17 +161,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!paymobRes.ok) {
-      await setDoc(
-        doc(db, "orders", orderId),
-        {
-          paymentStatus: "payment_init_failed",
-          status: "فشل إنشاء رابط الدفع",
-          paymobError: data,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-
+      await supabase.from("orders").update({ payment_status: "payment_init_failed", status_label: "فشل إنشاء رابط الدفع", paymob_error: data }).eq("id", orderId);
       return NextResponse.json({ message: data?.detail || data?.message || "فشل إنشاء عملية الدفع في Paymob.", details: data }, { status: paymobRes.status });
     }
 
@@ -196,17 +171,7 @@ export async function POST(req: NextRequest) {
     }
 
     const url = `${paymobBaseUrl()}/unifiedcheckout/?publicKey=${encodeURIComponent(publicKey)}&clientSecret=${encodeURIComponent(clientSecret)}`;
-
-    await setDoc(
-      doc(db, "orders", orderId),
-      {
-        paymobIntentionId: data.id || "",
-        paymobClientSecret: clientSecret,
-        paymobCheckoutUrl: url,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    await supabase.from("orders").update({ paymob_intention_id: data.id || "", paymob_client_secret: clientSecret, paymob_checkout_url: url }).eq("id", orderId);
 
     return NextResponse.json({ ok: true, url, checkoutUrl: url, orderId });
   } catch (error: any) {

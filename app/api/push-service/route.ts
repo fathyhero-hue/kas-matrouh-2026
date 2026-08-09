@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getRouteAdmin } from "@/lib/supabase/route-auth";
 
 export const runtime = "nodejs";
 
@@ -8,8 +9,13 @@ type PushBody = {
   url?: string;
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { isAdmin } = await getRouteAdmin(request);
+    if (!isAdmin) {
+      return NextResponse.json({ ok: false, error: "غير مصرح." }, { status: 401 });
+    }
+
     const payload = (await request.json().catch(() => ({}))) as PushBody;
 
     const title = String(payload.title || "").trim();

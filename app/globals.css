@@ -29,12 +29,16 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-green: var(--accent-green);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-orange: var(--accent-orange);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand-dark: var(--brand-dark);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -48,73 +52,119 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+  Brand palette extracted directly from assets/matrouh_logo_transparent.png
+  via pixel sampling (dominant-color histogram), not guessed:
+    purple (primary)  #4B1690  — the logo's badge/ball purple
+    purple (dark bg)  #24124D  — deepest shadow tone in the badge
+    green (accent)    #1CB82E  — ribbon/ball panel green
+    blue (accent)     #2FB2FC  — ribbon/ball panel sky blue
+    orange (accent)   #FB8C00  — ribbon/ball panel orange
+  This replaces the unused default shadcn gray theme AND the navy+gold
+  palette the old UI used, which never matched the actual logo.
+*/
 :root {
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #1b0b3d;
+  --foreground: #f5f3fa;
+  --card: #2a1354;
+  --card-foreground: #f5f3fa;
+  --popover: #2a1354;
+  --popover-foreground: #f5f3fa;
+  --primary: #4b1690;
+  --primary-foreground: #ffffff;
+  --brand-dark: #24124d;
+  --secondary: #241048;
+  --secondary-foreground: #f5f3fa;
+  --muted: #241048;
+  --muted-foreground: #b4a6d6;
+  --accent: #2fb2fc;
+  --accent-foreground: #08202e;
+  --accent-green: #1cb82e;
+  --accent-blue: #2fb2fc;
+  --accent-orange: #fb8c00;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #8b5cf6;
+  --chart-1: #4b1690;
+  --chart-2: #2fb2fc;
+  --chart-3: #1cb82e;
+  --chart-4: #fb8c00;
+  --chart-5: #b4a6d6;
+  --radius: 1rem;
+  --sidebar: #2a1354;
+  --sidebar-foreground: #f5f3fa;
+  --sidebar-primary: #4b1690;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #241048;
+  --sidebar-accent-foreground: #f5f3fa;
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-ring: #8b5cf6;
 }
 
+/*
+  This product has always been a single dark, brand-purple theme — there is
+  no light-mode toggle anywhere in the UI. .dark mirrors :root so any
+  `dark:` utility keeps working without behaving differently.
+*/
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #1b0b3d;
+  --foreground: #f5f3fa;
+  --card: #2a1354;
+  --card-foreground: #f5f3fa;
+  --popover: #2a1354;
+  --popover-foreground: #f5f3fa;
+  --primary: #4b1690;
+  --primary-foreground: #ffffff;
+  --brand-dark: #24124d;
+  --secondary: #241048;
+  --secondary-foreground: #f5f3fa;
+  --muted: #241048;
+  --muted-foreground: #b4a6d6;
+  --accent: #2fb2fc;
+  --accent-foreground: #08202e;
+  --accent-green: #1cb82e;
+  --accent-blue: #2fb2fc;
+  --accent-orange: #fb8c00;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #8b5cf6;
+  --chart-1: #4b1690;
+  --chart-2: #2fb2fc;
+  --chart-3: #1cb82e;
+  --chart-4: #fb8c00;
+  --chart-5: #b4a6d6;
+  --sidebar: #2a1354;
+  --sidebar-foreground: #f5f3fa;
+  --sidebar-primary: #4b1690;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #241048;
+  --sidebar-accent-foreground: #f5f3fa;
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-ring: #8b5cf6;
+}
+
+/*
+  Fluid, mobile-first type scale: clamp(min, preferred, max) means every
+  size already starts at its mobile value and grows smoothly with the
+  viewport — no sm:/md: text-size prefixes needed per-component, and no
+  jarring jumps at breakpoints. Arabic script reads better with slightly
+  more line-height than Latin, so body/heading line-heights are tuned up.
+*/
+@theme inline {
+  --text-display: clamp(1.25rem, 0.85rem + 1.8vw, 1.875rem);
+  --text-display--line-height: 1.15;
+  --text-h1: clamp(1.0625rem, 0.8rem + 1.2vw, 1.5rem);
+  --text-h1--line-height: 1.2;
+  --text-h2: clamp(0.9375rem, 0.8rem + 0.7vw, 1.25rem);
+  --text-h2--line-height: 1.25;
+  --text-h3: clamp(0.875rem, 0.78rem + 0.4vw, 1.0625rem);
+  --text-h3--line-height: 1.3;
+  --text-body: clamp(0.75rem, 0.7rem + 0.2vw, 0.8125rem);
+  --text-body--line-height: 1.55;
+  --text-caption: 0.625rem;
+  --text-caption--line-height: 1.4;
 }
 
 @layer base {
@@ -122,10 +172,25 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground text-body;
   }
   html {
     @apply font-sans;
+  }
+  h1 {
+    @apply text-h1 font-black;
+  }
+  h2 {
+    @apply text-h2 font-black;
+  }
+  h3 {
+    @apply text-h3 font-bold;
+  }
+  h4, h5, h6 {
+    @apply text-body font-bold;
+  }
+  small {
+    @apply text-caption;
   }
 }
 @keyframes marquee-rtl {
@@ -139,4 +204,12 @@
 
 .animate-marquee {
   animation: marquee-rtl 18s linear infinite;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
