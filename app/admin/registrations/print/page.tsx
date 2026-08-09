@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { IdCard, type IdCardData } from "@/components/player-card/id-card";
 import { PrintButton } from "@/components/admin/print-button";
+import { PdfDownloadButton } from "@/components/admin/pdf-download-button";
 
 export const dynamic = "force-dynamic";
 
@@ -19,19 +20,18 @@ export default async function RegistrationsPrintPage({
   return (
     <main dir="rtl" className="min-h-screen bg-white p-6 text-black print:p-0">
       <style>{`
-        @page { size: A4; margin: 10mm; }
+        @page { size: A4; margin: 8mm; }
         @media print {
           html, body { background: white; }
         }
         .print-page {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 10mm;
-          justify-items: center;
-          align-content: start;
+          grid-template-columns: repeat(2, 94mm);
+          gap: 5mm;
+          justify-content: center;
+          align-content: center;
         }
         .print-card-cell {
-          width: 90mm;
           break-inside: avoid;
         }
         .print-card-cell:nth-child(4n) {
@@ -66,7 +66,7 @@ export default async function RegistrationsPrintPage({
               zoom: r.zoom,
             };
             return (
-              <div key={r.id} className="print-card-cell">
+              <div key={r.id} className="print-card-cell" data-print-card>
                 <IdCard data={data} />
               </div>
             );
@@ -75,6 +75,7 @@ export default async function RegistrationsPrintPage({
       )}
 
       <PrintButton />
+      {rows.length > 0 && <PdfDownloadButton filename={`player-cards${tournament ? `-${tournament}` : ""}.pdf`} />}
     </main>
   );
 }
