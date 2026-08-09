@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Shield, CheckCircle2, ClipboardList } from "lucide-react";
+import { Shield, CheckCircle2, ClipboardList, Trophy } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
@@ -25,6 +25,15 @@ export default async function RostersPage({ params, searchParams }: TournamentPa
 
   const rows = rosters || [];
   const editionQs = editionKey ? `?edition=${editionKey}` : "";
+  const registerLink = slug === "elite-cup" && (
+    <Link
+      href="/elite-cup/register"
+      className="mb-3 flex items-center justify-center gap-2 rounded-2xl bg-accent-green/15 py-3 text-body font-black text-accent-green ring-1 ring-accent-green/30 transition-colors hover:bg-accent-green/25"
+    >
+      <Trophy className="h-4 w-4" />
+      لسه ما اشتركتش؟ سجّل فريقك وادفع الاشتراك هنا
+    </Link>
+  );
   const submitLink = SUPPORTS_SUBMISSION.has(slug) && (
     <Link
       href={`/${slug}/rosters/submit${editionQs}`}
@@ -38,6 +47,7 @@ export default async function RostersPage({ params, searchParams }: TournamentPa
   if (rows.length === 0) {
     return (
       <div>
+        {registerLink}
         {submitLink}
         <EmptyState message="لسه مفيش قوائم فرق مسجّلة" />
       </div>

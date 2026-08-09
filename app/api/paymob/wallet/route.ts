@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { guardEliteRegistration } from "@/lib/paymob/elite-registration-guard";
 
 export const runtime = "nodejs";
 
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
     const isShopOrder = rawItems.length > 0;
 
     const tournament = String(body.tournament || "matrouh_cup");
+    const teamName = String(body.teamName || "").trim();
     const shopCustomer: ShopCustomer = body.customer || {};
     const customerName = String(shopCustomer.name || shopCustomer.managerName || body.managerName || body.name || "عميل مطروح").trim();
     const email = String(shopCustomer.email || body.email || "customer@matrouhcup.online").trim();
@@ -80,9 +82,16 @@ export async function POST(req: NextRequest) {
     const address = String(shopCustomer.address || body.address || "Matrouh").trim();
     const accessPassword = generateAccessPassword();
 
-    const price = Number(body.price || body.total || 0);
+    const supabase = createServiceRoleClient();
+
+    let price = Number(body.price || body.total || 0);
+    if (!isShopOrder && tournament === "elite_cup") {
+      const guard = await guardEliteRegistration(supabase, teamName);
+      if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: 400 });
+      price = guard.price; // server-side price — never trust client-sent amount for a paid registration
+    }
     const items: ShopItem[] = rawItems.length ? rawItems : [{ id: tournament, title: `اشتراك ${tournamentLabel(tournament)}`, price, qty: 1 }];
-    const total = Number(body.total || price || items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 1), 0));
+    const total = Number(isShopOrder ? body.total || price : price);
     const amountCents = toAmountCents(total);
 
     if (!phone || phone.length < 10) {
@@ -93,8 +102,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { firstName, lastName } = splitName(customerName);
-
-    const supabase = createServiceRoleClient();
     const { data: order, error: orderErr } = await supabase
       .from("orders")
       .insert({
@@ -108,6 +115,8 @@ export async function POST(req: NextRequest) {
         customer_phone: phone,
         customer_address: address,
         customer_raw: shopCustomer,
+        customer_team_name: isShopOrder ? null : teamName || null,
+        team_name: isShopOrder ? null : teamName || null,
         total,
         currency: "EGP",
         payment_method: "paymob_wallet",

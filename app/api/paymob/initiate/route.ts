@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { guardEliteRegistration } from "@/lib/paymob/elite-registration-guard";
 
 export const runtime = "nodejs";
 
@@ -62,20 +63,31 @@ export async function POST(req: NextRequest) {
     }
 
     const tournament = String(body.tournament || "matrouh_cup");
-    const price = Number(body.price || 0);
-    const amount = toAmountCents(price);
     const managerName = String(body.managerName || "").trim();
     const email = String(body.email || "customer@matrouhcup.online").trim();
     const phone = String(body.phone || "01000000000").replace(/\s+/g, "");
+    const teamName = String(body.teamName || "").trim();
 
-    if (!managerName || !phone || amount <= 0) {
+    if (!managerName || !phone) {
+      return NextResponse.json({ message: "بيانات الدفع غير مكتملة." }, { status: 400 });
+    }
+
+    const supabase = createServiceRoleClient();
+
+    let price = Number(body.price || 0);
+    if (tournament === "elite_cup") {
+      const guard = await guardEliteRegistration(supabase, teamName);
+      if (!guard.ok) return NextResponse.json({ message: guard.error }, { status: 400 });
+      price = guard.price; // server-side price — never trust client-sent amount for a paid registration
+    }
+    const amount = toAmountCents(price);
+    if (amount <= 0) {
       return NextResponse.json({ message: "بيانات الدفع غير مكتملة." }, { status: 400 });
     }
 
     const { firstName, lastName } = splitArabicName(managerName);
     const accessPassword = generateAccessPassword();
 
-    const supabase = createServiceRoleClient();
     const { data: order, error: orderErr } = await supabase
       .from("orders")
       .insert({
@@ -86,6 +98,8 @@ export async function POST(req: NextRequest) {
         customer_manager_name: managerName,
         customer_email: email,
         customer_phone: phone,
+        customer_team_name: teamName || null,
+        team_name: teamName || null,
         manager_name: managerName,
         phone,
         total: price,

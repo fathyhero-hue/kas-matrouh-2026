@@ -40,7 +40,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "الرقم السري غير صحيح.");
-      if (data.managerName) setManagerName(data.managerName);
+      if (data.teamName) setTeamName(data.teamName);
       setStep("form");
     } catch (e: any) {
       toast.error(e?.message || "تعذر التحقق من الرقم السري.");

@@ -2,9 +2,15 @@
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const TOURNAMENT_ROSTER_LINK: Record<string, string> = {
+  elite_cup: "/elite-cup/rosters/submit",
+  matrouh_cup: "/matrouh-cup/rosters/submit",
+};
 
 function isTrue(value: string | null) {
   return value === "true" || value === "1" || value === "True";
@@ -31,9 +37,9 @@ function PaymentResultInner() {
   const result = useMemo(() => {
     const success = isTrue(successValue);
     const pending = isTrue(pendingValue);
-    if (success) return { title: "تم الدفع بنجاح", status: "paid", icon: "✅", color: "text-emerald-400" };
-    if (pending) return { title: "الدفع قيد المعالجة", status: "pending_payment", icon: "⏳", color: "text-yellow-400" };
-    return { title: "لم تكتمل عملية الدفع", status: "failed", icon: "❌", color: "text-red-400" };
+    if (success) return { title: "تم الدفع بنجاح", status: "paid", Icon: CheckCircle2, tone: "text-accent-green" };
+    if (pending) return { title: "الدفع قيد المعالجة", status: "pending_payment", Icon: Clock, tone: "text-accent-orange" };
+    return { title: "لم تكتمل عملية الدفع", status: "failed", Icon: XCircle, tone: "text-destructive" };
   }, [successValue, pendingValue]);
 
   // This page is read-only: the Paymob webhook (app/api/paymob/webhook) is the
@@ -72,8 +78,6 @@ function PaymentResultInner() {
         customer_phone: row.customer_phone,
       });
 
-      // Stop polling once the webhook has recorded a final status, or after
-      // enough attempts that we should stop waiting either way.
       if (row.payment_status === "paid" || row.payment_status === "failed" || attempts >= 8) {
         setPolling(false);
       }
@@ -91,43 +95,48 @@ function PaymentResultInner() {
   }, [rawOrderId]);
 
   const accessPassword = order?.access_password || "";
-  const tournament = order?.tournament || "matrouh_cup";
-  const returnUrl = accessPassword
-    ? `/?paid=1&tournament=${encodeURIComponent(tournament)}&accessPassword=${encodeURIComponent(accessPassword)}`
-    : "/";
+  const tournament = order?.tournament || "";
+  const returnUrl = accessPassword ? TOURNAMENT_ROSTER_LINK[tournament] || "/" : "/";
 
   return (
-    <section className="w-full max-w-xl bg-[#13213a] border border-white/10 rounded-3xl shadow-2xl p-8 text-center space-y-5">
-      <div className="text-7xl">{result.icon}</div>
-      <h1 className={`text-3xl font-black ${result.color}`}>{result.title}</h1>
+    <section className="w-full max-w-md rounded-3xl bg-card p-8 text-center ring-1 ring-white/10">
+      <result.Icon className={`mx-auto h-14 w-14 ${result.tone}`} />
+      <h1 className={`mt-3 text-h1 font-black ${result.tone}`}>{result.title}</h1>
 
-      <p className="text-gray-300 font-bold leading-7">
-        رقم الطلب: <span className="text-yellow-300" dir="ltr">{rawOrderId || "جارٍ الربط..."}</span>
+      <p className="mt-3 text-caption font-bold text-muted-foreground">
+        رقم الطلب: <span className="text-accent-orange" dir="ltr">{rawOrderId || "جارٍ الربط..."}</span>
       </p>
 
-      {polling && !accessPassword && <p className="text-gray-400 font-bold">جاري تأكيد حالة الدفع...</p>}
+      {polling && !accessPassword && (
+        <p className="mt-4 flex items-center justify-center gap-2 text-caption font-bold text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> جاري تأكيد حالة الدفع...
+        </p>
+      )}
 
       {order?.payment_status === "paid" && accessPassword && (
-        <div className="rounded-3xl border border-emerald-400/40 bg-emerald-500/10 p-5 space-y-3">
-          <p className="text-emerald-300 font-black text-lg">رقم الدخول لاستمارة قائمة الفريق</p>
-          <div className="text-5xl font-black tracking-[0.25em] text-yellow-300" dir="ltr">{accessPassword}</div>
-          <p className="text-gray-200 font-bold text-sm leading-7">
-            احفظ الرقم. استخدمه للرجوع إلى استمارة تسجيل قائمة الفريق.
-            {order.customer_phone ? ` الرقم مربوط بالموبايل ${order.customer_phone}.` : ""}
+        <div className="mt-5 space-y-3 rounded-2xl bg-accent-green/10 p-5 ring-1 ring-accent-green/30">
+          <p className="text-body font-black text-accent-green">الرقم السري لتسجيل قائمة الفريق</p>
+          <div className="text-display font-black tracking-[0.25em] text-accent-orange" dir="ltr">{accessPassword}</div>
+          <p className="text-caption font-bold leading-6 text-muted-foreground">
+            احفظ الرقم ده كويس، هتحتاجه عشان تدخل تسجّل قائمة لاعبين فريقك.
+            {order.customer_phone ? ` الرقم مربوط بموبايل ${order.customer_phone}.` : ""}
           </p>
         </div>
       )}
 
       {result.status === "pending_payment" && !accessPassword && (
-        <p className="text-yellow-200 font-bold leading-7">
-          العملية قيد الانتظار. أكمل تأكيد الدفع من المحفظة، ثم ارجع للصفحة أو افتح التطبيق مرة أخرى.
+        <p className="mt-4 text-caption font-bold leading-6 text-accent-orange">
+          العملية قيد الانتظار. أكمل تأكيد الدفع من المحفظة، ثم ارجع لهذه الصفحة.
         </p>
       )}
 
-      {error && <p className="text-red-300 font-bold leading-7">{error}</p>}
+      {error && <p className="mt-4 text-caption font-bold text-destructive">{error}</p>}
 
-      <a href={returnUrl} className="inline-flex items-center justify-center rounded-2xl bg-yellow-400 text-black font-black px-8 py-4 hover:bg-yellow-300 transition-colors">
-        الرجوع للتطبيق وفتح التسجيل
+      <a
+        href={returnUrl}
+        className="mt-6 inline-flex items-center justify-center rounded-2xl bg-primary px-8 py-3.5 text-body font-black text-primary-foreground transition-colors hover:opacity-90"
+      >
+        {accessPassword ? "روح لتسجيل قائمة الفريق" : "الرجوع للموقع"}
       </a>
     </section>
   );
@@ -135,8 +144,8 @@ function PaymentResultInner() {
 
 export default function PaymentResultPage() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[#0a1428] text-white flex items-center justify-center p-6">
-      <Suspense fallback={<div className="text-yellow-300 font-black">جاري قراءة نتيجة الدفع...</div>}>
+    <main dir="rtl" className="flex min-h-screen items-center justify-center p-6">
+      <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />}>
         <PaymentResultInner />
       </Suspense>
     </main>
