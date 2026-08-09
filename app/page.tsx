@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Trophy, Radio, ShoppingBag, IdCard, ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { Radio, ShoppingBag, IdCard, ArrowLeft } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { MatchCard } from "@/components/sport/match-card";
 import { NewsTicker } from "@/components/home/news-ticker";
@@ -72,8 +73,8 @@ export default async function NewHomePage() {
       <NewsTicker text={ticker} />
 
       <section className="mx-auto max-w-5xl px-4 pb-10 pt-12 text-center sm:px-6">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary shadow-[0_0_30px_rgba(75,22,144,0.5)]">
-          <Trophy className="h-8 w-8 text-primary-foreground" />
+        <div className="mx-auto mb-4 h-20 w-20 overflow-hidden rounded-full shadow-[0_0_30px_rgba(75,22,144,0.5)]">
+          <Image src="/logo-circle.png" alt="مطروح الرياضية" width={80} height={80} className="h-full w-full object-cover" priority />
         </div>
         <h1 className="text-display font-black">مطروح الرياضية</h1>
         <p className="mx-auto mt-2 max-w-md text-body font-medium text-muted-foreground">
