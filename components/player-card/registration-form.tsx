@@ -12,6 +12,14 @@ const ROLE_OPTIONS = [
 
 const BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
 
+// Custom day/month/year selects instead of a native <input type="date"> —
+// the native control's placeholder segments render garbled under the page's
+// RTL direction in some browsers, so we fully control the layout ourselves.
+const ARABIC_MONTHS = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
 type LinkedTournament = { tournamentKey: string; suffix: string };
 type Tournament = { id: string; name: string; logo_url: string | null; linkedTournament: LinkedTournament | null };
 type RosterPlayer = { name: string; photoUrl: string | null };
@@ -75,7 +83,10 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
 
   const [role, setRole] = useState("player");
   const [fullName, setFullName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const birthDate = birthDay && birthMonth && birthYear ? `${birthYear}-${birthMonth}-${birthDay}` : "";
   const [nationalId, setNationalId] = useState("");
   const [teamName, setTeamName] = useState("");
   const [manualEntry, setManualEntry] = useState(false);
@@ -140,7 +151,9 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
 
   const reset = () => {
     setFullName("");
-    setBirthDate("");
+    setBirthDay("");
+    setBirthMonth("");
+    setBirthYear("");
     setNationalId("");
     setPhotoFile(null);
     setPhotoPreview("");
@@ -394,13 +407,26 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
 
       <div>
         <label className="mb-1 block text-caption font-bold text-muted-foreground">تاريخ الميلاد</label>
-        <input
-          type="date"
-          value={birthDate}
-          onChange={(e) => setBirthDate(e.target.value)}
-          dir="ltr"
-          className={inputCls}
-        />
+        <div className="grid grid-cols-3 gap-2">
+          <select value={birthDay} onChange={(e) => setBirthDay(e.target.value)} className={inputCls}>
+            <option value="">يوم</option>
+            {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")).map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <select value={birthMonth} onChange={(e) => setBirthMonth(e.target.value)} className={inputCls}>
+            <option value="">شهر</option>
+            {ARABIC_MONTHS.map((m, i) => (
+              <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>
+            ))}
+          </select>
+          <select value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className={inputCls}>
+            <option value="">سنة</option>
+            {Array.from({ length: 60 }, (_, i) => String(new Date().getFullYear() - 5 - i)).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <input
         value={nationalId}
