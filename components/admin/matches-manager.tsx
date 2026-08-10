@@ -63,13 +63,28 @@ function getAccurateLiveMinute(m: Match, now: number) {
 
 const inputCls = "h-10 w-full rounded-lg bg-secondary px-3 text-caption font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue";
 
-export function MatchesManager({ bracketId, initialMatches }: { bracketId: string; initialMatches: Match[] }) {
+export function MatchesManager({
+  bracketId,
+  initialMatches,
+  groupATeams = [],
+  groupBTeams = [],
+}: {
+  bracketId: string;
+  initialMatches: Match[];
+  groupATeams?: string[];
+  groupBTeams?: string[];
+}) {
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [form, setForm] = useState<any>(emptyForm(bracketId));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [matchGroup, setMatchGroup] = useState<"A" | "B">("A");
+
+  const hasGroups = groupATeams.length > 0 || groupBTeams.length > 0;
+  const isGroupStage = form.round === "دور المجموعات";
+  const teamOptions = hasGroups ? (isGroupStage ? (matchGroup === "A" ? groupATeams : groupBTeams) : [...groupATeams, ...groupBTeams]) : [];
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -123,6 +138,8 @@ export function MatchesManager({ bracketId, initialMatches }: { bracketId: strin
 
   const startEdit = (m: Match) => {
     setEditingId(m.id);
+    if (groupATeams.includes(m.team_a)) setMatchGroup("A");
+    else if (groupBTeams.includes(m.team_a)) setMatchGroup("B");
     setForm({
       bracket_id: m.bracket_id,
       team_a: m.team_a,
@@ -208,11 +225,47 @@ export function MatchesManager({ bracketId, initialMatches }: { bracketId: strin
     <div className="space-y-6">
       <div className="rounded-2xl bg-card p-4 ring-1 ring-white/10 sm:p-5">
         <h2 className="mb-4 text-h3 font-black">{editingId ? "تعديل بيانات ونتيجة المباراة" : "إنشاء مباراة جديدة"}</h2>
+
+        {hasGroups && isGroupStage && (
+          <div className="mb-3 flex gap-2 rounded-full bg-secondary p-1 ring-1 ring-white/10">
+            <button
+              onClick={() => setMatchGroup("A")}
+              className={`flex-1 rounded-full py-1.5 text-[11px] font-black transition-colors ${matchGroup === "A" ? "bg-accent-blue text-background" : "text-muted-foreground"}`}
+            >
+              مباراة من المجموعة الأولى
+            </button>
+            <button
+              onClick={() => setMatchGroup("B")}
+              className={`flex-1 rounded-full py-1.5 text-[11px] font-black transition-colors ${matchGroup === "B" ? "bg-accent-green text-background" : "text-muted-foreground"}`}
+            >
+              مباراة من المجموعة الثانية
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <input value={form.team_a} onChange={(e) => setForm({ ...form, team_a: e.target.value })} placeholder="الفريق الأول" className={inputCls} />
+          {hasGroups ? (
+            <select value={form.team_a} onChange={(e) => setForm({ ...form, team_a: e.target.value })} className={inputCls}>
+              <option value="">اختر الفريق الأول</option>
+              {teamOptions.map((t) => (
+                <option key={t} value={t} disabled={t === form.team_b}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            <input value={form.team_a} onChange={(e) => setForm({ ...form, team_a: e.target.value })} placeholder="الفريق الأول" className={inputCls} />
+          )}
           <input type="number" value={form.home_goals} onChange={(e) => setForm({ ...form, home_goals: Number(e.target.value) })} className={`${inputCls} text-center text-h3 font-black text-accent-orange`} />
           <input type="number" value={form.away_goals} onChange={(e) => setForm({ ...form, away_goals: Number(e.target.value) })} className={`${inputCls} text-center text-h3 font-black text-accent-orange`} />
-          <input value={form.team_b} onChange={(e) => setForm({ ...form, team_b: e.target.value })} placeholder="الفريق الثاني" className={inputCls} />
+          {hasGroups ? (
+            <select value={form.team_b} onChange={(e) => setForm({ ...form, team_b: e.target.value })} className={inputCls}>
+              <option value="">اختر الفريق الثاني</option>
+              {teamOptions.map((t) => (
+                <option key={t} value={t} disabled={t === form.team_a}>{t}</option>
+              ))}
+            </select>
+          ) : (
+            <input value={form.team_b} onChange={(e) => setForm({ ...form, team_b: e.target.value })} placeholder="الفريق الثاني" className={inputCls} />
+          )}
         </div>
 
         {form.round !== "دور المجموعات" && Number(form.home_goals) === Number(form.away_goals) && (

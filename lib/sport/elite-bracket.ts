@@ -1,4 +1,5 @@
-import type { StandingsRow } from "./standings";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildStandings, type MatchRow, type StandingsRow } from "./standings";
 
 export type BracketMatch = {
   team_a: string | null;
@@ -47,6 +48,31 @@ export function resolveSlot(matches: BracketMatch[], teamA: string, teamB: strin
   }
 
   return { teamA: match.team_a || teamA, teamB: match.team_b || teamB, played: true, homeGoals: hg, awayGoals: ag, winner };
+}
+
+// Shared by the tournament overview page and the dedicated standings page so
+// both always agree on group membership and the resulting two tables.
+export async function getEliteGroupStandings(supabase: SupabaseClient, bracketId: string) {
+  const [{ data: groupsSetting }, { data: matches }] = await Promise.all([
+    supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle(),
+    supabase.from("matches").select("*").eq("bracket_id", bracketId),
+  ]);
+
+  const groupA: string[] = (groupsSetting?.value as any)?.groupA || [];
+  const groupB: string[] = (groupsSetting?.value as any)?.groupB || [];
+  const allMatches = (matches || []) as (MatchRow & BracketMatch)[];
+  const inGroup = (team: string | null, group: string[]) => !!team && group.includes(team);
+
+  const groupAMatches = allMatches.filter((m) => inGroup(m.team_a, groupA) && inGroup(m.team_b, groupA));
+  const groupBMatches = allMatches.filter((m) => inGroup(m.team_a, groupB) && inGroup(m.team_b, groupB));
+
+  return {
+    groupA,
+    groupB,
+    groupAStandings: buildStandings(groupAMatches),
+    groupBStandings: buildStandings(groupBMatches),
+    allMatches,
+  };
 }
 
 export type EliteBracket = {

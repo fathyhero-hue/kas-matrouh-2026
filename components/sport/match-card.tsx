@@ -63,7 +63,7 @@ export function MatchCard({
           {upcoming ? (
             <span className="text-h3 font-black text-muted-foreground">vs</span>
           ) : (
-            <div className="flex items-center gap-1.5 text-h2 font-black" dir="ltr">
+            <div className="flex items-center gap-1.5 text-h2 font-black">
               <span>{homeGoals ?? 0}</span>
               <span className="text-muted-foreground">-</span>
               <span>{awayGoals ?? 0}</span>

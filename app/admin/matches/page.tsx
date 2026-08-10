@@ -23,6 +23,14 @@ export default async function AdminMatchesPage({
     ? await supabase.from("matches").select("*").eq("bracket_id", bracketId).order("match_date", { ascending: false }).order("match_time", { ascending: false })
     : { data: [] };
 
+  let eliteGroupA: string[] = [];
+  let eliteGroupB: string[] = [];
+  if (slug === "elite-cup") {
+    const { data: groupsSetting } = await supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
+    eliteGroupA = (groupsSetting?.value as any)?.groupA || [];
+    eliteGroupB = (groupsSetting?.value as any)?.groupB || [];
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -53,7 +61,7 @@ export default async function AdminMatchesPage({
           لا يوجد براكيت مطابق لهذه البطولة/النسخة.
         </div>
       ) : (
-        <MatchesManager bracketId={bracketId} initialMatches={matches || []} />
+        <MatchesManager bracketId={bracketId} initialMatches={matches || []} groupATeams={eliteGroupA} groupBTeams={eliteGroupB} />
       )}
     </div>
   );

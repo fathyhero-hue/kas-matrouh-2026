@@ -11,7 +11,7 @@ import { MatchCard } from "@/components/sport/match-card";
 import { StandingsTable } from "@/components/sport/standings-table";
 import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
 import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
-import { computeEliteBracket } from "@/lib/sport/elite-bracket";
+import { computeEliteBracket, getEliteGroupStandings } from "@/lib/sport/elite-bracket";
 
 export const revalidate = 30;
 
@@ -76,16 +76,7 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
   const recentResults = allMatches.filter((m) => m.status === "انتهت").slice(0, 5);
 
   if (slug === "elite-cup") {
-    const service = createServiceRoleClient();
-    const { data: groupsSetting } = await service.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
-    const groupA: string[] = (groupsSetting?.value as any)?.groupA || [];
-    const groupB: string[] = (groupsSetting?.value as any)?.groupB || [];
-    const inGroup = (team: string | null, group: string[]) => !!team && group.includes(team);
-
-    const groupAMatches = allMatches.filter((m) => inGroup(m.team_a, groupA) && inGroup(m.team_b, groupA));
-    const groupBMatches = allMatches.filter((m) => inGroup(m.team_a, groupB) && inGroup(m.team_b, groupB));
-    const groupAStandings = buildStandings(groupAMatches);
-    const groupBStandings = buildStandings(groupBMatches);
+    const { groupA, groupB, groupAStandings, groupBStandings } = await getEliteGroupStandings(supabase, bracketId);
     const bracket = computeEliteBracket(groupAStandings, groupBStandings, allMatches as any);
 
     return (
