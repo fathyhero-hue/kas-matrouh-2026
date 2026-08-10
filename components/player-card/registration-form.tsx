@@ -392,12 +392,16 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
         )}
       </div>
 
-      <input
-        type="date"
-        value={birthDate}
-        onChange={(e) => setBirthDate(e.target.value)}
-        className={inputCls}
-      />
+      <div>
+        <label className="mb-1 block text-caption font-bold text-muted-foreground">تاريخ الميلاد</label>
+        <input
+          type="date"
+          value={birthDate}
+          onChange={(e) => setBirthDate(e.target.value)}
+          dir="ltr"
+          className={inputCls}
+        />
+      </div>
       <input
         value={nationalId}
         onChange={(e) => setNationalId(e.target.value)}
