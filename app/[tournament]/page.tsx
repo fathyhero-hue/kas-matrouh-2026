@@ -12,6 +12,7 @@ import { StandingsTable } from "@/components/sport/standings-table";
 import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
 import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
 import { computeEliteBracket, getEliteGroupStandings } from "@/lib/sport/elite-bracket";
+import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
@@ -59,15 +60,19 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
     ) : null;
   }
 
-  const { data: matches } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("bracket_id", bracketId)
-    .order("match_date", { ascending: false })
-    .order("match_time", { ascending: false });
+  const [{ data: matches }, logos] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("*")
+      .eq("bracket_id", bracketId)
+      .order("match_date", { ascending: false })
+      .order("match_time", { ascending: false }),
+    getBracketTeamLogos(supabase, bracketId),
+  ]);
 
   const allMatches = matches || [];
-  const standings = buildStandings(allMatches);
+  const teamLogo = (team: string | null, fallback: string | null) => lookupTeamLogo(logos, team) || fallback;
+  const standings = buildStandings(allMatches, logos);
   const live = allMatches.find((m) => m.is_live);
   const upcoming = !live
     ? [...allMatches].filter((m) => m.status !== "انتهت").sort((a, b) => (a.match_date || "").localeCompare(b.match_date || ""))[0]
@@ -88,9 +93,9 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
             <h2 className="mb-3 text-h3 font-black text-muted-foreground">{live ? "جارية الآن" : "المباراة القادمة"}</h2>
             <MatchCard
               teamA={featured.team_a}
-              teamALogo={featured.team_a_logo}
+              teamALogo={teamLogo(featured.team_a, featured.team_a_logo)}
               teamB={featured.team_b}
-              teamBLogo={featured.team_b_logo}
+              teamBLogo={teamLogo(featured.team_b, featured.team_b_logo)}
               homeGoals={featured.home_goals}
               awayGoals={featured.away_goals}
               status={featured.status}
@@ -132,9 +137,9 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
                 <MatchCard
                   key={m.id}
                   teamA={m.team_a}
-                  teamALogo={m.team_a_logo}
+                  teamALogo={teamLogo(m.team_a, m.team_a_logo)}
                   teamB={m.team_b}
-                  teamBLogo={m.team_b_logo}
+                  teamBLogo={teamLogo(m.team_b, m.team_b_logo)}
                   homeGoals={m.home_goals}
                   awayGoals={m.away_goals}
                   status={m.status}
@@ -170,9 +175,9 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
           <h2 className="mb-3 text-h3 font-black text-muted-foreground">{live ? "جارية الآن" : "المباراة القادمة"}</h2>
           <MatchCard
             teamA={featured.team_a}
-            teamALogo={featured.team_a_logo}
+            teamALogo={teamLogo(featured.team_a, featured.team_a_logo)}
             teamB={featured.team_b}
-            teamBLogo={featured.team_b_logo}
+            teamBLogo={teamLogo(featured.team_b, featured.team_b_logo)}
             homeGoals={featured.home_goals}
             awayGoals={featured.away_goals}
             status={featured.status}
@@ -200,9 +205,9 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
               <MatchCard
                 key={m.id}
                 teamA={m.team_a}
-                teamALogo={m.team_a_logo}
+                teamALogo={teamLogo(m.team_a, m.team_a_logo)}
                 teamB={m.team_b}
-                teamBLogo={m.team_b_logo}
+                teamBLogo={teamLogo(m.team_b, m.team_b_logo)}
                 homeGoals={m.home_goals}
                 awayGoals={m.away_goals}
                 status={m.status}

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildStandings, type MatchRow, type StandingsRow } from "./standings";
+import { getBracketTeamLogos } from "./roster-link";
 
 export type BracketMatch = {
   team_a: string | null;
@@ -53,9 +54,10 @@ export function resolveSlot(matches: BracketMatch[], teamA: string, teamB: strin
 // Shared by the tournament overview page and the dedicated standings page so
 // both always agree on group membership and the resulting two tables.
 export async function getEliteGroupStandings(supabase: SupabaseClient, bracketId: string) {
-  const [{ data: groupsSetting }, { data: matches }] = await Promise.all([
+  const [{ data: groupsSetting }, { data: matches }, logos] = await Promise.all([
     supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle(),
     supabase.from("matches").select("*").eq("bracket_id", bracketId),
+    getBracketTeamLogos(supabase, bracketId),
   ]);
 
   const groupA: string[] = (groupsSetting?.value as any)?.groupA || [];
@@ -69,8 +71,8 @@ export async function getEliteGroupStandings(supabase: SupabaseClient, bracketId
   return {
     groupA,
     groupB,
-    groupAStandings: buildStandings(groupAMatches),
-    groupBStandings: buildStandings(groupBMatches),
+    groupAStandings: buildStandings(groupAMatches, logos),
+    groupBStandings: buildStandings(groupBMatches, logos),
     allMatches,
   };
 }

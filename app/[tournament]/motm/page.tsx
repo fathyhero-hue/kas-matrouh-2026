@@ -5,6 +5,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
+import { getBracketRosterTeams, buildPlayerPhotoResolver } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
@@ -16,9 +17,13 @@ export default async function MotmPage({ params, searchParams }: TournamentPageP
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const { data: items } = await supabase.from("motm").select("*").eq("bracket_id", bracketId);
+  const [{ data: items }, rosterTeams] = await Promise.all([
+    supabase.from("motm").select("*").eq("bracket_id", bracketId),
+    getBracketRosterTeams(supabase, bracketId),
+  ]);
+  const resolvePhoto = buildPlayerPhotoResolver(rosterTeams);
 
-  const rows = items || [];
+  const rows = (items || []).map((m) => ({ ...m, image_url: m.image_url || resolvePhoto(m.team, m.player) }));
   if (rows.length === 0) return <EmptyState message="لسه مفيش نجوم مباريات معلنة" />;
 
   return (

@@ -5,6 +5,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
+import { getBracketRosterTeams, buildPlayerPhotoResolver } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
@@ -16,9 +17,13 @@ export default async function ScorersPage({ params, searchParams }: TournamentPa
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const { data: goals } = await supabase.from("goals").select("*").eq("bracket_id", bracketId).order("goals", { ascending: false });
+  const [{ data: goals }, rosterTeams] = await Promise.all([
+    supabase.from("goals").select("*").eq("bracket_id", bracketId).order("goals", { ascending: false }),
+    getBracketRosterTeams(supabase, bracketId),
+  ]);
+  const resolvePhoto = buildPlayerPhotoResolver(rosterTeams);
 
-  const scorers = (goals || []).filter((g) => (g.goals || 0) > 0);
+  const scorers = (goals || []).filter((g) => (g.goals || 0) > 0).map((g) => ({ ...g, image_url: g.image_url || resolvePhoto(g.team, g.player) }));
   if (scorers.length === 0) return <EmptyState message="لسه مفيش أهداف مسجّلة" />;
 
   return (

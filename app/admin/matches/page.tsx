@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
 import { MatchesManager } from "@/components/admin/matches-manager";
+import { getBracketRosterTeams } from "@/lib/sport/roster-link";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,10 @@ export default async function AdminMatchesPage({
     eliteGroupA = (groupsSetting?.value as any)?.groupA || [];
     eliteGroupB = (groupsSetting?.value as any)?.groupB || [];
   }
+
+  const rosterTeams = bracketId
+    ? (await getBracketRosterTeams(supabase, bracketId)).map((t) => ({ team: t.team, logoUrl: t.logoUrl }))
+    : [];
 
   return (
     <div className="space-y-5">
@@ -61,7 +66,7 @@ export default async function AdminMatchesPage({
           لا يوجد براكيت مطابق لهذه البطولة/النسخة.
         </div>
       ) : (
-        <MatchesManager bracketId={bracketId} initialMatches={matches || []} groupATeams={eliteGroupA} groupBTeams={eliteGroupB} />
+        <MatchesManager bracketId={bracketId} initialMatches={matches || []} groupATeams={eliteGroupA} groupBTeams={eliteGroupB} rosterTeams={rosterTeams} />
       )}
     </div>
   );

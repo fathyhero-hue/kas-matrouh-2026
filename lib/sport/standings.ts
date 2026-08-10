@@ -1,3 +1,5 @@
+import { normalize } from "./roster-link";
+
 export type MatchRow = {
   team_a: string | null;
   team_b: string | null;
@@ -9,6 +11,7 @@ export type MatchRow = {
 
 export type StandingsRow = {
   team: string;
+  logoUrl?: string | null;
   played: number;
   won: number;
   drawn: number;
@@ -20,7 +23,9 @@ export type StandingsRow = {
 
 // Group-stage, finished matches only — mirrors the points/tiebreak rules the
 // admin panel has always used (3/1/0, then goal difference, then goals for).
-export function buildStandings(matches: MatchRow[]): StandingsRow[] {
+// `logos`, when passed, fills in each row's real team logo from the roster
+// (see lib/sport/roster-link.ts) so standings tables show it automatically.
+export function buildStandings(matches: MatchRow[], logos?: Map<string, string>): StandingsRow[] {
   const teams = new Map<string, Omit<StandingsRow, "team" | "points">>();
   const ensure = (name: string) => {
     if (!teams.has(name)) teams.set(name, { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 });
@@ -54,6 +59,6 @@ export function buildStandings(matches: MatchRow[]): StandingsRow[] {
   }
 
   return [...teams.entries()]
-    .map(([team, s]) => ({ team, ...s, points: s.won * 3 + s.drawn }))
+    .map(([team, s]) => ({ team, logoUrl: logos?.get(normalize(team)) || null, ...s, points: s.won * 3 + s.drawn }))
     .sort((x, y) => y.points - x.points || (y.goalsFor - y.goalsAgainst) - (x.goalsFor - x.goalsAgainst) || y.goalsFor - x.goalsFor);
 }

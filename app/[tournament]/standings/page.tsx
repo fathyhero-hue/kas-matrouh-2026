@@ -4,6 +4,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { buildStandings } from "@/lib/sport/standings";
 import { getEliteGroupStandings } from "@/lib/sport/elite-bracket";
+import { getBracketTeamLogos } from "@/lib/sport/roster-link";
 import { StandingsTable } from "@/components/sport/standings-table";
 import { EmptyState } from "@/components/sport/empty-state";
 
@@ -35,9 +36,12 @@ export default async function StandingsPage({ params, searchParams }: Tournament
     );
   }
 
-  const { data: matches } = await supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status, stage").eq("bracket_id", bracketId);
+  const [{ data: matches }, logos] = await Promise.all([
+    supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status, stage").eq("bracket_id", bracketId),
+    getBracketTeamLogos(supabase, bracketId),
+  ]);
 
-  const standings = buildStandings(matches || []);
+  const standings = buildStandings(matches || [], logos);
   if (standings.length === 0) return <EmptyState message="لسه مفيش نتائج كفاية لعرض الترتيب" />;
 
   return <StandingsTable rows={standings} />;

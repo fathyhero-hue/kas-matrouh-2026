@@ -68,11 +68,13 @@ export function MatchesManager({
   initialMatches,
   groupATeams = [],
   groupBTeams = [],
+  rosterTeams = [],
 }: {
   bracketId: string;
   initialMatches: Match[];
   groupATeams?: string[];
   groupBTeams?: string[];
+  rosterTeams?: { team: string; logoUrl: string | null }[];
 }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [form, setForm] = useState<any>(emptyForm(bracketId));
@@ -84,7 +86,18 @@ export function MatchesManager({
 
   const hasGroups = groupATeams.length > 0 || groupBTeams.length > 0;
   const isGroupStage = form.round === "دور المجموعات";
-  const teamOptions = hasGroups ? (isGroupStage ? (matchGroup === "A" ? groupATeams : groupBTeams) : [...groupATeams, ...groupBTeams]) : [];
+  // Elite-cup groups (when assigned) win as the team source during group-stage
+  // matches; otherwise fall back to whichever teams have a real submitted
+  // roster for this bracket — this covers matrouh-cup/ramadan-cup too.
+  const teamOptions = hasGroups
+    ? isGroupStage
+      ? matchGroup === "A"
+        ? groupATeams
+        : groupBTeams
+      : [...groupATeams, ...groupBTeams]
+    : rosterTeams.map((t) => t.team);
+  const hasTeamOptions = teamOptions.length > 0;
+  const rosterLogoMap = useMemo(() => new Map(rosterTeams.map((t) => [t.team, t.logoUrl])), [rosterTeams]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -244,7 +257,7 @@ export function MatchesManager({
         )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {hasGroups ? (
+          {hasTeamOptions ? (
             <select value={form.team_a} onChange={(e) => setForm({ ...form, team_a: e.target.value })} className={inputCls}>
               <option value="">اختر الفريق الأول</option>
               {teamOptions.map((t) => (
@@ -256,7 +269,7 @@ export function MatchesManager({
           )}
           <input type="number" value={form.home_goals} onChange={(e) => setForm({ ...form, home_goals: Number(e.target.value) })} className={`${inputCls} text-center text-h3 font-black text-accent-orange`} />
           <input type="number" value={form.away_goals} onChange={(e) => setForm({ ...form, away_goals: Number(e.target.value) })} className={`${inputCls} text-center text-h3 font-black text-accent-orange`} />
-          {hasGroups ? (
+          {hasTeamOptions ? (
             <select value={form.team_b} onChange={(e) => setForm({ ...form, team_b: e.target.value })} className={inputCls}>
               <option value="">اختر الفريق الثاني</option>
               {teamOptions.map((t) => (
@@ -268,6 +281,19 @@ export function MatchesManager({
           )}
         </div>
 
+        {(rosterLogoMap.get(form.team_a) || rosterLogoMap.get(form.team_b)) && (
+          <div className="mt-3 flex items-center justify-center gap-6">
+            {rosterLogoMap.get(form.team_a) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={rosterLogoMap.get(form.team_a)!} alt={form.team_a} className="h-10 w-10 rounded-full object-contain ring-1 ring-white/10" />
+            )}
+            {rosterLogoMap.get(form.team_b) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={rosterLogoMap.get(form.team_b)!} alt={form.team_b} className="h-10 w-10 rounded-full object-contain ring-1 ring-white/10" />
+            )}
+          </div>
+        )}
+
         {form.round !== "دور المجموعات" && Number(form.home_goals) === Number(form.away_goals) && (
           <div className="mt-3 rounded-xl bg-accent-orange/10 p-3 ring-1 ring-accent-orange/30">
             <div className="mb-2 text-caption font-black text-accent-orange">ضربات الجزاء عند التعادل</div>
@@ -277,11 +303,6 @@ export function MatchesManager({
             </div>
           </div>
         )}
-
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <input value={form.team_a_logo} onChange={(e) => setForm({ ...form, team_a_logo: e.target.value })} placeholder="رابط شعار الفريق الأول (اختياري)" dir="ltr" className={inputCls} />
-          <input value={form.team_b_logo} onChange={(e) => setForm({ ...form, team_b_logo: e.target.value })} placeholder="رابط شعار الفريق الثاني (اختياري)" dir="ltr" className={inputCls} />
-        </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <input type="date" value={form.match_date} onChange={(e) => setForm({ ...form, match_date: e.target.value })} className={inputCls} />

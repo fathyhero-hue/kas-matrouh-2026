@@ -4,6 +4,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { MatchCard } from "@/components/sport/match-card";
 import { EmptyState } from "@/components/sport/empty-state";
+import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
@@ -15,12 +16,15 @@ export default async function MatchesPage({ params, searchParams }: TournamentPa
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const { data: matches } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("bracket_id", bracketId)
-    .order("match_date", { ascending: false })
-    .order("match_time", { ascending: false });
+  const [{ data: matches }, logos] = await Promise.all([
+    supabase
+      .from("matches")
+      .select("*")
+      .eq("bracket_id", bracketId)
+      .order("match_date", { ascending: false })
+      .order("match_time", { ascending: false }),
+    getBracketTeamLogos(supabase, bracketId),
+  ]);
 
   const allMatches = matches || [];
   if (allMatches.length === 0) return <EmptyState message="لسه مفيش مباريات مسجّلة" />;
@@ -39,9 +43,9 @@ export default async function MatchesPage({ params, searchParams }: TournamentPa
                 <MatchCard
                   key={m.id}
                   teamA={m.team_a}
-                  teamALogo={m.team_a_logo}
+                  teamALogo={lookupTeamLogo(logos, m.team_a) || m.team_a_logo}
                   teamB={m.team_b}
-                  teamBLogo={m.team_b_logo}
+                  teamBLogo={lookupTeamLogo(logos, m.team_b) || m.team_b_logo}
                   homeGoals={m.home_goals}
                   awayGoals={m.away_goals}
                   status={m.status}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
 import { StatsManager } from "@/components/admin/stats-manager";
+import { getBracketRosterTeams } from "@/lib/sport/roster-link";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export default async function AdminStatsPage({
         supabase.from("formations").select("*, formation_players(*)").eq("bracket_id", bracketId).order("updated_at", { ascending: false }),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+
+  const rosterTeams = bracketId ? await getBracketRosterTeams(supabase, bracketId) : [];
 
   return (
     <div className="space-y-5">
@@ -62,6 +65,7 @@ export default async function AdminStatsPage({
           initialCards={(cards.data || []) as any}
           initialMotm={(motm.data || []) as any}
           initialFormations={(formations.data || []) as any}
+          rosterTeams={rosterTeams}
         />
       )}
     </div>

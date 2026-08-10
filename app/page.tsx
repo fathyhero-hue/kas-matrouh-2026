@@ -7,6 +7,7 @@ import { NewsTicker } from "@/components/home/news-ticker";
 import { NewsSection } from "@/components/home/news-section";
 import { SponsorsMarquee } from "@/components/home/sponsors-marquee";
 import { TOURNAMENTS, type TournamentSlug } from "@/lib/sport/tournaments";
+import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 15;
 
@@ -68,6 +69,19 @@ export default async function NewHomePage() {
   const [ticker, liveMatches, news] = await Promise.all([getTicker(), getLiveMatches(), getNews()]);
   const upcomingMatch = liveMatches.length === 0 ? await getUpcomingMatch() : null;
 
+  // Live/upcoming matches can belong to different tournaments — resolve each
+  // one's real team logos from its own bracket's roster.
+  const supabase = createPublicClient();
+  const bracketIds = [...new Set([...liveMatches, ...(upcomingMatch ? [upcomingMatch] : [])].map((m: any) => m.bracket_id).filter(Boolean))];
+  const logosByBracket = new Map<string, Map<string, string>>();
+  await Promise.all(
+    bracketIds.map(async (id) => {
+      logosByBracket.set(id, await getBracketTeamLogos(supabase, id));
+    })
+  );
+  const teamLogo = (bracketId: string, team: string | null, fallback: string | null) =>
+    lookupTeamLogo(logosByBracket.get(bracketId) || new Map(), team) || fallback;
+
   return (
     <main dir="rtl" className="min-h-screen">
       <NewsTicker text={ticker} />
@@ -94,9 +108,9 @@ export default async function NewHomePage() {
               const card = (
                 <MatchCard
                   teamA={match.team_a}
-                  teamALogo={match.team_a_logo}
+                  teamALogo={teamLogo(match.bracket_id, match.team_a, match.team_a_logo)}
                   teamB={match.team_b}
-                  teamBLogo={match.team_b_logo}
+                  teamBLogo={teamLogo(match.bracket_id, match.team_b, match.team_b_logo)}
                   homeGoals={match.home_goals}
                   awayGoals={match.away_goals}
                   status={match.status}
@@ -126,9 +140,9 @@ export default async function NewHomePage() {
           </div>
           <MatchCard
             teamA={upcomingMatch.team_a}
-            teamALogo={upcomingMatch.team_a_logo}
+            teamALogo={teamLogo(upcomingMatch.bracket_id, upcomingMatch.team_a, upcomingMatch.team_a_logo)}
             teamB={upcomingMatch.team_b}
-            teamBLogo={upcomingMatch.team_b_logo}
+            teamBLogo={teamLogo(upcomingMatch.bracket_id, upcomingMatch.team_b, upcomingMatch.team_b_logo)}
             homeGoals={upcomingMatch.home_goals}
             awayGoals={upcomingMatch.away_goals}
             status={upcomingMatch.status}

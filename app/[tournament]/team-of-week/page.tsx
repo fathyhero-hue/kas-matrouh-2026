@@ -4,6 +4,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
+import { getBracketRosterTeams, buildPlayerPhotoResolver } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
@@ -15,17 +16,23 @@ export default async function TeamOfWeekPage({ params, searchParams }: Tournamen
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const { data: formations } = await supabase
-    .from("formations")
-    .select("*, formation_players(*)")
-    .eq("bracket_id", bracketId)
-    .order("updated_at", { ascending: false });
+  const [{ data: formations }, rosterTeams] = await Promise.all([
+    supabase
+      .from("formations")
+      .select("*, formation_players(*)")
+      .eq("bracket_id", bracketId)
+      .order("updated_at", { ascending: false }),
+    getBracketRosterTeams(supabase, bracketId),
+  ]);
+  const resolvePhoto = buildPlayerPhotoResolver(rosterTeams);
 
   const rows = formations || [];
   if (rows.length === 0) return <EmptyState message="لسه مفيش تشكيلة جولة منشورة" />;
 
   const latest = rows[0];
-  const players = (latest.formation_players || []).sort((a: any, b: any) => a.slot_index - b.slot_index);
+  const players = (latest.formation_players || [])
+    .sort((a: any, b: any) => a.slot_index - b.slot_index)
+    .map((p: any) => ({ ...p, image_url: p.image_url || resolvePhoto(p.team, p.name) }));
 
   return (
     <div>
