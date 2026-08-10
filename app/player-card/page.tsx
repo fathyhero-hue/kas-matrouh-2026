@@ -17,7 +17,11 @@ function resolveLinkedTournament(name: string): { tournamentKey: string; suffix:
   const target = normalize(name);
   for (const slug of LINKABLE_SLUGS) {
     const config = TOURNAMENTS[slug];
-    if (normalize(config.label) === target) {
+    const label = normalize(config.label);
+    // player_registration_tournaments rows are named e.g. "بطولة كأس مطروح"
+    // while TOURNAMENTS labels are just "كأس مطروح" — match either containing
+    // the other instead of requiring exact equality.
+    if (target === label || target.includes(label) || label.includes(target)) {
       return { tournamentKey: config.tournament, suffix: resolveEdition(slug, undefined).suffix };
     }
   }
