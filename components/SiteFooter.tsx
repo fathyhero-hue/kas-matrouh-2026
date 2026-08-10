@@ -13,7 +13,7 @@ const links = [
 
 export default function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-white/10 bg-brand-dark text-foreground">
+    <footer className="print:hidden mt-16 border-t border-white/10 bg-brand-dark text-foreground">
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
         {/* Brand */}
         <div className="flex flex-col items-center gap-2 text-center">

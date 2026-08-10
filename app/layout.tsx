@@ -30,7 +30,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" className={`dark ${cairo.variable}`}>
       <body className="bg-background text-foreground font-sans">
         <CartProvider>
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-brand-dark/95 backdrop-blur-lg">
+          <header className="print:hidden sticky top-0 z-40 border-b border-white/10 bg-brand-dark/95 backdrop-blur-lg">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
               <Link href="/" className="flex items-center gap-2.5">
                 <Image src="/logo.png" alt="مطروح الرياضية" width={36} height={36} className="rounded-full" priority />
