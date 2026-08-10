@@ -29,6 +29,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
   const [logoPreview, setLogoPreview] = useState("");
   const [players, setPlayers] = useState<PlayerRow[]>(() => emptyPlayers(maxPlayers));
   const [submitting, setSubmitting] = useState(false);
+  const [progressLabel, setProgressLabel] = useState("");
 
   const unlock = async () => {
     if (!code.trim()) return toast.error("الرجاء إدخال الرقم السري.");
@@ -82,21 +83,59 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
 
     setSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.set("suffix", suffix);
-      fd.set("teamName", teamName.trim());
-      fd.set("managerName", managerName.trim());
-      fd.set("managerPhone", managerPhone.trim());
-      if (logoFile) fd.set("logo", logoFile);
-      fd.set("players", JSON.stringify(players.map((p) => ({ name: p.name.trim(), number: p.number.trim() }))));
+      // Team + player names/numbers first, as a small JSON request. Photos
+      // are uploaded one at a time afterwards — a whole squad's photos sent
+      // together in one request routinely exceeds the server's request-size
+      // limit and gets rejected before it even reaches the app.
+      setProgressLabel("جاري حفظ بيانات الفريق...");
+      const res = await fetch("/api/roster/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          suffix,
+          teamName: teamName.trim(),
+          managerName: managerName.trim(),
+          managerPhone: managerPhone.trim(),
+          players: players.map((p) => ({ name: p.name.trim(), number: p.number.trim() })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "فشل حفظ بيانات الفريق");
+
+      const rosterId = data.rosterId as string;
+      const playerIds = (data.playerIds || []) as string[];
+
+      const uploadOne = async (kind: "logo" | "personal" | "id", file: File, playerId?: string) => {
+        const uploadFd = new FormData();
+        uploadFd.set("rosterId", rosterId);
+        uploadFd.set("kind", kind);
+        if (playerId) uploadFd.set("playerId", playerId);
+        uploadFd.set("file", file);
+        const r = await fetch("/api/roster/upload-photo", { method: "POST", body: uploadFd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d?.error || "فشل رفع إحدى الصور");
+      };
+
+      const tasks: (() => Promise<void>)[] = [];
+      if (logoFile) tasks.push(() => uploadOne("logo", logoFile));
       players.forEach((p, i) => {
-        if (p.personalFile) fd.set(`player_${i}_personal`, p.personalFile);
-        if (p.idFile) fd.set(`player_${i}_id`, p.idFile);
+        const playerId = playerIds[i];
+        if (p.personalFile) tasks.push(() => uploadOne("personal", p.personalFile!, playerId));
+        if (p.idFile) tasks.push(() => uploadOne("id", p.idFile!, playerId));
       });
 
-      const res = await fetch("/api/roster/submit", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل حفظ القائمة");
+      let done = 0;
+      setProgressLabel(`جاري رفع الصور... 0/${tasks.length}`);
+      let nextIndex = 0;
+      const worker = async () => {
+        while (nextIndex < tasks.length) {
+          const myIndex = nextIndex++;
+          await tasks[myIndex]();
+          done++;
+          setProgressLabel(`جاري رفع الصور... ${done}/${tasks.length}`);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, tasks.length) }, worker));
 
       setStep("success");
       toast.success("تم رفع الصور واعتماد قائمة الفريق بنجاح ✅");
@@ -104,6 +143,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       toast.error(e?.message || "حدث خطأ أثناء رفع الصور، يرجى المحاولة مرة أخرى.");
     } finally {
       setSubmitting(false);
+      setProgressLabel("");
     }
   };
 
@@ -230,7 +270,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-body font-black text-primary-foreground disabled:opacity-60"
       >
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {submitting ? "جاري رفع الصور..." : "حفظ واعتماد القائمة نهائياً"}
+        {submitting ? progressLabel || "جاري الحفظ..." : "حفظ واعتماد القائمة نهائياً"}
       </button>
     </div>
   );
