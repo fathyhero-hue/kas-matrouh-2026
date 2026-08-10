@@ -3,43 +3,48 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
-const CARD_ASPECT = 1.586; // matches IdCard's aspect-[1.586/1]
+const CARD_W = 95; // mm
+const CARD_H = 55; // mm
 const PAGE_W = 210;
 const PAGE_H = 297;
-const MARGIN = 8;
-const GAP = 5;
-const COLS = 2;
-const ROWS = 2;
+const GAP = 2;
+const COLS = 2; // col 0 = front, col 1 = back
+const ROWS = 4; // 4 cards (8 faces) per page
 
 export function PdfDownloadButton({ filename = "player-cards.pdf" }: { filename?: string }) {
   const [loading, setLoading] = useState(false);
 
   const download = async () => {
-    const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-print-card]"));
-    if (cards.length === 0) return;
+    const fronts = Array.from(document.querySelectorAll<HTMLElement>('[data-card-face="front"]'));
+    const backs = Array.from(document.querySelectorAll<HTMLElement>('[data-card-face="back"]'));
+    if (fronts.length === 0) return;
 
     setLoading(true);
     try {
       const [{ toPng }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
 
-      const cardW = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
-      const cardH = cardW / CARD_ASPECT;
-      const gridH = cardH * ROWS + GAP * (ROWS - 1);
-      const offsetY = MARGIN + Math.max(0, (PAGE_H - MARGIN * 2 - gridH) / 2);
+      const gridW = CARD_W * COLS + GAP * (COLS - 1);
+      const gridH = CARD_H * ROWS + GAP * (ROWS - 1);
+      const marginX = Math.max(0, (PAGE_W - gridW) / 2);
+      const marginY = Math.max(0, (PAGE_H - gridH) / 2);
 
       const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-      for (let i = 0; i < cards.length; i++) {
-        const posInPage = i % (COLS * ROWS);
+      for (let i = 0; i < fronts.length; i++) {
+        const cardsPerPage = ROWS;
+        const posInPage = i % cardsPerPage;
         if (i !== 0 && posInPage === 0) doc.addPage();
 
-        const col = posInPage % COLS;
-        const row = Math.floor(posInPage / COLS);
-        const x = MARGIN + col * (cardW + GAP);
-        const y = offsetY + row * (cardH + GAP);
+        const row = posInPage;
+        const y = marginY + row * (CARD_H + GAP);
 
-        const dataUrl = await toPng(cards[i], { pixelRatio: 2, cacheBust: true });
-        doc.addImage(dataUrl, "PNG", x, y, cardW, cardH);
+        const frontDataUrl = await toPng(fronts[i], { pixelRatio: 2, cacheBust: true });
+        doc.addImage(frontDataUrl, "PNG", marginX, y, CARD_W, CARD_H);
+
+        if (backs[i]) {
+          const backDataUrl = await toPng(backs[i], { pixelRatio: 2, cacheBust: true });
+          doc.addImage(backDataUrl, "PNG", marginX + CARD_W + GAP, y, CARD_W, CARD_H);
+        }
       }
 
       doc.save(filename);

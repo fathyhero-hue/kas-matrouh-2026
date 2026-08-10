@@ -28,7 +28,7 @@ export function AdminNav() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-brand-dark/95 backdrop-blur-lg">
+    <header className="print:hidden sticky top-0 z-40 border-b border-white/10 bg-brand-dark/95 backdrop-blur-lg">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2 text-body font-black">
           <Trophy className="h-5 w-5 text-accent-blue" />

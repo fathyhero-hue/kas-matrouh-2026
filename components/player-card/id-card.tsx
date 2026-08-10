@@ -43,7 +43,7 @@ export function IdCard({ data }: { data: IdCardData }) {
   return (
     <div dir="rtl" className="print-card-grid grid grid-cols-1 gap-5 justify-items-center">
       {/* Front */}
-      <div className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#d5d5d5] text-black bg-white">
+      <div data-card-face="front" className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#d5d5d5] text-black bg-white">
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(84,28,162,0.10),rgba(13,148,136,0.04)_44%,rgba(245,158,11,0.08)_100%)]"></div>
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#4b1690] via-[#1da1f2] to-[#22c55e]"></div>
         <div className="absolute -right-14 -top-14 w-44 h-44 rounded-full bg-[#4b1690]/8 blur-2xl"></div>
@@ -143,7 +143,7 @@ export function IdCard({ data }: { data: IdCardData }) {
       </div>
 
       {/* Back */}
-      <div className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#4b1690]/20 text-white">
+      <div data-card-face="back" className="id-card-print relative w-full max-w-[430px] aspect-[1.586/1] rounded-[22px] overflow-hidden shadow-2xl border border-[#4b1690]/20 text-white">
         <div className="absolute inset-0 bg-[linear-gradient(135deg,#35115f_0%,#4b1690_45%,#1d4ed8_82%,#16a34a_100%)]"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.20),transparent_28%)]"></div>
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.14]">
