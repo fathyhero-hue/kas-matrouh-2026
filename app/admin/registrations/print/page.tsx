@@ -5,6 +5,22 @@ import { PdfDownloadButton } from "@/components/admin/pdf-download-button";
 
 export const dynamic = "force-dynamic";
 
+// Fetched server-side (no CORS restrictions here) and inlined as a data URI so the
+// browser never needs a cross-origin fetch when rasterizing the card for PDF export.
+async function toDataUri(url: string | null | undefined): Promise<string | undefined> {
+  if (!url) return undefined;
+  if (url.startsWith("data:")) return url;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return undefined;
+    const contentType = res.headers.get("content-type") || "image/png";
+    const buf = Buffer.from(await res.arrayBuffer());
+    return `data:${contentType};base64,${buf.toString("base64")}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export default async function RegistrationsPrintPage({
   searchParams,
 }: {
@@ -16,6 +32,29 @@ export default async function RegistrationsPrintPage({
   if (tournament) query = query.eq("tournament_name", tournament);
   const { data: registrations } = await query;
   const rows = registrations || [];
+
+  const cards: IdCardData[] = await Promise.all(
+    rows.map(async (r: any) => {
+      const [photoUrl, tournamentLogoUrl] = await Promise.all([toDataUri(r.photo_url), toDataUri(r.tournament_logo_url)]);
+      return {
+        fullName: r.full_name,
+        role: r.role,
+        roleLabel: r.role_label,
+        team: r.team_name || "لاعب حر",
+        tournament: r.tournament_name,
+        tournamentLogoUrl,
+        serial: r.serial_number,
+        qrPayload: r.qr_payload,
+        birthDate: r.birth_date,
+        registrationDate: r.registration_date,
+        nationalId: r.national_id,
+        photoUrl,
+        cropX: r.crop_x,
+        cropY: r.crop_y,
+        zoom: r.zoom,
+      };
+    })
+  );
 
   return (
     <main dir="rtl" className="min-h-screen bg-white p-6 text-black print:p-0">
@@ -40,42 +79,23 @@ export default async function RegistrationsPrintPage({
       `}</style>
 
       <h1 className="mb-4 text-h2 font-black text-black print:hidden">
-        بطاقات المسجّلين {tournament ? `— ${tournament}` : ""} ({rows.length})
+        بطاقات المسجّلين {tournament ? `— ${tournament}` : ""} ({cards.length})
       </h1>
 
-      {rows.length === 0 ? (
+      {cards.length === 0 ? (
         <p className="text-body text-gray-500 print:hidden">لا توجد بطاقات لتصديرها.</p>
       ) : (
         <div className="print-page">
-          {rows.map((r: any) => {
-            const data: IdCardData = {
-              fullName: r.full_name,
-              role: r.role,
-              roleLabel: r.role_label,
-              team: r.team_name || "لاعب حر",
-              tournament: r.tournament_name,
-              tournamentLogoUrl: r.tournament_logo_url || undefined,
-              serial: r.serial_number,
-              qrPayload: r.qr_payload,
-              birthDate: r.birth_date,
-              registrationDate: r.registration_date,
-              nationalId: r.national_id,
-              photoUrl: r.photo_url,
-              cropX: r.crop_x,
-              cropY: r.crop_y,
-              zoom: r.zoom,
-            };
-            return (
-              <div key={r.id} className="print-card-cell" data-print-card>
-                <IdCard data={data} />
-              </div>
-            );
-          })}
+          {cards.map((data, i) => (
+            <div key={rows[i].id} className="print-card-cell" data-print-card>
+              <IdCard data={data} />
+            </div>
+          ))}
         </div>
       )}
 
       <PrintButton />
-      {rows.length > 0 && <PdfDownloadButton filename={`player-cards${tournament ? `-${tournament}` : ""}.pdf`} />}
+      {cards.length > 0 && <PdfDownloadButton filename={`player-cards${tournament ? `-${tournament}` : ""}.pdf`} />}
     </main>
   );
 }
