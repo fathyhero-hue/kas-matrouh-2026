@@ -9,7 +9,9 @@ import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { buildStandings } from "@/lib/sport/standings";
 import { MatchCard } from "@/components/sport/match-card";
 import { StandingsTable } from "@/components/sport/standings-table";
+import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
 import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
+import { computeEliteBracket } from "@/lib/sport/elite-bracket";
 
 export const revalidate = 30;
 
@@ -72,6 +74,90 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
     : null;
   const featured = live || upcoming;
   const recentResults = allMatches.filter((m) => m.status === "انتهت").slice(0, 5);
+
+  if (slug === "elite-cup") {
+    const service = createServiceRoleClient();
+    const { data: groupsSetting } = await service.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
+    const groupA: string[] = (groupsSetting?.value as any)?.groupA || [];
+    const groupB: string[] = (groupsSetting?.value as any)?.groupB || [];
+    const inGroup = (team: string | null, group: string[]) => !!team && group.includes(team);
+
+    const groupAMatches = allMatches.filter((m) => inGroup(m.team_a, groupA) && inGroup(m.team_b, groupA));
+    const groupBMatches = allMatches.filter((m) => inGroup(m.team_a, groupB) && inGroup(m.team_b, groupB));
+    const groupAStandings = buildStandings(groupAMatches);
+    const groupBStandings = buildStandings(groupBMatches);
+    const bracket = computeEliteBracket(groupAStandings, groupBStandings, allMatches as any);
+
+    return (
+      <div>
+        {eliteRegistrationBanner}
+
+        {featured && (
+          <section className="mb-8">
+            <h2 className="mb-3 text-h3 font-black text-muted-foreground">{live ? "جارية الآن" : "المباراة القادمة"}</h2>
+            <MatchCard
+              teamA={featured.team_a}
+              teamALogo={featured.team_a_logo}
+              teamB={featured.team_b}
+              teamBLogo={featured.team_b_logo}
+              homeGoals={featured.home_goals}
+              awayGoals={featured.away_goals}
+              status={featured.status}
+              matchDate={featured.match_date}
+              matchTime={featured.match_time}
+              round={featured.round}
+              isLive={featured.is_live}
+              liveMinute={featured.live_minute}
+            />
+          </section>
+        )}
+
+        {(groupA.length > 0 || groupB.length > 0) && (
+          <section className="mb-8">
+            <h2 className="mb-3 text-h3 font-black text-muted-foreground">ترتيب المجموعات</h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <div className="mb-2 text-caption font-black text-accent-blue">المجموعة الأولى</div>
+                <StandingsTable rows={groupAStandings} />
+              </div>
+              <div>
+                <div className="mb-2 text-caption font-black text-accent-green">المجموعة الثانية</div>
+                <StandingsTable rows={groupBStandings} />
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-h3 font-black text-muted-foreground">مخطط الأدوار الإقصائية</h2>
+          <EliteBracketDiagram bracket={bracket} />
+        </section>
+
+        {recentResults.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-3 text-h3 font-black text-muted-foreground">آخر النتائج</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {recentResults.map((m) => (
+                <MatchCard
+                  key={m.id}
+                  teamA={m.team_a}
+                  teamALogo={m.team_a_logo}
+                  teamB={m.team_b}
+                  teamBLogo={m.team_b_logo}
+                  homeGoals={m.home_goals}
+                  awayGoals={m.away_goals}
+                  status={m.status}
+                  matchDate={m.match_date}
+                  matchTime={m.match_time}
+                  round={m.round}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   if (allMatches.length === 0) {
     return (

@@ -5,6 +5,7 @@ import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { RostersManager } from "@/components/admin/rosters-manager";
 import { BannedListManager } from "@/components/admin/banned-list-manager";
 import { EliteTeamsStatus } from "@/components/admin/elite-teams-status";
+import { EliteGroupsManager } from "@/components/admin/elite-groups-manager";
 
 function normalizeTeamName(name: string): string {
   return String(name || "")
@@ -53,7 +54,10 @@ export default async function AdminRostersPage({
   const { data: banned } = await supabase.from("banned_entities").select("*").order("name", { ascending: true });
 
   let eliteTeams: { name: string; order: any; roster: { is_submitted: boolean; playerCount: number } | null }[] | null = null;
+  let eliteGroups: { groupA: string[]; groupB: string[] } | null = null;
   if (slug === "elite-cup") {
+    const { data: groupsSetting } = await supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
+    eliteGroups = { groupA: (groupsSetting?.value as any)?.groupA || [], groupB: (groupsSetting?.value as any)?.groupB || [] };
     const { data: eliteOrders } = await supabase
       .from("orders")
       .select("id, team_name, payment_status, manager_name, phone, access_password, admin_manual_access")
@@ -113,6 +117,7 @@ export default async function AdminRostersPage({
       </div>
 
       {eliteTeams && <EliteTeamsStatus teams={eliteTeams} price={Number(settings?.price || 1500)} />}
+      {eliteGroups && <EliteGroupsManager initialGroupA={eliteGroups.groupA} initialGroupB={eliteGroups.groupB} />}
 
       {!bracketId ? (
         <div className="rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا يوجد براكيت مطابق لهذه البطولة/النسخة.</div>
