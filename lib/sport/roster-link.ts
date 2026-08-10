@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type RosterPlayerLite = { name: string; photoUrl: string | null };
-export type RosterTeamLite = { team: string; logoUrl: string | null; players: RosterPlayerLite[] };
+export type RosterTeamLite = {
+  team: string;
+  logoUrl: string | null;
+  coachName: string | null;
+  coachPhotoUrl: string | null;
+  players: RosterPlayerLite[];
+};
 
 // Same normalization strategy used elsewhere for team-name matching
 // (elite-bracket.ts, roster/submit route) — trim + collapse spaces + lowercase.
@@ -16,7 +22,7 @@ export function normalize(value: string): string {
 export async function getBracketRosterTeams(supabase: SupabaseClient, bracketId: string): Promise<RosterTeamLite[]> {
   const { data } = await supabase
     .from("team_rosters")
-    .select("team_name, logo_url, roster_players(name, personal_image_url)")
+    .select("team_name, logo_url, coach_name, coach_photo_url, roster_players(name, personal_image_url)")
     .eq("bracket_id", bracketId);
 
   return (data || [])
@@ -24,6 +30,8 @@ export async function getBracketRosterTeams(supabase: SupabaseClient, bracketId:
     .map((r: any) => ({
       team: r.team_name as string,
       logoUrl: (r.logo_url as string) || null,
+      coachName: (r.coach_name as string) || null,
+      coachPhotoUrl: (r.coach_photo_url as string) || null,
       players: ((r.roster_players || []) as any[])
         .filter((p) => p.name)
         .map((p) => ({ name: p.name as string, photoUrl: (p.personal_image_url as string) || null })),

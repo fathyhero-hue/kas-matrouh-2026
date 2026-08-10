@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     const teamName = String(body.teamName || "").trim();
     const managerName = String(body.managerName || "");
     const managerPhone = String(body.managerPhone || "");
+    const coachName = String(body.coachName || "").trim();
     const players = (Array.isArray(body.players) ? body.players : []) as Array<{ name: string; number: string }>;
 
     if (!teamName || !managerName.trim() || !managerPhone.trim() || !players.length) {
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
           team_slug: slug,
           manager_name: managerName,
           manager_phone: managerPhone,
+          coach_name: coachName,
           is_submitted: true,
           updated_at: new Date().toISOString(),
         },

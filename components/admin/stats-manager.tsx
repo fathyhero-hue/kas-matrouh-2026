@@ -9,7 +9,13 @@ type Card = { id: string; player: string; team: string; yellow: number; red: num
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
-type RosterTeam = { team: string; logoUrl: string | null; players: { name: string; photoUrl: string | null }[] };
+type RosterTeam = {
+  team: string;
+  logoUrl: string | null;
+  coachName?: string | null;
+  coachPhotoUrl?: string | null;
+  players: { name: string; photoUrl: string | null }[];
+};
 
 const inputCls = "h-10 w-full rounded-lg bg-secondary px-3 text-caption font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue";
 const TABS = [
@@ -461,6 +467,22 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
         <input value={coachName} onChange={(e) => setCoachName(e.target.value)} placeholder="اسم المدرب (اختياري)" className={inputCls} />
         <input value={coachTeam} onChange={(e) => setCoachTeam(e.target.value)} placeholder="فريق المدرب" className={inputCls} />
       </div>
+      {(() => {
+        const registeredCoach = rosterTeams.find((t) => t.team === coachTeam && t.coachName);
+        if (!registeredCoach) return null;
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              setCoachName(registeredCoach.coachName || "");
+              setCoachImageUrl(registeredCoach.coachPhotoUrl || "");
+            }}
+            className="flex w-full items-center justify-between gap-2 rounded-xl bg-accent-blue/10 px-4 py-2.5 text-caption font-bold text-accent-blue ring-1 ring-accent-blue/30"
+          >
+            استخدام المدرب المسجّل: {registeredCoach.coachName}
+          </button>
+        );
+      })()}
       {coachName.trim() && (
         <div className="flex items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-white/10">
           <PhotoUploadButton onUploaded={setCoachImageUrl} />

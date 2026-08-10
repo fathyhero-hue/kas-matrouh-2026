@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
-const KINDS = new Set(["logo", "personal", "id"]);
+const KINDS = new Set(["logo", "coach", "personal", "id"]);
 
 // One photo per request — called repeatedly by the roster submit form after
 // /api/roster/submit creates the team/player rows, so no single request ever
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     if (!rosterId || !file) return NextResponse.json({ error: "بيانات الرفع غير مكتملة." }, { status: 400 });
     if (!KINDS.has(kind)) return NextResponse.json({ error: "نوع الصورة غير معروف." }, { status: 400 });
-    if (kind !== "logo" && !playerId) return NextResponse.json({ error: "بيانات اللاعب غير مكتملة." }, { status: 400 });
+    if (kind !== "logo" && kind !== "coach" && !playerId) return NextResponse.json({ error: "بيانات اللاعب غير مكتملة." }, { status: 400 });
     if (file.size > MAX_PHOTO_BYTES) return NextResponse.json({ error: "حجم الصورة كبير جداً (أقصى حد 2 ميجا)." }, { status: 400 });
 
     const supabase = createServiceRoleClient();
@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
 
     if (kind === "logo") {
       await supabase.from("team_rosters").update({ logo_url: url }).eq("id", rosterId);
+    } else if (kind === "coach") {
+      await supabase.from("team_rosters").update({ coach_photo_url: url }).eq("id", rosterId);
     } else if (kind === "personal") {
       await supabase.from("roster_players").update({ personal_image_url: url }).eq("id", playerId);
     } else {

@@ -2,8 +2,27 @@ import { IdCard } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { RegistrationForm } from "@/components/player-card/registration-form";
 import { EmptyState } from "@/components/sport/empty-state";
+import { TOURNAMENTS, resolveEdition, type TournamentSlug } from "@/lib/sport/tournaments";
+import { normalize } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
+
+// Only these two have a real roster/access-code system (see
+// app/[tournament]/rosters/submit/page.tsx's SUPPORTS_SUBMISSION) — matching
+// a player_registration_tournaments row's name against one of them is what
+// turns on the secret-code gate + real team/player picker for that campaign.
+const LINKABLE_SLUGS: TournamentSlug[] = ["matrouh-cup", "elite-cup"];
+
+function resolveLinkedTournament(name: string): { tournamentKey: string; suffix: string } | null {
+  const target = normalize(name);
+  for (const slug of LINKABLE_SLUGS) {
+    const config = TOURNAMENTS[slug];
+    if (normalize(config.label) === target) {
+      return { tournamentKey: config.tournament, suffix: resolveEdition(slug, undefined).suffix };
+    }
+  }
+  return null;
+}
 
 export default async function PlayerCardPage() {
   const supabase = createPublicClient();
@@ -13,7 +32,7 @@ export default async function PlayerCardPage() {
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  const rows = tournaments || [];
+  const rows = (tournaments || []).map((t) => ({ ...t, linkedTournament: resolveLinkedTournament(t.name) }));
 
   return (
     <main dir="rtl" className="mx-auto max-w-xl px-4 pb-16 pt-8 sm:px-6">

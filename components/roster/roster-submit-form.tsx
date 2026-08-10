@@ -27,6 +27,9 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
   const [managerPhone, setManagerPhone] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
+  const [coachName, setCoachName] = useState("");
+  const [coachFile, setCoachFile] = useState<File | null>(null);
+  const [coachPreview, setCoachPreview] = useState("");
   const [players, setPlayers] = useState<PlayerRow[]>(() => emptyPlayers(maxPlayers));
   const [submitting, setSubmitting] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
@@ -63,6 +66,14 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     setLogoPreview(URL.createObjectURL(file));
   };
 
+  const handleCoachFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast.error("اختار صورة صحيحة");
+    if (file.size > 2 * 1024 * 1024) return toast.error("حجم الصورة كبير (أقصى 2 ميجا)");
+    setCoachFile(file);
+    setCoachPreview(URL.createObjectURL(file));
+  };
+
   const handlePlayerFile = (index: number, field: "personal" | "id", file?: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("اختار صورة صحيحة");
@@ -96,6 +107,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
           teamName: teamName.trim(),
           managerName: managerName.trim(),
           managerPhone: managerPhone.trim(),
+          coachName: coachName.trim(),
           players: players.map((p) => ({ name: p.name.trim(), number: p.number.trim() })),
         }),
       });
@@ -105,7 +117,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       const rosterId = data.rosterId as string;
       const playerIds = (data.playerIds || []) as string[];
 
-      const uploadOne = async (kind: "logo" | "personal" | "id", file: File, playerId?: string) => {
+      const uploadOne = async (kind: "logo" | "coach" | "personal" | "id", file: File, playerId?: string) => {
         const uploadFd = new FormData();
         uploadFd.set("rosterId", rosterId);
         uploadFd.set("kind", kind);
@@ -118,6 +130,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
 
       const tasks: (() => Promise<void>)[] = [];
       if (logoFile) tasks.push(() => uploadOne("logo", logoFile));
+      if (coachFile) tasks.push(() => uploadOne("coach", coachFile));
       players.forEach((p, i) => {
         const playerId = playerIds[i];
         if (p.personalFile) tasks.push(() => uploadOne("personal", p.personalFile!, playerId));
@@ -217,6 +230,27 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
         {logoPreview ? "تم اختيار شعار الفريق ✓" : "رفع شعار الفريق (اختياري)"}
         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoFile(e.target.files?.[0])} />
       </label>
+
+      <div className="rounded-2xl bg-card p-4 ring-1 ring-white/10">
+        <div className="mb-3 text-caption font-black text-muted-foreground">بيانات المدرب (اختياري)</div>
+        <div className="flex items-center gap-3">
+          <label className="flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-secondary ring-1 ring-white/10">
+            {coachPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coachPreview} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <Camera className="h-5 w-5 text-muted-foreground" />
+            )}
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleCoachFile(e.target.files?.[0])} />
+          </label>
+          <input
+            value={coachName}
+            onChange={(e) => setCoachName(e.target.value)}
+            placeholder="اسم المدرب"
+            className="h-12 flex-1 rounded-xl bg-secondary px-4 text-body font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue"
+          />
+        </div>
+      </div>
 
       <div className="space-y-3">
         <div className="text-caption font-black text-muted-foreground">قائمة اللاعبين ({players.length})</div>
