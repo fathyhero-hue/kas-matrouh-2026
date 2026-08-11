@@ -24,6 +24,7 @@ function statusBadge(order: TeamOrder | null) {
   if (order.payment_status === "paid") return { label: "دفع الاشتراك", tone: "bg-accent-green/15 text-accent-green", Icon: CheckCircle2 };
   if (order.payment_status === "manual_access") return { label: "تفعيل يدوي", tone: "bg-accent-blue/15 text-accent-blue", Icon: ShieldCheck };
   if (order.payment_status === "pending_payment") return { label: "بانتظار الدفع", tone: "bg-accent-orange/15 text-accent-orange", Icon: Clock };
+  if (order.payment_status === "cancelled") return { label: "تم إلغاء التفعيل", tone: "bg-white/5 text-muted-foreground", Icon: XCircle };
   return { label: "فشل الدفع", tone: "bg-red-500/15 text-red-400", Icon: XCircle };
 }
 
@@ -61,6 +62,19 @@ export function EliteTeamsStatus({ teams: initialTeams, price }: { teams: TeamRo
     navigator.clipboard.writeText(password).then(() => toast.success("تم نسخ الرقم السري"));
   };
 
+  const deactivate = async (teamName: string, orderId: string) => {
+    if (!confirm(`متأكد من إلغاء التفعيل اليدوي لفريق "${teamName}"؟ الرقم السري بتاعه هيوقف عن العمل.`)) return;
+    try {
+      const res = await fetch(`/api/admin/elite-registration?orderId=${orderId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "فشل الإلغاء");
+      setTeams((prev) => prev.map((t) => (t.name === teamName ? { ...t, order: { ...t.order!, payment_status: "cancelled" } } : t)));
+      toast.success(`تم إلغاء تفعيل فريق ${teamName}`);
+    } catch (e: any) {
+      toast.error(e?.message || "فشل الإلغاء");
+    }
+  };
+
   const activeCount = teams.filter((t) => t.order?.payment_status === "paid" || t.order?.payment_status === "manual_access").length;
 
   return (
@@ -94,6 +108,11 @@ export function EliteTeamsStatus({ teams: initialTeams, price }: { teams: TeamRo
                 {isActive && t.order?.access_password && (
                   <button onClick={() => copyPassword(t.order!.access_password!)} className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] font-black text-accent-blue">
                     <Copy className="h-3 w-3" /> <span dir="ltr">{t.order.access_password}</span>
+                  </button>
+                )}
+                {t.order?.payment_status === "manual_access" && (
+                  <button onClick={() => deactivate(t.name, t.order!.id)} className="rounded-lg bg-red-500/15 px-3 py-1.5 text-[11px] font-black text-red-400">
+                    إلغاء التفعيل
                   </button>
                 )}
                 {!isActive && (

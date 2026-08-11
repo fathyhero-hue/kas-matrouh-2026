@@ -80,3 +80,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error?.message || "فشل التفعيل اليدوي." }, { status: 500 });
   }
 }
+
+// Reverts an admin-granted manual activation — never touches real Paymob
+// payments (payment_status must currently be "manual_access").
+export async function DELETE(req: NextRequest) {
+  try {
+    const orderId = req.nextUrl.searchParams.get("orderId");
+    if (!orderId) return NextResponse.json({ error: "معرّف الطلب مفقود." }, { status: 400 });
+
+    const supabase = createServiceRoleClient();
+    const { data: order } = await supabase.from("orders").select("id, payment_status").eq("id", orderId).maybeSingle();
+    if (!order) return NextResponse.json({ error: "الطلب غير موجود." }, { status: 404 });
+    if (order.payment_status !== "manual_access") {
+      return NextResponse.json({ error: "متاح إلغاؤه فقط للتفعيل اليدوي، مش للدفع الحقيقي." }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ payment_status: "cancelled", status_label: "تم إلغاء التفعيل اليدوي", roster_access_active: false, admin_manual_access: false })
+      .eq("id", orderId);
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error("Elite manual deactivation error:", error);
+    return NextResponse.json({ error: error?.message || "فشل إلغاء التفعيل." }, { status: 500 });
+  }
+}
