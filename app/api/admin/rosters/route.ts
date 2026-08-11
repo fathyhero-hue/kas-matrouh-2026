@@ -22,23 +22,33 @@ export async function POST(req: NextRequest) {
       rosterId = data.id;
     }
 
+    let playerIds: string[] = [];
     if (Array.isArray(players)) {
-      await supabase.from("roster_players").delete().eq("roster_id", rosterId);
-      if (players.length) {
-        await supabase.from("roster_players").insert(
-          players.map((p: any, i: number) => ({
-            roster_id: rosterId,
-            slot_index: i,
-            name: p.name || "",
-            number: p.number || "",
-            personal_image_url: p.personal_image_url || "",
-            id_image_url: p.id_image_url || "",
-          }))
-        );
+      // Update existing rows in place by slot instead of delete+reinsert, so
+      // player ids stay stable across saves — otherwise any photo already
+      // uploaded via /api/roster/upload-photo (keyed by player id) would get
+      // orphaned the next time the admin saves the roster.
+      const { data: existingPlayers } = await supabase.from("roster_players").select("id, slot_index").eq("roster_id", rosterId);
+      const existingBySlot = new Map((existingPlayers || []).map((p: any) => [p.slot_index, p.id as string]));
+
+      for (let i = 0; i < players.length; i++) {
+        const p = players[i];
+        const patch = { name: p.name || "", number: p.number || "", personal_image_url: p.personal_image_url || "", id_image_url: p.id_image_url || "" };
+        const existingId = existingBySlot.get(i);
+        if (existingId) {
+          await supabase.from("roster_players").update(patch).eq("id", existingId);
+          playerIds.push(existingId);
+        } else {
+          const { data: inserted } = await supabase.from("roster_players").insert({ roster_id: rosterId, slot_index: i, ...patch }).select("id").single();
+          playerIds.push(inserted?.id as string);
+        }
       }
+
+      const extraIds = [...existingBySlot.entries()].filter(([slot]) => slot >= players.length).map(([, id]) => id);
+      if (extraIds.length) await supabase.from("roster_players").delete().in("id", extraIds);
     }
 
-    return NextResponse.json({ ok: true, roster });
+    return NextResponse.json({ ok: true, roster, playerIds });
   } catch (error: any) {
     console.error("Admin roster save error:", error);
     return NextResponse.json({ error: error?.message || "فشل حفظ القائمة." }, { status: 500 });
