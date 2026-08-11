@@ -10,6 +10,7 @@ const SECTIONS: { href: string; label: string }[] = [
   { href: "/standings", label: "الترتيب" },
   { href: "/matches", label: "المباريات" },
   { href: "/knockout", label: "الأدوار الإقصائية" },
+  { href: "/stats", label: "الإحصائيات" },
   { href: "/scorers", label: "الهدافين" },
   { href: "/cards", label: "البطاقات" },
   { href: "/rosters", label: "قوائم الفرق" },
