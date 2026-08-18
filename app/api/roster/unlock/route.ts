@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 const REGISTRATION_KEY: Record<string, string> = {
   matrouh_cup: "matrouh",
   elite_cup: "elite",
+  ramadan_cup: "ramadan",
 };
 
 export async function POST(req: NextRequest) {

@@ -3,13 +3,11 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Shield, CheckCircle2, ClipboardList, Trophy } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
-import { isTournamentSlug, resolveEdition, getRosterMaxPlayers, type TournamentPageProps } from "@/lib/sport/tournaments";
+import { isTournamentSlug, resolveEdition, getRosterMaxPlayers, supportsRosterSubmission, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 
 export const revalidate = 30;
-
-const SUPPORTS_SUBMISSION = new Set(["matrouh-cup", "elite-cup"]);
 
 export default async function RostersPage({ params, searchParams }: TournamentPageProps) {
   const { tournament: slug } = await params;
@@ -36,7 +34,7 @@ export default async function RostersPage({ params, searchParams }: TournamentPa
       لسه ما اشتركتش؟ سجّل فريقك وادفع الاشتراك هنا
     </Link>
   );
-  const submitLink = SUPPORTS_SUBMISSION.has(slug) && (
+  const submitLink = supportsRosterSubmission(slug) && (
     <Link
       href={`/${slug}/rosters/submit${editionQs}`}
       className="mb-4 flex items-center justify-center gap-2 rounded-2xl bg-accent-blue/15 py-3 text-body font-black text-accent-blue ring-1 ring-accent-blue/30 transition-colors hover:bg-accent-blue/25"

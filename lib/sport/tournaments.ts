@@ -47,6 +47,15 @@ export function getRosterMaxPlayers(slug: TournamentSlug): number {
   return ROSTER_MAX_PLAYERS[slug] ?? DEFAULT_ROSTER_MAX_PLAYERS;
 }
 
+// Tournaments with a real roster/access-code system — public roster
+// submission, the admin's per-tournament registration-settings panel (shared
+// code + deadline), and the player-card gate all key off this same set.
+export const ROSTER_SUBMISSION_TOURNAMENTS: TournamentSlug[] = ["matrouh-cup", "elite-cup", "ramadan-cup"];
+
+export function supportsRosterSubmission(slug: TournamentSlug): boolean {
+  return ROSTER_SUBMISSION_TOURNAMENTS.includes(slug);
+}
+
 export type TournamentPageProps = {
   params: Promise<{ tournament: string }>;
   searchParams: Promise<{ edition?: string }>;

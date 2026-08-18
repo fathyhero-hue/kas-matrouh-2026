@@ -2,20 +2,18 @@ import { IdCard } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
 import { RegistrationForm } from "@/components/player-card/registration-form";
 import { EmptyState } from "@/components/sport/empty-state";
-import { TOURNAMENTS, resolveEdition, type TournamentSlug } from "@/lib/sport/tournaments";
+import { TOURNAMENTS, resolveEdition, ROSTER_SUBMISSION_TOURNAMENTS } from "@/lib/sport/tournaments";
 import { normalize } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
 
-// Only these two have a real roster/access-code system (see
-// app/[tournament]/rosters/submit/page.tsx's SUPPORTS_SUBMISSION) — matching
-// a player_registration_tournaments row's name against one of them is what
+// Only tournaments with a real roster/access-code system (see
+// lib/sport/tournaments.ts's ROSTER_SUBMISSION_TOURNAMENTS) — matching a
+// player_registration_tournaments row's name against one of them is what
 // turns on the secret-code gate + real team/player picker for that campaign.
-const LINKABLE_SLUGS: TournamentSlug[] = ["matrouh-cup", "elite-cup"];
-
 function resolveLinkedTournament(name: string): { tournamentKey: string; suffix: string } | null {
   const target = normalize(name);
-  for (const slug of LINKABLE_SLUGS) {
+  for (const slug of ROSTER_SUBMISSION_TOURNAMENTS) {
     const config = TOURNAMENTS[slug];
     const label = normalize(config.label);
     // player_registration_tournaments rows are named e.g. "بطولة كأس مطروح"

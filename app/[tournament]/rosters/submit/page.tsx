@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { ClipboardList } from "lucide-react";
-import { isTournamentSlug, resolveEdition, TOURNAMENTS, getRosterMaxPlayers, type TournamentPageProps } from "@/lib/sport/tournaments";
+import { isTournamentSlug, resolveEdition, TOURNAMENTS, getRosterMaxPlayers, supportsRosterSubmission, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { EmptyState } from "@/components/sport/empty-state";
 import { RosterSubmitForm } from "@/components/roster/roster-submit-form";
-
-const SUPPORTS_SUBMISSION = new Set(["matrouh-cup", "elite-cup"]);
 
 export default async function RosterSubmitPage({ params, searchParams }: TournamentPageProps) {
   const { tournament: slug } = await params;
@@ -20,7 +18,7 @@ export default async function RosterSubmitPage({ params, searchParams }: Tournam
         <h1 className="text-h1 font-black">تقديم قائمة الفريق</h1>
       </div>
 
-      {SUPPORTS_SUBMISSION.has(slug) ? (
+      {supportsRosterSubmission(slug) ? (
         <RosterSubmitForm
           tournament={config.tournament}
           suffix={edition.suffix}

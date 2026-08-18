@@ -10,8 +10,7 @@ export async function POST(req: NextRequest) {
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
       .from("registration_settings")
-      .update({ deadline, password, price })
-      .eq("tournament", tournament)
+      .upsert({ tournament, deadline, password, price }, { onConflict: "tournament" })
       .select()
       .single();
     if (error) throw error;
