@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper } from "lucide-react";
+import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper, IdCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const NAV_ITEMS = [
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/admin/matches", label: "المباريات", icon: Trophy },
   { href: "/admin/stats", label: "الإحصائيات", icon: Star },
   { href: "/admin/rosters", label: "القوائم", icon: ClipboardList },
+  { href: "/admin/registrations", label: "كروت اللاعبين", icon: IdCard },
   { href: "/admin/media", label: "الإعلام", icon: Newspaper },
   { href: "/admin/shop", label: "المتجر", icon: ShoppingBag },
 ];

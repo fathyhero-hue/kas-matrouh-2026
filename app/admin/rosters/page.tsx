@@ -92,27 +92,22 @@ export default async function AdminRostersPage({
         <p className="mt-1 text-caption text-muted-foreground">مراجعة قوائم الفرق وإعدادات التسجيل</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(TOURNAMENTS) as TournamentSlug[]).map((s) => {
-            const c = TOURNAMENTS[s];
-            return c.editions.map((e) => (
-              <Link
-                key={`${s}-${e.key}`}
-                href={`/admin/rosters?tournament=${s}&edition=${e.key}`}
-                className={`rounded-full px-3 py-1.5 text-caption font-bold transition-colors ${
-                  s === slug && e.key === edition.key ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {c.icon} {c.label}
-                {c.editions.length > 1 ? ` — ${e.label}` : ""}
-              </Link>
-            ));
-          })}
-        </div>
-        <Link href="/admin/registrations" className="mr-auto rounded-full bg-accent-blue/15 px-3 py-1.5 text-caption font-bold text-accent-blue">
-          تسجيل اللاعبين الفردي ←
-        </Link>
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(TOURNAMENTS) as TournamentSlug[]).map((s) => {
+          const c = TOURNAMENTS[s];
+          return c.editions.map((e) => (
+            <Link
+              key={`${s}-${e.key}`}
+              href={`/admin/rosters?tournament=${s}&edition=${e.key}`}
+              className={`rounded-full px-3 py-1.5 text-caption font-bold transition-colors ${
+                s === slug && e.key === edition.key ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {c.icon} {c.label}
+              {c.editions.length > 1 ? ` — ${e.label}` : ""}
+            </Link>
+          ));
+        })}
       </div>
 
       {eliteTeams && <EliteTeamsStatus teams={eliteTeams} price={Number(settings?.price || 1500)} />}
