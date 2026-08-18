@@ -1,12 +1,8 @@
 import { notFound } from "next/navigation";
 import { ClipboardList } from "lucide-react";
-import { isTournamentSlug, resolveEdition, TOURNAMENTS, type TournamentPageProps } from "@/lib/sport/tournaments";
+import { isTournamentSlug, resolveEdition, TOURNAMENTS, getRosterMaxPlayers, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { EmptyState } from "@/components/sport/empty-state";
 import { RosterSubmitForm } from "@/components/roster/roster-submit-form";
-
-const MAX_PLAYERS: Record<string, number> = {
-  "elite-cup": 11,
-};
 
 const SUPPORTS_SUBMISSION = new Set(["matrouh-cup", "elite-cup"]);
 
@@ -28,7 +24,7 @@ export default async function RosterSubmitPage({ params, searchParams }: Tournam
         <RosterSubmitForm
           tournament={config.tournament}
           suffix={edition.suffix}
-          maxPlayers={MAX_PLAYERS[slug] || 12}
+          maxPlayers={getRosterMaxPlayers(slug)}
         />
       ) : (
         <EmptyState message="تقديم القوائم غير متاح لهذه البطولة حالياً" />

@@ -36,6 +36,17 @@ export function isTournamentSlug(value: string): value is TournamentSlug {
   return value in TOURNAMENTS;
 }
 
+// Max roster size per tournament — shared by the submit form, the admin
+// roster manager, and the public rosters list (for the completeness badge).
+export const ROSTER_MAX_PLAYERS: Partial<Record<TournamentSlug, number>> = {
+  "elite-cup": 11,
+};
+export const DEFAULT_ROSTER_MAX_PLAYERS = 12;
+
+export function getRosterMaxPlayers(slug: TournamentSlug): number {
+  return ROSTER_MAX_PLAYERS[slug] ?? DEFAULT_ROSTER_MAX_PLAYERS;
+}
+
 export type TournamentPageProps = {
   params: Promise<{ tournament: string }>;
   searchParams: Promise<{ edition?: string }>;

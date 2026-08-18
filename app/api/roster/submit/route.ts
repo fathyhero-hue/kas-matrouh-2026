@@ -30,14 +30,26 @@ export async function POST(req: NextRequest) {
     const coachName = String(body.coachName || "").trim();
     const players = (Array.isArray(body.players) ? body.players : []) as Array<{ name: string; number: string }>;
 
-    if (!teamName || !managerName.trim() || !managerPhone.trim() || !players.length) {
+    if (!teamName || !managerName.trim() || !managerPhone.trim()) {
       return NextResponse.json({ error: "بيانات القائمة غير مكتملة." }, { status: 400 });
     }
+    // Rosters no longer need to be full — a team can submit any number of
+    // players and complete the rest later (before the registration
+    // deadline). Blank slots are simply skipped; a slot with only one of
+    // name/number filled in is still a real mistake worth catching.
+    let filledCount = 0;
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      if (!p?.name?.trim() || !p?.number?.trim()) {
-        return NextResponse.json({ error: `الرجاء ملء بيانات جميع اللاعبين. اللاعب رقم ${i + 1} بياناته ناقصة.` }, { status: 400 });
+      const hasName = !!p?.name?.trim();
+      const hasNumber = !!p?.number?.trim();
+      if (!hasName && !hasNumber) continue;
+      if (!hasName || !hasNumber) {
+        return NextResponse.json({ error: `الرجاء إكمال اسم ورقم اللاعب رقم ${i + 1}.` }, { status: 400 });
       }
+      filledCount++;
+    }
+    if (filledCount === 0) {
+      return NextResponse.json({ error: "الرجاء تسجيل لاعب واحد على الأقل." }, { status: 400 });
     }
 
     const supabase = createServiceRoleClient();

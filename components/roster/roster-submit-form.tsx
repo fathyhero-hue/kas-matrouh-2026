@@ -2,37 +2,98 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Lock, Camera, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { Lock, Camera, CheckCircle2, Loader2, ShieldCheck, Clock } from "lucide-react";
 
 type PlayerRow = {
   name: string;
   number: string;
   personalFile: File | null;
   personalPreview: string;
+  personalIsExisting: boolean;
   idFile: File | null;
   idPreview: string;
+  idIsExisting: boolean;
 };
 
 function emptyPlayers(count: number): PlayerRow[] {
-  return Array.from({ length: count }, () => ({ name: "", number: "", personalFile: null, personalPreview: "", idFile: null, idPreview: "" }));
+  return Array.from({ length: count }, () => ({
+    name: "", number: "", personalFile: null, personalPreview: "", personalIsExisting: false, idFile: null, idPreview: "", idIsExisting: false,
+  }));
+}
+
+function formatDeadline(deadline: string) {
+  try {
+    return new Date(deadline).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+  } catch {
+    return deadline;
+  }
 }
 
 export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournament: string; suffix: string; maxPlayers: number }) {
   const [step, setStep] = useState<"unlock" | "form" | "success">("unlock");
   const [code, setCode] = useState("");
   const [unlocking, setUnlocking] = useState(false);
+  const [deadline, setDeadline] = useState("");
+  const [resumedNotice, setResumedNotice] = useState(false);
 
   const [teamName, setTeamName] = useState("");
   const [managerName, setManagerName] = useState("");
   const [managerPhone, setManagerPhone] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
+  const [logoIsExisting, setLogoIsExisting] = useState(false);
   const [coachName, setCoachName] = useState("");
   const [coachFile, setCoachFile] = useState<File | null>(null);
   const [coachPreview, setCoachPreview] = useState("");
+  const [coachIsExisting, setCoachIsExisting] = useState(false);
   const [players, setPlayers] = useState<PlayerRow[]>(() => emptyPlayers(maxPlayers));
   const [submitting, setSubmitting] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
+  const [completedCount, setCompletedCount] = useState(0);
+
+  const applyExistingRoster = (data: any) => {
+    if (!data?.found) return;
+    setResumedNotice(true);
+    if (data.managerName) setManagerName(data.managerName);
+    if (data.managerPhone) setManagerPhone(data.managerPhone);
+    if (data.logoUrl) {
+      setLogoPreview(data.logoUrl);
+      setLogoIsExisting(true);
+    }
+    if (data.coachName) setCoachName(data.coachName);
+    if (data.coachPhotoUrl) {
+      setCoachPreview(data.coachPhotoUrl);
+      setCoachIsExisting(true);
+    }
+    const bySlot = new Map<number, any>((data.players || []).map((p: any) => [p.slot_index, p]));
+    setPlayers(
+      Array.from({ length: maxPlayers }, (_, i) => {
+        const existing = bySlot.get(i);
+        if (!existing) return { name: "", number: "", personalFile: null, personalPreview: "", personalIsExisting: false, idFile: null, idPreview: "", idIsExisting: false };
+        return {
+          name: existing.name || "",
+          number: existing.number || "",
+          personalFile: null,
+          personalPreview: existing.personal_image_url || "",
+          personalIsExisting: !!existing.personal_image_url,
+          idFile: null,
+          idPreview: existing.id_image_url || "",
+          idIsExisting: !!existing.id_image_url,
+        };
+      })
+    );
+  };
+
+  const fetchExistingRoster = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      const res = await fetch(`/api/roster/my-roster?suffix=${encodeURIComponent(suffix)}&teamName=${encodeURIComponent(name.trim())}`);
+      const data = await res.json().catch(() => ({}));
+      applyExistingRoster(data);
+    } catch {
+      // silent — worst case they just start from a blank form
+    }
+  };
 
   const unlock = async () => {
     if (!code.trim()) return toast.error("الرجاء إدخال الرقم السري.");
@@ -45,7 +106,11 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "الرقم السري غير صحيح.");
-      if (data.teamName) setTeamName(data.teamName);
+      if (data.deadline) setDeadline(data.deadline);
+      if (data.teamName) {
+        setTeamName(data.teamName);
+        await fetchExistingRoster(data.teamName);
+      }
       setStep("form");
     } catch (e: any) {
       toast.error(e?.message || "تعذر التحقق من الرقم السري.");
@@ -64,6 +129,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     if (file.size > 2 * 1024 * 1024) return toast.error("حجم الصورة كبير (أقصى 2 ميجا)");
     setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
+    setLogoIsExisting(false);
   };
 
   const handleCoachFile = (file?: File) => {
@@ -72,6 +138,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     if (file.size > 2 * 1024 * 1024) return toast.error("حجم الصورة كبير (أقصى 2 ميجا)");
     setCoachFile(file);
     setCoachPreview(URL.createObjectURL(file));
+    setCoachIsExisting(false);
   };
 
   const handlePlayerFile = (index: number, field: "personal" | "id", file?: File) => {
@@ -79,18 +146,28 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     if (!file.type.startsWith("image/")) return toast.error("اختار صورة صحيحة");
     if (file.size > 2 * 1024 * 1024) return toast.error("حجم الصورة كبير (أقصى 2 ميجا)");
     const preview = URL.createObjectURL(file);
-    if (field === "personal") updatePlayer(index, { personalFile: file, personalPreview: preview });
-    else updatePlayer(index, { idFile: file, idPreview: preview });
+    if (field === "personal") updatePlayer(index, { personalFile: file, personalPreview: preview, personalIsExisting: false });
+    else updatePlayer(index, { idFile: file, idPreview: preview, idIsExisting: false });
   };
 
   const submit = async () => {
     if (!teamName.trim()) return toast.error("يرجى كتابة اسم الفريق.");
     if (!managerName.trim() || !managerPhone.trim()) return toast.error("الرجاء إكمال بيانات مسئول الفريق (الاسم ورقم الهاتف).");
+
+    // Rosters no longer need to be full — only slots the manager actually
+    // started filling in need to be complete; empty slots are simply skipped
+    // and can be completed on a later visit before the deadline.
+    let touched = 0;
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      if (!p.name.trim() || !p.number.trim()) return toast.error(`الرجاء ملء بيانات جميع اللاعبين. اللاعب رقم ${i + 1} بياناته ناقصة.`);
-      if (!p.personalFile || !p.idFile) return toast.error(`الرجاء إرفاق الصورة الشخصية وصورة البطاقة للاعب ${p.name || i + 1}.`);
+      const hasAnything = p.name.trim() || p.number.trim() || p.personalFile || p.idFile || p.personalIsExisting || p.idIsExisting;
+      if (!hasAnything) continue;
+      if (!p.name.trim() || !p.number.trim()) return toast.error(`الرجاء إكمال اسم ورقم اللاعب رقم ${i + 1}.`);
+      if (!p.personalFile && !p.personalIsExisting) return toast.error(`الرجاء إرفاق الصورة الشخصية للاعب ${p.name || i + 1}.`);
+      if (!p.idFile && !p.idIsExisting) return toast.error(`الرجاء إرفاق صورة البطاقة للاعب ${p.name || i + 1}.`);
+      touched++;
     }
+    if (touched === 0) return toast.error("الرجاء تسجيل لاعب واحد على الأقل.");
 
     setSubmitting(true);
     try {
@@ -128,6 +205,8 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
         if (!r.ok) throw new Error(d?.error || "فشل رفع إحدى الصور");
       };
 
+      // Only newly-picked files need uploading — anything already saved from
+      // a previous visit (personalIsExisting/idIsExisting/etc.) is left as-is.
       const tasks: (() => Promise<void>)[] = [];
       if (logoFile) tasks.push(() => uploadOne("logo", logoFile));
       if (coachFile) tasks.push(() => uploadOne("coach", coachFile));
@@ -150,8 +229,9 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       };
       await Promise.all(Array.from({ length: Math.min(3, tasks.length) }, worker));
 
+      setCompletedCount(touched);
       setStep("success");
-      toast.success("تم رفع الصور واعتماد قائمة الفريق بنجاح ✅");
+      toast.success("تم حفظ القائمة بنجاح ✅");
     } catch (e: any) {
       toast.error(e?.message || "حدث خطأ أثناء رفع الصور، يرجى المحاولة مرة أخرى.");
     } finally {
@@ -190,20 +270,42 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
   }
 
   if (step === "success") {
+    const isComplete = completedCount >= maxPlayers;
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-card p-8 text-center ring-1 ring-white/10">
         <CheckCircle2 className="h-12 w-12 text-accent-green" />
-        <h2 className="text-h3 font-black">تم اعتماد قائمة الفريق بنجاح</h2>
-        <p className="text-caption text-muted-foreground">هيتم مراجعة القائمة والصور من فريق البطولة، وهتلاقي فريقك ظاهر في صفحة القوائم.</p>
+        <h2 className="text-h3 font-black">تم حفظ قائمة الفريق بنجاح</h2>
+        {isComplete ? (
+          <p className="text-caption text-muted-foreground">القائمة مكتملة ({completedCount}/{maxPlayers}). هيتم مراجعتها من فريق البطولة، وهتلاقي فريقك ظاهر في صفحة القوائم.</p>
+        ) : (
+          <div className="w-full rounded-xl bg-accent-orange/10 p-4 ring-1 ring-accent-orange/30">
+            <p className="text-caption font-bold text-accent-orange">
+              اتسجل {completedCount} من {maxPlayers} لاعب بس. تقدر ترجع بنفس الرقم السري فى أي وقت تكمل بيه باقي اللاعبين
+              {deadline ? <> قبل <span className="font-black">{formatDeadline(deadline)}</span></> : null}.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {resumedNotice && (
+        <div className="flex items-center gap-2 rounded-xl bg-accent-blue/10 px-4 py-2.5 text-caption font-bold text-accent-blue ring-1 ring-accent-blue/30">
+          <ShieldCheck className="h-4 w-4 shrink-0" /> لقينا قائمة سابقة لفريقكم واتحمّلت تلقائي — كمّل أو عدّل اللي محتاجه بس.
+        </div>
+      )}
+      {deadline && (
+        <div className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 text-caption font-bold text-muted-foreground">
+          <Clock className="h-4 w-4 shrink-0" /> آخر موعد لاستكمال التسجيل: <span className="font-black text-foreground">{formatDeadline(deadline)}</span>
+        </div>
+      )}
+
       <input
         value={teamName}
         onChange={(e) => setTeamName(e.target.value)}
+        onBlur={() => !resumedNotice && fetchExistingRoster(teamName)}
         placeholder="اسم الفريق"
         className="h-12 w-full rounded-xl bg-card px-4 text-body font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue"
       />
@@ -253,7 +355,9 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       </div>
 
       <div className="space-y-3">
-        <div className="text-caption font-black text-muted-foreground">قائمة اللاعبين ({players.length})</div>
+        <div className="text-caption font-black text-muted-foreground">
+          قائمة اللاعبين — سجّل بأي عدد وكمّل الباقي لاحقًا (بحد أقصى {maxPlayers})
+        </div>
         {players.map((p, i) => (
           <div key={i} className="rounded-2xl bg-card p-4 ring-1 ring-white/10">
             <div className="mb-3 flex items-center gap-2">
@@ -304,7 +408,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-body font-black text-primary-foreground disabled:opacity-60"
       >
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        {submitting ? progressLabel || "جاري الحفظ..." : "حفظ واعتماد القائمة نهائياً"}
+        {submitting ? progressLabel || "جاري الحفظ..." : "حفظ القائمة"}
       </button>
     </div>
   );

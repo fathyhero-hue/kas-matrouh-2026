@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (settings.password && trimmedCode === settings.password) {
-      return NextResponse.json({ ok: true, teamName: "" });
+      return NextResponse.json({ ok: true, teamName: "", deadline: settings.deadline || null });
     }
 
     const { data: candidates } = await supabase.rpc("find_orders_by_access_code", { p_code: trimmedCode });
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "الرقم السري غير صحيح أو غير مفعل لهذه البطولة." }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, teamName: paidOrder.team_name || "" });
+    return NextResponse.json({ ok: true, teamName: paidOrder.team_name || "", deadline: settings.deadline || null });
   } catch (error: any) {
     console.error("Roster unlock error:", error);
     return NextResponse.json({ error: "تعذر التحقق من الرقم السري حالياً. حاول مرة أخرى." }, { status: 500 });

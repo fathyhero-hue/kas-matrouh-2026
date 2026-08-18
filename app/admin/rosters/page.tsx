@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
+import { TOURNAMENTS, resolveEdition, isTournamentSlug, getRosterMaxPlayers, type TournamentSlug } from "@/lib/sport/tournaments";
 import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { RostersManager } from "@/components/admin/rosters-manager";
 import { BannedListManager } from "@/components/admin/banned-list-manager";
@@ -22,7 +22,6 @@ const STATUS_PRIORITY: Record<string, number> = { paid: 3, manual_access: 3, pen
 export const dynamic = "force-dynamic";
 
 const REGISTRATION_KEY: Record<string, string> = { "matrouh-cup": "matrouh", "elite-cup": "elite" };
-const MAX_PLAYERS: Record<string, number> = { "elite-cup": 11 };
 
 export default async function AdminRostersPage({
   searchParams,
@@ -127,7 +126,7 @@ export default async function AdminRostersPage({
           initialRosters={(rosters || []) as any}
           registrationKey={registrationKey}
           initialSettings={settings as any}
-          maxPlayers={MAX_PLAYERS[slug] || 12}
+          maxPlayers={getRosterMaxPlayers(slug)}
           allowCreate={slug !== "elite-cup"}
         />
       )}
