@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+
+type RosterPlayerInput = { name?: unknown; number?: unknown };
+type RosterPlayer = { name: string; number: string };
 
 function normalizeTeamName(name: string): string {
   return String(name || "")
@@ -21,14 +25,27 @@ function normalizeTeamName(name: string): string {
 // Vercel's ~4.5MB request body limit and gets rejected with 413 before it
 // ever reaches this handler.
 export async function POST(req: NextRequest) {
+  const requestId = randomUUID();
+  let stage = "parse-request";
+
   try {
-    const body = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = await req.json();
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    }
     const suffix = String(body.suffix || "");
     const teamName = String(body.teamName || "").trim();
     const managerName = String(body.managerName || "");
     const managerPhone = String(body.managerPhone || "");
     const coachName = String(body.coachName || "").trim();
-    const players = (Array.isArray(body.players) ? body.players : []) as Array<{ name: string; number: string }>;
+    const playersInput = (Array.isArray(body.players) ? body.players : []) as RosterPlayerInput[];
+    const players: RosterPlayer[] = [];
 
     if (!teamName || !managerName.trim() || !managerPhone.trim()) {
       return NextResponse.json({ error: "بيانات القائمة غير مكتملة." }, { status: 400 });
@@ -38,10 +55,16 @@ export async function POST(req: NextRequest) {
     // deadline). Blank slots are simply skipped; a slot with only one of
     // name/number filled in is still a real mistake worth catching.
     let filledCount = 0;
-    for (let i = 0; i < players.length; i++) {
-      const p = players[i];
-      const hasName = !!p?.name?.trim();
-      const hasNumber = !!p?.number?.trim();
+    for (let i = 0; i < playersInput.length; i++) {
+      const p = playersInput[i];
+      if (!p || typeof p !== "object" || Array.isArray(p)) {
+        return NextResponse.json({ error: `Invalid player data at slot ${i + 1}.` }, { status: 400 });
+      }
+      const name = typeof p.name === "string" ? p.name.trim() : "";
+      const number = typeof p.number === "string" ? p.number.trim() : "";
+      const hasName = !!name;
+      const hasNumber = !!number;
+      players[i] = { name, number };
       if (!hasName && !hasNumber) continue;
       if (!hasName || !hasNumber) {
         return NextResponse.json({ error: `الرجاء إكمال اسم ورقم اللاعب رقم ${i + 1}.` }, { status: 400 });
@@ -54,22 +77,36 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceRoleClient();
 
-    const { data: bracket } = await supabase.from("brackets").select("id").eq("legacy_suffix", suffix).single();
+    stage = "lookup-bracket";
+    const { data: bracket, error: bracketErr } = await supabase.from("brackets").select("id").eq("legacy_suffix", suffix).single();
+    if (bracketErr) {
+      logDatabaseError(requestId, stage, bracketErr);
+      return databaseFailure(requestId);
+    }
     if (!bracket) return NextResponse.json({ error: "بطولة غير معروفة." }, { status: 400 });
 
-    const { data: bannedRows } = await supabase.from("banned_entities").select("name, type");
-    const banned = bannedRows || [];
-    if (banned.some((b: any) => b.type === "team" && normalizeTeamName(b.name) === normalizeTeamName(teamName))) {
+    stage = "check-restrictions";
+    const { data: bannedRows, error: bannedErr } = await supabase.from("banned_entities").select("name, type");
+    if (bannedErr) {
+      logDatabaseError(requestId, stage, bannedErr);
+      return databaseFailure(requestId);
+    }
+    const banned = (bannedRows || []) as { name: string; type: string }[];
+    if (banned.some((b) => b.type === "team" && normalizeTeamName(b.name) === normalizeTeamName(teamName))) {
       return NextResponse.json({ error: `عذراً، فريق "${teamName}" مستبعد ولا يمكنه المشاركة في البطولة.` }, { status: 400 });
     }
-    const bannedPlayer = players.find((p) => banned.some((b: any) => b.type === "player" && normalizeTeamName(b.name) === normalizeTeamName(p.name)));
+    const bannedPlayer = players.find((p) => p.name && banned.some((b) => b.type === "player" && normalizeTeamName(b.name) === normalizeTeamName(p.name)));
     if (bannedPlayer) {
       return NextResponse.json({ error: `عذراً، اللاعب "${bannedPlayer.name}" مستبعد ولا يمكن تسجيله.` }, { status: 400 });
     }
 
-    const { data: restrictedRows } = await supabase.from("restricted_players").select("name");
-    const restricted = restrictedRows || [];
-    const restrictedCount = players.filter((p) => restricted.some((r: any) => normalizeTeamName(r.name) === normalizeTeamName(p.name))).length;
+    const { data: restrictedRows, error: restrictedErr } = await supabase.from("restricted_players").select("name");
+    if (restrictedErr) {
+      logDatabaseError(requestId, stage, restrictedErr);
+      return databaseFailure(requestId);
+    }
+    const restricted = (restrictedRows || []) as { name: string }[];
+    const restrictedCount = players.filter((p) => p.name && restricted.some((r) => normalizeTeamName(r.name) === normalizeTeamName(p.name))).length;
     if (restrictedCount > 2) {
       return NextResponse.json({ error: `عذراً، لقد قمت بتسجيل ${restrictedCount} لاعبين من قائمة التقييد. الحد الأقصى المسموح به هو 2 لاعبين فقط في الفريق الواحد.` }, { status: 400 });
     }
@@ -77,6 +114,7 @@ export async function POST(req: NextRequest) {
     const normalizedId = teamName.trim().replace(/\s+/g, " ").toLowerCase();
     const slug = teamName.trim().replace(/\s+/g, "_").replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 80) || "team";
 
+    stage = "upsert-roster";
     const { data: roster, error: rosterErr } = await supabase
       .from("team_rosters")
       .upsert(
@@ -91,50 +129,90 @@ export async function POST(req: NextRequest) {
           is_submitted: true,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "bracket_id,legacy_id" }
+        { onConflict: "bracket_id,team_slug" }
       )
       .select("id")
       .single();
 
     if (rosterErr || !roster) {
-      console.error("Roster upsert failed:", rosterErr);
-      return NextResponse.json({ error: "فشل حفظ بيانات الفريق." }, { status: 500 });
+      logDatabaseError(requestId, stage, rosterErr);
+      if (rosterErr?.code === "23505" && rosterErr.message?.includes("team_rosters_bracket_id_team_slug_key")) {
+        return NextResponse.json({ error: "يوجد فريق مسجل بهذا الاسم في البطولة بالفعل.", requestId }, { status: 409 });
+      }
+      return databaseFailure(requestId);
     }
     const rosterId = roster.id as string;
 
     // Update in place by slot rather than delete+reinsert, so a resubmit
     // (e.g. retrying after a photo upload failed) doesn't wipe photos that
     // already uploaded successfully against the previous player row ids.
-    const { data: existingPlayers } = await supabase.from("roster_players").select("id, slot_index").eq("roster_id", rosterId);
-    const existingBySlot = new Map((existingPlayers || []).map((p: any) => [p.slot_index, p.id as string]));
+    stage = "lookup-existing-players";
+    const { data: existingPlayers, error: existingPlayersErr } = await supabase.from("roster_players").select("id, slot_index").eq("roster_id", rosterId);
+    if (existingPlayersErr) {
+      logDatabaseError(requestId, stage, existingPlayersErr);
+      return databaseFailure(requestId);
+    }
+    const existingBySlot = new Map((existingPlayers || []).map((p) => [p.slot_index, p.id]));
 
     const playerIds: string[] = [];
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
       const existingId = existingBySlot.get(i);
       if (existingId) {
-        await supabase.from("roster_players").update({ name: p.name, number: p.number }).eq("id", existingId);
+        stage = "update-player";
+        const { error: updateErr } = await supabase.from("roster_players").update({ name: p.name, number: p.number }).eq("id", existingId);
+        if (updateErr) {
+          logDatabaseError(requestId, stage, updateErr);
+          return databaseFailure(requestId);
+        }
         playerIds.push(existingId);
       } else {
+        stage = "insert-player";
         const { data: inserted, error: insertErr } = await supabase
           .from("roster_players")
           .insert({ roster_id: rosterId, slot_index: i, name: p.name, number: p.number, personal_image_url: "", id_image_url: "" })
           .select("id")
           .single();
         if (insertErr || !inserted) {
-          console.error("Roster player insert failed:", insertErr);
-          return NextResponse.json({ error: "فشل حفظ بيانات اللاعبين." }, { status: 500 });
+          logDatabaseError(requestId, stage, insertErr);
+          return databaseFailure(requestId);
         }
         playerIds.push(inserted.id as string);
       }
     }
 
     const extraIds = [...existingBySlot.entries()].filter(([slot]) => slot >= players.length).map(([, id]) => id);
-    if (extraIds.length) await supabase.from("roster_players").delete().in("id", extraIds);
+    if (extraIds.length) {
+      stage = "delete-removed-players";
+      const { error: deleteErr } = await supabase.from("roster_players").delete().in("id", extraIds);
+      if (deleteErr) {
+        logDatabaseError(requestId, stage, deleteErr);
+        return databaseFailure(requestId);
+      }
+    }
 
     return NextResponse.json({ ok: true, teamId: normalizedId, rosterId, playerIds });
-  } catch (error: any) {
-    console.error("Roster submit error:", error);
-    return NextResponse.json({ error: error?.message || "حدث خطأ أثناء حفظ القائمة." }, { status: 500 });
+  } catch (error: unknown) {
+    logDatabaseError(requestId, stage, error);
+    return databaseFailure(requestId);
   }
+}
+
+function logDatabaseError(requestId: string, stage: string, error: unknown) {
+  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  console.error("Roster submission failed", {
+    requestId,
+    stage,
+    code: typeof value.code === "string" ? value.code : null,
+    message: typeof value.message === "string" ? value.message : String(error),
+    details: typeof value.details === "string" ? value.details : null,
+    hint: typeof value.hint === "string" ? value.hint : null,
+  });
+}
+
+function databaseFailure(requestId: string) {
+  return NextResponse.json(
+    { error: "تعذر حفظ القائمة مؤقتًا. أعد المحاولة لاحقًا، وأرسل رقم البلاغ للدعم إذا استمرت المشكلة.", requestId },
+    { status: 500 }
+  );
 }
