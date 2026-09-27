@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { authorizeAdminRequest } from "@/lib/admin/authorization";
+import { auditAdminMutation } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -9,6 +11,8 @@ const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 // (e.g. a late substitute) — used by goals/cards/motm/team-of-week forms
 // instead of asking the admin to paste an image URL.
 export async function POST(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'stats.photos.upload');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const form = await req.formData();
     const file = form.get("photo") as File | null;
@@ -27,6 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data } = supabase.storage.from("player-registration-photos").getPublicUrl(path);
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "storage.mutation", permission: "stats.photos.upload", entityType: "storage", request: req });
     return NextResponse.json({ ok: true, url: data.publicUrl });
   } catch (error: any) {
     console.error("Stats photo upload error:", error);

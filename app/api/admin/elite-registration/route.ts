@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { authorizeAdminRequest } from "@/lib/admin/authorization";
+import { auditAdminMutation } from "@/lib/admin/audit";
 import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { ensureEliteTeamRoster } from "@/lib/paymob/elite-roster-sync";
 
@@ -22,6 +24,8 @@ function generateAccessPassword() {
 // Admin-side "grant access without an online payment" — for cash/manual subscriptions.
 // Still enforced against the same fixed 10-team list and one-active-slot-per-team rule.
 export async function POST(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'registrations.edit');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const { teamName: teamNameRaw, managerName, phone } = await req.json();
     const teamName = String(teamNameRaw || "").trim();
@@ -74,6 +78,7 @@ export async function POST(req: NextRequest) {
 
     await ensureEliteTeamRoster(supabase, { teamName: match, managerName, phone });
 
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "orders.mutation", permission: "registrations.edit", entityType: "orders", request: req });
     return NextResponse.json({ ok: true, order });
   } catch (error: any) {
     console.error("Elite manual activation error:", error);
@@ -84,6 +89,8 @@ export async function POST(req: NextRequest) {
 // Reverts an admin-granted manual activation — never touches real Paymob
 // payments (payment_status must currently be "manual_access").
 export async function DELETE(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'registrations.edit');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const orderId = req.nextUrl.searchParams.get("orderId");
     if (!orderId) return NextResponse.json({ error: "معرّف الطلب مفقود." }, { status: 400 });
@@ -101,6 +108,7 @@ export async function DELETE(req: NextRequest) {
       .eq("id", orderId);
     if (error) throw error;
 
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "orders.mutation", permission: "registrations.edit", entityType: "orders", request: req });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("Elite manual deactivation error:", error);

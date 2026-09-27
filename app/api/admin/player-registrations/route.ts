@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { authorizeAdminRequest } from "@/lib/admin/authorization";
+import { auditAdminMutation } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
 export async function PATCH(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'registrations.edit');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const form = await req.formData();
     const id = String(form.get("id") || "");
@@ -51,6 +55,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "فشل حفظ التعديل." }, { status: 500 });
     }
 
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "player_registrations.mutation", permission: "registrations.edit", entityType: "player_registrations", request: req });
     return NextResponse.json({ ok: true, row });
   } catch (error: any) {
     console.error("Admin player registration patch error:", error);
@@ -59,12 +64,15 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'registrations.delete');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "معرّف التسجيل مفقود." }, { status: 400 });
     const supabase = createServiceRoleClient();
     const { error } = await supabase.from("player_registrations").delete().eq("id", id);
     if (error) throw error;
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "player_registrations.mutation", permission: "registrations.edit", entityType: "player_registrations", request: req });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("Admin player registration delete error:", error);

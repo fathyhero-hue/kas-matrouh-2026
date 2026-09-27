@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { authorizeAdminRequest } from "@/lib/admin/authorization";
+import { auditAdminMutation } from "@/lib/admin/audit";
+import { pickAllowedFields } from "@/lib/admin/fields";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'rosters.edit');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const body = await req.json();
-    const { id, players, ...patch } = body;
+    const id = body.id;
+    const players = body.players;
+    const patch = pickAllowedFields(body, ["team_name", "manager_name", "coach_name", "logo_url", "bracket_id", "tournament", "is_submitted", "submitted_at", "notes"]);
     const supabase = createServiceRoleClient();
 
     let rosterId = id as string | undefined;
@@ -48,6 +55,7 @@ export async function POST(req: NextRequest) {
       if (extraIds.length) await supabase.from("roster_players").delete().in("id", extraIds);
     }
 
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "rosters.mutation", permission: "rosters.edit", entityType: "rosters", request: req });
     return NextResponse.json({ ok: true, roster, playerIds });
   } catch (error: any) {
     console.error("Admin roster save error:", error);
@@ -56,6 +64,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, 'rosters.delete');
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "معرّف الفريق مفقود." }, { status: 400 });
@@ -63,6 +73,7 @@ export async function DELETE(req: NextRequest) {
     await supabase.from("roster_players").delete().eq("roster_id", id);
     const { error } = await supabase.from("team_rosters").delete().eq("id", id);
     if (error) throw error;
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "rosters.mutation", permission: "rosters.edit", entityType: "rosters", request: req });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("Admin roster delete error:", error);

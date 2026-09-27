@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRouteAdmin } from "@/lib/supabase/route-auth";
+import { authorizeAdminRequest } from "@/lib/admin/authorization";
+import { auditAdminMutation } from "@/lib/admin/audit";
 
 export const runtime = "nodejs";
 
@@ -10,6 +12,8 @@ type PushBody = {
 };
 
 export async function POST(request: NextRequest) {
+  const authorization = await authorizeAdminRequest(request, "notifications.send");
+  if (authorization instanceof NextResponse) return authorization;
   try {
     const { isAdmin } = await getRouteAdmin(request);
     if (!isAdmin) {
