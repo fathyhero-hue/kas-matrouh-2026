@@ -2,22 +2,33 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper, IdCard } from "lucide-react";
+import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper, IdCard, Users, History } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "الرئيسية", icon: LayoutDashboard },
-  { href: "/admin/matches", label: "المباريات", icon: Trophy },
-  { href: "/admin/stats", label: "الإحصائيات", icon: Star },
-  { href: "/admin/rosters", label: "القوائم", icon: ClipboardList },
-  { href: "/admin/registrations", label: "كروت اللاعبين", icon: IdCard },
-  { href: "/admin/media", label: "الإعلام", icon: Newspaper },
-  { href: "/admin/shop", label: "المتجر", icon: ShoppingBag },
+  { href: "/admin/admins", permission: "admins.view", label: "إدارة المسؤولين", icon: Users },
+  { href: "/admin/audit", permission: "audit.view", label: "سجل النشاط", icon: History },
+  { href: "/admin", permission: "dashboard.view", label: "الرئيسية", icon: LayoutDashboard },
+  { href: "/admin/matches", permission: "matches.view", label: "المباريات", icon: Trophy },
+  { href: "/admin/stats", permission: "stats.view", label: "الإحصائيات", icon: Star },
+  { href: "/admin/rosters", permission: "rosters.view", label: "القوائم", icon: ClipboardList },
+  { href: "/admin/registrations", permission: "registrations.view", label: "كروت اللاعبين", icon: IdCard },
+  { href: "/admin/media", permission: "content.view", label: "الإعلام", icon: Newspaper },
+  { href: "/admin/shop", permission: "shop.products.view", label: "المتجر", icon: ShoppingBag },
 ];
 
 export function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [permissions, setPermissions] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => fetch("/api/admin/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(data => { if (!cancelled) setPermissions(data?.permissions ?? []); }).catch(() => { if (!cancelled) setPermissions([]); });
+    void load();
+    window.addEventListener("admin-permissions-changed", load);
+    return () => { cancelled = true; window.removeEventListener("admin-permissions-changed", load); };
+  }, [pathname]);
 
   if (pathname === "/admin/login") return null;
 
@@ -36,7 +47,7 @@ export function AdminNav() {
           لوحة الإدارة
         </div>
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission)).map((item) => {
             const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
             return (
               <Link

@@ -226,19 +226,17 @@ export function resolveAdminPermissions(
   role: AdminRole,
   overrides: readonly PermissionOverride[] = [],
 ): ReadonlySet<AdminPermission> {
-  const resolved = new Set<AdminPermission>(getRolePermissions(role));
+  return resolvePermissionBaseline(getRolePermissions(role), overrides);
+}
 
-  // A deny wins if duplicate override rows contain both effects.
-  const denied = new Set(overrides.filter(({ effect }) => effect === "deny").map(({ permission }) => permission));
-  if (role !== "super_admin") {
-    for (const permission of denied) resolved.delete(permission);
-  }
-  for (const { permission, effect } of overrides) {
-    if (role === "super_admin" || denied.has(permission)) continue;
-    if (effect === "allow") resolved.add(permission);
-    else resolved.delete(permission);
-  }
-
+/** Shared by authorization, account details and default-role tests. DENY always wins. */
+export function resolvePermissionBaseline(
+  baseline: readonly AdminPermission[],
+  overrides: readonly PermissionOverride[] = [],
+): ReadonlySet<AdminPermission> {
+  const resolved = new Set(baseline);
+  for (const { permission, effect } of overrides) if (effect === "allow") resolved.add(permission);
+  for (const { permission, effect } of overrides) if (effect === "deny") resolved.delete(permission);
   return resolved;
 }
 

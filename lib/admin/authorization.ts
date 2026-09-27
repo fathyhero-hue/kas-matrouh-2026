@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_PERMISSIONS, isAdminPermission, isAdminRole, type AdminPermission, type AdminRole } from "@/lib/admin/permissions";
+import { ADMIN_PERMISSIONS, resolvePermissionBaseline, isAdminPermission, isAdminRole, type AdminPermission, type AdminRole } from "@/lib/admin/permissions";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 type Profile = { user_id: string; role_key: string | null; is_active: boolean | null };
@@ -25,22 +25,14 @@ function createSessionClient(request: NextRequest) {
   });
 }
 
-function resolvePermissions(role: AdminRole, roleRows: RolePermission[], overrides: Override[]) {
-  const permissions = new Set<AdminPermission>(role === "super_admin"
-    ? ADMIN_PERMISSIONS
-    : roleRows.flatMap(({ permission_key }) => isAdminPermission(permission_key) ? [permission_key] : []));
-  const denied = new Set(overrides.filter((row) => row.effect === "deny" && isAdminPermission(row.permission_key))
-    .map((row) => row.permission_key as AdminPermission));
-  if (role !== "super_admin") {
-    for (const permission of denied) permissions.delete(permission);
-    for (const row of overrides) {
-      if (row.effect === "allow" && isAdminPermission(row.permission_key) && !denied.has(row.permission_key)) permissions.add(row.permission_key);
-    }
-  }
-  return permissions;
+export function resolvePermissions(role: AdminRole, roleRows: RolePermission[], overrides: Override[]) {
+  return resolvePermissionBaseline(
+    role === "super_admin" ? [...ADMIN_PERMISSIONS] : roleRows.flatMap(({ permission_key }) => isAdminPermission(permission_key) ? [permission_key] : []),
+    overrides.flatMap(({ permission_key, effect }) => isAdminPermission(permission_key) ? [{ permission: permission_key, effect }] : []),
+  );
 }
 
-export async function requireAdminPermission(request: NextRequest, permission: AdminPermission): Promise<AdminAuthorizationContext> {
+export async function requireAdminPermission(request: NextRequest, permission?: AdminPermission): Promise<AdminAuthorizationContext> {
   const { data: { user } } = await createSessionClient(request).auth.getUser();
   if (!user) throw new AdminAuthorizationError(401, "AUTH_REQUIRED", "Authentication is required.");
 
@@ -65,7 +57,7 @@ export async function requireAdminPermission(request: NextRequest, permission: A
     throw new AdminAuthorizationError(503, "RBAC_NOT_READY", "Administrative authorization is not ready.");
   }
   const permissions = resolvePermissions(profile.role_key, (roleData ?? []) as RolePermission[], (overrideData ?? []) as Override[]);
-  if (!permissions.has(permission)) throw new AdminAuthorizationError(403, "ADMIN_FORBIDDEN", "You are not authorized for this operation.");
+  if (permission && !permissions.has(permission)) throw new AdminAuthorizationError(403, "ADMIN_FORBIDDEN", "You are not authorized for this operation.");
   return { userId: user.id, role: profile.role_key, permissions };
 }
 
@@ -99,4 +91,15 @@ export function adminAuthorizationResponse(error: unknown) {
   }
   console.error("[admin-auth] unexpected authorization error");
   return NextResponse.json({ error: { code: "ADMIN_AUTH_ERROR", message: "Administrative authorization failed." } }, { status: 503 });
+}
+
+export async function requireAdminPagePermission(permission?: AdminPermission) {
+  const cookieStore = await cookies();
+  const request = { cookies: cookieStore } as unknown as NextRequest;
+  try { return await requireAdminPermission(request, permission); }
+  catch (error) {
+    if (error instanceof AdminAuthorizationError && error.status === 403) redirect("/admin/forbidden");
+    if (error instanceof AdminAuthorizationError && error.status === 401) redirect("/admin/login");
+    throw error;
+  }
 }

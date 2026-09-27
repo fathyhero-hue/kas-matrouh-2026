@@ -23,7 +23,7 @@ test("role validation and super admin baseline", () => {
   assert.equal(hasAdminPermission("super_admin", "settings.manage"), true);
   assert.equal(hasAdminPermission("super_admin", "settings.manage", [
     { permission: "settings.manage", effect: "deny" },
-  ]), true);
+  ]), false);
 });
 
 test("supervisor is operational but cannot administer the system", () => {

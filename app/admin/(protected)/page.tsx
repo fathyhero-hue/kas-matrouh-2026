@@ -1,15 +1,17 @@
+import { requireAdminPagePermission } from "@/lib/admin/authorization";
+import type { AdminPermission } from "@/lib/admin/permissions";
 import Link from "next/link";
 import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-async function getStats() {
+async function getStats(permissions: ReadonlySet<AdminPermission>) {
   const supabase = createServiceRoleClient();
   const [{ count: liveCount }, { count: pendingRosters }, { count: pendingOrders }] = await Promise.all([
-    supabase.from("matches").select("id", { count: "exact", head: true }).eq("is_live", true),
-    supabase.from("team_rosters").select("id", { count: "exact", head: true }).eq("is_submitted", false),
-    supabase.from("orders").select("id", { count: "exact", head: true }).eq("payment_status", "pending_payment"),
+    permissions.has("matches.view") ? supabase.from("matches").select("id", { count: "exact", head: true }).eq("is_live", true) : Promise.resolve({ count: 0 }),
+    permissions.has("rosters.view") ? supabase.from("team_rosters").select("id", { count: "exact", head: true }).eq("is_submitted", false) : Promise.resolve({ count: 0 }),
+    permissions.has("shop.orders.view") ? supabase.from("orders").select("id", { count: "exact", head: true }).eq("payment_status", "pending_payment") : Promise.resolve({ count: 0 }),
   ]);
   return {
     liveCount: liveCount || 0,
@@ -19,11 +21,16 @@ async function getStats() {
 }
 
 export default async function AdminDashboard() {
-  const stats = await getStats();
+  const { permissions } = await requireAdminPagePermission();
+  const stats = await getStats(permissions);
 
   const cards = [
+    { href: "/admin/admins", permission: "admins.view" as AdminPermission, icon: ClipboardList, title: "إدارة المسؤولين", subtitle: "إدارة حسابات المسؤولين والأدوار والصلاحيات" },
+    { href: "/admin/audit", permission: "audit.view" as AdminPermission, icon: ClipboardList, title: "سجل النشاط", subtitle: "متابعة العمليات والتغييرات داخل لوحة التحكم" },
+    { href: "/admin/registrations", permission: "registrations.view" as AdminPermission, icon: ClipboardList, title: "التسجيلات", subtitle: "إدارة طلبات وتسجيلات اللاعبين" },
     {
       href: "/admin/matches",
+      permission: "matches.view" as AdminPermission,
       icon: Trophy,
       title: "المباريات",
       subtitle: "التحكم باللايف، النتائج، والعداد",
@@ -32,6 +39,7 @@ export default async function AdminDashboard() {
     },
     {
       href: "/admin/rosters",
+      permission: "rosters.view" as AdminPermission,
       icon: ClipboardList,
       title: "القوائم والتسجيل",
       subtitle: "مراجعة قوائم الفرق وطلبات التسجيل",
@@ -40,6 +48,7 @@ export default async function AdminDashboard() {
     },
     {
       href: "/admin/shop",
+      permission: "shop.products.view" as AdminPermission,
       icon: ShoppingBag,
       title: "المتجر والطلبات",
       subtitle: "المنتجات، الطلبات، والمدفوعات",
@@ -48,12 +57,14 @@ export default async function AdminDashboard() {
     },
     {
       href: "/admin/stats",
+      permission: "stats.view" as AdminPermission,
       icon: Star,
       title: "الهدافين والكروت ونجم المباراة",
       subtitle: "إحصائيات اللاعبين لكل بطولة",
     },
     {
       href: "/admin/media",
+      permission: "content.view" as AdminPermission,
       icon: Newspaper,
       title: "الإعلام والإشعارات",
       subtitle: "الأخبار، شريط الأخبار، والإشعارات الفورية",
@@ -68,7 +79,7 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {cards.map((c, i) => (
+        {cards.filter(c => permissions.has(c.permission)).map((c, i) => (
           <Link
             key={`${c.href}-${i}`}
             href={c.href}
