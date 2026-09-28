@@ -66,15 +66,6 @@ export default async function AdminRostersPage({
     throw new Error("Failed to load team rosters");
   }
 
-  console.info("[admin-rosters]", {
-    tournament: config.tournament,
-    edition: edition.key,
-    legacySuffix: edition.suffix,
-    bracketFound: Boolean(bracket),
-    bracketId,
-    rosterCount: rosters.length,
-  });
-
   const registrationKey = REGISTRATION_KEY[slug];
   const { data: settings } = registrationKey
     ? await supabase.from("registration_settings").select("*").eq("tournament", registrationKey).maybeSingle()
