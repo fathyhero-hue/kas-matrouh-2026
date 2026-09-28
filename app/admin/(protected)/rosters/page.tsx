@@ -34,16 +34,46 @@ export default async function AdminRostersPage({
   const edition = resolveEdition(slug, editionKey);
 
   const supabase = createServiceRoleClient();
-  const { data: bracket } = await supabase.from("brackets").select("id").eq("legacy_suffix", edition.suffix).maybeSingle();
-  const bracketId = bracket?.id as string | undefined;
+  const { data: bracket, error: bracketError } = await supabase.from("brackets").select("id").eq("legacy_suffix", edition.suffix).maybeSingle();
+  if (bracketError) {
+    console.error("[admin-rosters] bracket query failed", {
+      code: bracketError.code,
+      message: bracketError.message,
+    });
+    throw new Error("Failed to load tournament bracket");
+  }
 
-  const { data: rosters } = bracketId
-    ? await supabase
-        .from("team_rosters")
-        .select("*, roster_players(*)")
-        .eq("bracket_id", bracketId)
-        .order("team_name", { ascending: true })
-    : { data: [] };
+  const bracketId = bracket?.id as string | undefined;
+  if (!bracketId) {
+    console.error("[admin-rosters] bracket not found", {
+      tournament: config.tournament,
+      edition: edition.key,
+      legacySuffix: edition.suffix,
+    });
+    throw new Error("Failed to load tournament bracket");
+  }
+
+  const { data: rosters, error: rostersError } = await supabase
+    .from("team_rosters")
+    .select("*, roster_players(*)")
+    .eq("bracket_id", bracketId)
+    .order("team_name", { ascending: true });
+  if (rostersError) {
+    console.error("[admin-rosters] roster query failed", {
+      code: rostersError.code,
+      message: rostersError.message,
+    });
+    throw new Error("Failed to load team rosters");
+  }
+
+  console.info("[admin-rosters]", {
+    tournament: config.tournament,
+    edition: edition.key,
+    legacySuffix: edition.suffix,
+    bracketFound: Boolean(bracket),
+    bracketId,
+    rosterCount: rosters.length,
+  });
 
   const registrationKey = REGISTRATION_KEY[slug];
   const { data: settings } = registrationKey
@@ -118,7 +148,7 @@ export default async function AdminRostersPage({
       ) : (
         <RostersManager
           bracketId={bracketId}
-          initialRosters={(rosters || []) as any}
+          initialRosters={rosters as any}
           registrationKey={registrationKey}
           initialSettings={settings as any}
           maxPlayers={getRosterMaxPlayers(slug)}
