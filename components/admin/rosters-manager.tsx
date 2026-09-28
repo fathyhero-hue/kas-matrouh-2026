@@ -256,7 +256,7 @@ export function RostersManager({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-h3 font-black">قوائم الفرق ({rosters.length})</h2>
         {allowCreate && (
           <button onClick={() => setCreating((v) => !v)} className="flex items-center gap-1.5 rounded-full bg-accent-blue/15 px-3 py-1.5 text-caption font-black text-accent-blue">
@@ -293,13 +293,13 @@ export function RostersManager({
                     <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-black text-muted-foreground">مفتوحة</span>
                   )}
                   <div className="flex shrink-0 gap-1.5">
-                    <button onClick={() => (isEditing ? closeEdit() : startEdit(r))} className="rounded-lg bg-accent-blue/15 p-2 text-accent-blue">
+                    <button aria-label={isEditing ? "إغلاق تعديل القائمة" : "تعديل القائمة"} title={isEditing ? "إغلاق التعديل" : "تعديل القائمة"} onClick={() => (isEditing ? closeEdit() : startEdit(r))} className="rounded-lg bg-accent-blue/15 p-2 text-accent-blue">
                       <Edit className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => toggleLock(r)} className={`rounded-lg p-2 ${r.is_submitted ? "bg-accent-orange/15 text-accent-orange" : "bg-accent-green/15 text-accent-green"}`}>
+                    <button aria-label={r.is_submitted ? "فتح القائمة" : "قفل القائمة"} title={r.is_submitted ? "فتح القائمة" : "قفل القائمة"} onClick={() => toggleLock(r)} className={`rounded-lg p-2 ${r.is_submitted ? "bg-accent-orange/15 text-accent-orange" : "bg-accent-green/15 text-accent-green"}`}>
                       {r.is_submitted ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                     </button>
-                    <button onClick={() => deleteRoster(r.id)} className="rounded-lg bg-red-500/15 p-2 text-red-400">
+                    <button aria-label="حذف القائمة" title="حذف القائمة" onClick={() => deleteRoster(r.id)} className="rounded-lg bg-red-500/15 p-2 text-red-400">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -364,7 +364,7 @@ export function RostersManager({
                       ))}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                       <button onClick={() => saveRoster(r.id)} className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-caption font-black text-primary-foreground">
                         <Save className="h-3.5 w-3.5" /> حفظ بيانات القائمة
                       </button>

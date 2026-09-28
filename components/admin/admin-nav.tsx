@@ -41,12 +41,12 @@ export function AdminNav() {
 
   return (
     <header className="print:hidden sticky top-0 z-40 border-b border-white/10 bg-brand-dark/95 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2 text-body font-black">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:flex-nowrap sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-body font-black sm:flex-none">
           <Trophy className="h-5 w-5 text-accent-blue" />
           لوحة الإدارة
         </div>
-        <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
+        <nav className="order-3 flex min-w-0 basis-full items-center gap-1 overflow-x-auto pb-0.5 sm:order-none sm:flex-1 sm:basis-auto">
           {NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission)).map((item) => {
             const active = item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
             return (

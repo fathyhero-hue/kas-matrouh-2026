@@ -92,14 +92,14 @@ export default async function AdminRostersPage({
         <p className="mt-1 text-caption text-muted-foreground">مراجعة قوائم الفرق وإعدادات التسجيل</p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1">
         {(Object.keys(TOURNAMENTS) as TournamentSlug[]).map((s) => {
           const c = TOURNAMENTS[s];
           return c.editions.map((e) => (
             <Link
               key={`${s}-${e.key}`}
               href={`/admin/rosters?tournament=${s}&edition=${e.key}`}
-              className={`rounded-full px-3 py-1.5 text-caption font-bold transition-colors ${
+              className={`shrink-0 rounded-full px-3 py-1.5 text-caption font-bold transition-colors ${
                 s === slug && e.key === edition.key ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
               }`}
             >

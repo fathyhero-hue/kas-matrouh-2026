@@ -55,12 +55,12 @@ export function EliteGroupsManager({ initialGroupA, initialGroupB }: { initialGr
 
       <div className="space-y-2">
         {ELITE_CUP_ELIGIBLE_TEAMS.map((team) => (
-          <div key={team} className="flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2">
+          <div key={team} className="flex flex-col gap-2 rounded-xl bg-secondary/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-caption font-bold">{team}</span>
-            <div className="flex gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5 sm:flex">
               <button
                 onClick={() => setGroup(team, assignment[team] === "A" ? null : "A")}
-                className={`rounded-lg px-3 py-1.5 text-[11px] font-black transition-colors ${
+                className={`min-w-0 rounded-lg px-2 py-2 text-[11px] font-black transition-colors sm:px-3 sm:py-1.5 ${
                   assignment[team] === "A" ? "bg-accent-blue text-background" : "bg-white/5 text-muted-foreground"
                 }`}
               >
@@ -68,7 +68,7 @@ export function EliteGroupsManager({ initialGroupA, initialGroupB }: { initialGr
               </button>
               <button
                 onClick={() => setGroup(team, assignment[team] === "B" ? null : "B")}
-                className={`rounded-lg px-3 py-1.5 text-[11px] font-black transition-colors ${
+                className={`min-w-0 rounded-lg px-2 py-2 text-[11px] font-black transition-colors sm:px-3 sm:py-1.5 ${
                   assignment[team] === "B" ? "bg-accent-green text-background" : "bg-white/5 text-muted-foreground"
                 }`}
               >
