@@ -21,6 +21,25 @@ async function toDataUri(url: string | null | undefined): Promise<string | undef
   }
 }
 
+type RegistrationPrintRow = {
+  id: string;
+  full_name: string;
+  role: string;
+  role_label: string;
+  team_name: string | null;
+  tournament_name: string;
+  tournament_logo_url: string | null;
+  serial_number: string;
+  qr_payload: string;
+  birth_date: string | null;
+  registration_date: string | null;
+  national_id: string | null;
+  photo_url: string | null;
+  crop_x: number | null;
+  crop_y: number | null;
+  zoom: number | null;
+};
+
 export default async function RegistrationsPrintPage({
   searchParams,
 }: {
@@ -34,7 +53,7 @@ export default async function RegistrationsPrintPage({
   const rows = registrations || [];
 
   const cards: IdCardData[] = await Promise.all(
-    rows.map(async (r: any) => {
+    rows.map(async (r: RegistrationPrintRow) => {
       const [photoUrl, tournamentLogoUrl] = await Promise.all([toDataUri(r.photo_url), toDataUri(r.tournament_logo_url)]);
       return {
         fullName: r.full_name,
@@ -45,13 +64,13 @@ export default async function RegistrationsPrintPage({
         tournamentLogoUrl,
         serial: r.serial_number,
         qrPayload: r.qr_payload,
-        birthDate: r.birth_date,
-        registrationDate: r.registration_date,
-        nationalId: r.national_id,
+        birthDate: r.birth_date || undefined,
+        registrationDate: r.registration_date || undefined,
+        nationalId: r.national_id || undefined,
         photoUrl,
-        cropX: r.crop_x,
-        cropY: r.crop_y,
-        zoom: r.zoom,
+        cropX: r.crop_x ?? undefined,
+        cropY: r.crop_y ?? undefined,
+        zoom: r.zoom ?? undefined,
       };
     })
   );
@@ -95,7 +114,7 @@ export default async function RegistrationsPrintPage({
       )}
 
       <PrintButton />
-      {cards.length > 0 && <PdfDownloadButton filename={`player-cards${tournament ? `-${tournament}` : ""}.pdf`} />}
+      {cards.length > 0 && <PdfDownloadButton cards={cards} filename={`player-cards${tournament ? `-${tournament}` : ""}.pdf`} />}
     </main>
   );
 }

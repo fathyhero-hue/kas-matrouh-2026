@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/admin/stats", permission: "stats.view", label: "الإحصائيات", icon: Star },
   { href: "/admin/rosters", permission: "rosters.view", label: "القوائم", icon: ClipboardList },
   { href: "/admin/registrations", permission: "registrations.view", label: "كروت اللاعبين", icon: IdCard },
+  { href: "/admin/player-cards", permission: "tournaments.player-cards.manage", label: "بطاقات اللاعبين", icon: IdCard },
   { href: "/admin/media", permission: "content.view", label: "الإعلام", icon: Newspaper },
   { href: "/admin/shop", permission: "shop.products.view", label: "المتجر", icon: ShoppingBag },
 ];

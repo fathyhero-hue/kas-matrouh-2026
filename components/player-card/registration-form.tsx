@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+/* eslint-disable react/no-unescaped-entities */
+
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Camera, Download, RotateCcw, Lock, ShieldCheck, Loader2 } from "lucide-react";
 import { IdCard, type IdCardData } from "./id-card";
+import { downloadCardPdf } from "@/lib/player-cards/export";
 
 const ROLE_OPTIONS = [
   { value: "player", label: "لاعب" },
@@ -49,9 +52,14 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
   const [rosterTeams, setRosterTeams] = useState<RosterTeam[]>([]);
 
   useEffect(() => {
-    setGateOpen(false);
-    setCode("");
-    setRosterTeams([]);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setGateOpen(false);
+      setCode("");
+      setRosterTeams([]);
+    });
+    return () => { active = false; };
   }, [tournamentId]);
 
   const unlock = async () => {
@@ -74,6 +82,8 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
       if (data.teamName) setTeamName(data.teamName);
       else if (teams[0]) setTeamName(teams[0].team);
       setGateOpen(true);
+    // The external response shape is intentionally treated as unknown at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       toast.error(e?.message || "تعذر التحقق من الرقم السري.");
     } finally {
@@ -98,7 +108,6 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<IdCardData | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
 
   const selectedRosterTeam = useMemo(() => rosterTeams.find((t) => t.team === teamName) || null, [rosterTeams, teamName]);
 
@@ -107,11 +116,17 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
   // resetting on every keystroke would wipe out what the user is typing.
   useEffect(() => {
     if (!linked) return;
-    setManualEntry(rosterTeams.length === 0);
-    setFullName("");
-    setExistingPhotoUrl("");
-    setPhotoFile(null);
-    setPhotoPreview("");
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setManualEntry(rosterTeams.length === 0);
+      setFullName("");
+      setExistingPhotoUrl("");
+      setPhotoFile(null);
+      setPhotoPreview("");
+    });
+    return () => { active = false; };
+    // rosterTeams is intentionally omitted: it is the async result that this reset prepares for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamName, role, linked]);
 
@@ -214,6 +229,7 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
         zoom,
       });
       toast.success("تم تسجيل البيانات بنجاح ✅");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       toast.error(e?.message || "حدث خطأ أثناء التسجيل");
     } finally {
@@ -222,15 +238,11 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
   };
 
   const downloadCard = async () => {
-    if (!cardRef.current) return;
+    if (!result) return;
     try {
-      const htmlToImage = await import("html-to-image");
-      const dataUrl = await htmlToImage.toPng(cardRef.current, { pixelRatio: 2 });
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `${result?.serial || "player-card"}.png`;
-      link.click();
-    } catch {
+      await downloadCardPdf(result, `${result.serial || "player-card"}.pdf`);
+    } catch (error) {
+      console.error("[player-card] export failed", error instanceof Error ? error.message : "unknown");
       toast.error("تعذر تحميل الكارت، جرب لقطة شاشة بدل كده");
     }
   };
@@ -250,9 +262,7 @@ export function RegistrationForm({ tournaments }: { tournaments: Tournament[] })
   if (result) {
     return (
       <div className="space-y-4">
-        <div ref={cardRef}>
-          <IdCard data={result} />
-        </div>
+        <IdCard data={result} />
 
         <button onClick={downloadCard} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3 text-body font-black text-primary-foreground">
           <Download className="h-4 w-4" />

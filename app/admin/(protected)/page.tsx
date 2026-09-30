@@ -1,7 +1,7 @@
 import { requireAdminPagePermission } from "@/lib/admin/authorization";
 import type { AdminPermission } from "@/lib/admin/permissions";
 import Link from "next/link";
-import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper } from "lucide-react";
+import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper, IdCard } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,7 @@ export default async function AdminDashboard() {
     { href: "/admin/admins", permission: "admins.view" as AdminPermission, icon: ClipboardList, title: "إدارة المسؤولين", subtitle: "إدارة حسابات المسؤولين والأدوار والصلاحيات" },
     { href: "/admin/audit", permission: "audit.view" as AdminPermission, icon: ClipboardList, title: "سجل النشاط", subtitle: "متابعة العمليات والتغييرات داخل لوحة التحكم" },
     { href: "/admin/registrations", permission: "registrations.view" as AdminPermission, icon: ClipboardList, title: "التسجيلات", subtitle: "إدارة طلبات وتسجيلات اللاعبين" },
+    { href: "/admin/player-cards", permission: "tournaments.player-cards.manage" as AdminPermission, icon: IdCard, title: "بطاقات اللاعبين", subtitle: "إنشاء ومعاينة وطباعة بطاقات لاعبي الفرق" },
     {
       href: "/admin/matches",
       permission: "matches.view" as AdminPermission,
