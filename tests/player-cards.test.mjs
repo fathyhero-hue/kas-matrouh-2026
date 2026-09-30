@@ -3,6 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 import { calculateA4Pages } from "../lib/player-cards/pagination.ts";
 import { renderCardSvg } from "../lib/player-cards/renderer.ts";
+import { A4_CARD_WIDTH_MM, A4_HEIGHT_MM, A4_WIDTH_MM, containRect, getA4CardRect, getContainScale } from "../lib/player-cards/layout.ts";
 
 test("A4 pagination never exceeds four cards", () => {
   const expected = new Map([[1, 1], [4, 1], [5, 2], [8, 2], [9, 3], [16, 4], [20, 5], [22, 6]]);
@@ -27,4 +28,37 @@ test("player cards migration is additive and service-role-only", () => {
 test("renderer and export source do not import html-to-image", () => {
   const source = `${fs.readFileSync("lib/player-cards/renderer.ts", "utf8")}\n${fs.readFileSync("lib/player-cards/export.ts", "utf8")}`;
   assert.doesNotMatch(source, /html-to-image/);
+});
+
+test("canonical dimensions and preview containment preserve aspect ratio", () => {
+  const svg = renderCardSvg({ fullName: "test", role: "player", roleLabel: "player", team: "team", tournament: "tournament", serial: "MTR-TEST", qrPayload: "test" }, "front");
+  assert.match(svg, /width="640" height="404" viewBox="0 0 640 404"/);
+  assert.equal(getContainScale(320, 202, 640, 404), 0.5);
+  assert.equal(getContainScale(1600, 1600, 640, 404), 1);
+  const rect = containRect(640, 404, 180, 277);
+  assert.ok(rect.width <= 180);
+  assert.ok(rect.height <= 277);
+  assert.equal(Number((rect.width / rect.height).toFixed(6)), Number((640 / 404).toFixed(6)));
+});
+
+test("A4 card rectangles stay inside the printable safe area", () => {
+  for (let index = 0; index < 4; index += 1) {
+    const rect = getA4CardRect(index, 640 / 404);
+    assert.ok(rect.x >= 0 && rect.y >= 0);
+    assert.ok(rect.x + rect.width <= A4_WIDTH_MM);
+    assert.ok(rect.y + rect.height <= A4_HEIGHT_MM);
+    assert.equal(rect.width, A4_CARD_WIDTH_MM);
+    assert.equal(rect.height, 92 / (640 / 404));
+  }
+});
+
+test("export and print paths do not use viewport or DOM preview dimensions", () => {
+  const exportSource = fs.readFileSync("lib/player-cards/export.ts", "utf8");
+  const printSource = fs.readFileSync("app/admin/(protected)/player-cards/[teamId]/print/page.tsx", "utf8");
+  assert.doesNotMatch(exportSource, /getBoundingClientRect|clientWidth|clientHeight/);
+  assert.match(exportSource, /renderCardFacePng\(item, "back"\)/);
+  assert.match(printSource, /grid-template-columns: repeat\(2/);
+  assert.match(printSource, /face: "front"/);
+  assert.match(printSource, /face: "back"/);
+  assert.match(printSource, /chunk\(cards, 4\)/);
 });

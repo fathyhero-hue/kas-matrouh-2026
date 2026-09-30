@@ -1,15 +1,7 @@
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
-import { CARD_HEIGHT, CARD_WIDTH, renderCardSvg, type CardRenderData } from "@/lib/player-cards/renderer";
-import { cardsPerA4Page } from "@/lib/player-cards/pagination";
-
-const PAGE_WIDTH = 210;
-const PAGE_HEIGHT = 297;
-const CARD_W_MM = 92;
-const CARD_H_MM = CARD_W_MM / (CARD_WIDTH / CARD_HEIGHT);
-const GAP_MM = 6;
-const MARGIN_X = (PAGE_WIDTH - CARD_W_MM * 2 - GAP_MM) / 2;
-const MARGIN_Y = (PAGE_HEIGHT - CARD_H_MM * 2 - GAP_MM) / 2;
+import { CARD_ASPECT_RATIO, CARD_HEIGHT, CARD_WIDTH, renderCardSvg, type CardRenderData } from "@/lib/player-cards/renderer";
+import { A4_CARDS_PER_PAGE, containRect, getA4CardRect } from "@/lib/player-cards/layout";
 
 async function imageAsDataUrl(source: string | undefined) {
   if (!source || source.startsWith("data:")) return source;
@@ -70,25 +62,31 @@ export async function renderCardFacePng(data: CardRenderData, face: "front" | "b
 export async function downloadCardPdf(data: CardRenderData, filename = "player-card.pdf") {
   const [front, back] = await Promise.all([renderCardFacePng(data, "front"), renderCardFacePng(data, "back")]);
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const x = (PAGE_WIDTH - CARD_W_MM) / 2;
-  const y = (PAGE_HEIGHT - CARD_H_MM) / 2;
-  doc.addImage(front, "PNG", x, y, CARD_W_MM, CARD_H_MM);
+  const rect = containRect(CARD_WIDTH, CARD_HEIGHT, 180, 277);
+  doc.addImage(front, "PNG", 15 + rect.x, 10 + rect.y, rect.width, rect.height);
   doc.addPage();
-  doc.addImage(back, "PNG", x, y, CARD_W_MM, CARD_H_MM);
+  doc.addImage(back, "PNG", 15 + rect.x, 10 + rect.y, rect.width, rect.height);
   doc.save(filename);
 }
 
 export async function downloadCardsPdf(data: CardRenderData[], filename = "player-cards.pdf") {
   if (data.length === 0) return;
-  const fronts = await Promise.all(data.map((item) => renderCardFacePng(item, "front")));
+  const faces = await Promise.all(data.map(async (item) => ({
+    front: await renderCardFacePng(item, "front"),
+    back: await renderCardFacePng(item, "back"),
+  })));
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
 
-  fronts.forEach((front, index) => {
-    const position = index % cardsPerA4Page;
-    if (index > 0 && position === 0) doc.addPage();
-    const row = Math.floor(position / 2);
-    const column = position % 2;
-    doc.addImage(front, "PNG", MARGIN_X + column * (CARD_W_MM + GAP_MM), MARGIN_Y + row * (CARD_H_MM + GAP_MM), CARD_W_MM, CARD_H_MM);
-  });
+  const addFacePages = (face: "front" | "back") => {
+    faces.forEach((item, index) => {
+      const rect = getA4CardRect(index, CARD_ASPECT_RATIO);
+      if (index > 0 && index % A4_CARDS_PER_PAGE === 0) doc.addPage();
+      doc.addImage(item[face], "PNG", rect.x, rect.y, rect.width, rect.height);
+    });
+  };
+
+  addFacePages("front");
+  doc.addPage();
+  addFacePages("back");
   doc.save(filename);
 }

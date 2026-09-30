@@ -1,3 +1,7 @@
+export const CARD_WIDTH = 640;
+export const CARD_HEIGHT = 404;
+export const CARD_ASPECT_RATIO = CARD_WIDTH / CARD_HEIGHT;
+
 export type CardRenderData = {
   fullName: string;
   role: "player" | "manager" | string;
@@ -17,9 +21,6 @@ export type CardRenderData = {
   zoom?: number;
 };
 
-export const CARD_WIDTH = 640;
-export const CARD_HEIGHT = 404;
-export const CARD_ASPECT_RATIO = CARD_WIDTH / CARD_HEIGHT;
 export const BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
 
 function escapeXml(value: unknown) {

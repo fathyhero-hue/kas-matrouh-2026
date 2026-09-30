@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CheckSquare, Download, Edit3, Eye, FileText, Loader2, Plus, Printer, Square, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { IdCard, type IdCardData } from "@/components/player-card/id-card";
+import { CardPreviewStage, IdCard, type IdCardData } from "@/components/player-card/id-card";
 import { downloadCardPdf, downloadCardsPdf } from "@/lib/player-cards/export";
 import { getCardCounts, type PlayerCardPlayer, type PlayerCardTeam, type PlayerCardRecord } from "@/lib/player-cards/data";
 
@@ -192,8 +192,37 @@ function EditModal({ player, data, onClose, onSave, busy }: { player: PlayerCard
   const [cropX, setCropX] = useState(Number(current.cropX ?? 50));
   const [cropY, setCropY] = useState(Number(current.cropY ?? 50));
   const [zoom, setZoom] = useState(Number(current.zoom ?? 1));
+  const [face, setFace] = useState<"front" | "back">("front");
   const previewData = { ...data, cropX, cropY, zoom };
-  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4" onClick={onClose}><div className="w-full max-w-3xl rounded-2xl bg-brand-dark p-4" onClick={(event) => event.stopPropagation()}><div className="mb-3 flex items-center justify-between"><h2 className="text-body font-black">تعديل بطاقة {player.name}</h2><button onClick={onClose} aria-label="إغلاق"><X className="h-5 w-5" /></button></div><div className="grid gap-5 lg:grid-cols-2"><IdCard data={previewData} face="front" /><div className="space-y-4"><Range label="القص الأفقي" value={cropX} min={0} max={100} step={1} onChange={setCropX} /><Range label="القص الرأسي" value={cropY} min={0} max={100} step={1} onChange={setCropY} /><Range label="التكبير" value={zoom} min={1} max={2} step={0.05} onChange={setZoom} /><button onClick={() => onSave({ cropX, cropY, zoom })} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-caption font-black text-primary-foreground disabled:opacity-50">{busy && <Loader2 className="h-4 w-4 animate-spin" />}حفظ التعديلات</button></div></div></div></div>;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-2 sm:p-4" onClick={onClose}>
+      <div className="max-h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-[1100px] overflow-y-auto rounded-2xl bg-brand-dark p-4 sm:max-h-[calc(100vh-32px)]" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-body font-black">{`\u062a\u0639\u062f\u064a\u0644 \u0628\u0637\u0627\u0642\u0629 ${player.name}`}</h2>
+          <button onClick={onClose} aria-label="\u0625\u063a\u0644\u0627\u0642"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+          <section className="min-w-0">
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setFace("front")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "front" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>{`\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u0623\u0645\u0627\u0645\u064a`}</button>
+              <button type="button" onClick={() => setFace("back")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "back" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>{`\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u062e\u0644\u0641\u064a`}</button>
+            </div>
+            <CardPreviewStage data={previewData} face={face} />
+          </section>
+          <section className="space-y-4 rounded-2xl bg-black/10 p-4">
+            <Range label={`\u0627\u0644\u0642\u0635 \u0627\u0644\u0623\u0641\u0642\u064a`} value={cropX} min={0} max={100} step={1} onChange={setCropX} />
+            <Range label={`\u0627\u0644\u0642\u0635 \u0627\u0644\u0631\u0623\u0633\u064a`} value={cropY} min={0} max={100} step={1} onChange={setCropY} />
+            <Range label={`\u0627\u0644\u062a\u0643\u0628\u064a\u0631`} value={zoom} min={1} max={2} step={0.05} onChange={setZoom} />
+            <button onClick={() => onSave({ cropX, cropY, zoom })} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-caption font-black text-primary-foreground disabled:opacity-50">
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {`\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a`}
+            </button>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Range({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {

@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { renderCardSvg, type CardRenderData } from "@/lib/player-cards/renderer";
+import { CARD_HEIGHT, CARD_WIDTH, renderCardSvg, type CardRenderData } from "@/lib/player-cards/renderer";
+import { getContainScale } from "@/lib/player-cards/layout";
 
 export type IdCardData = CardRenderData;
+
+function CardFace({ data, face, qrDataUrl }: { data: IdCardData; face: "front" | "back"; qrDataUrl: string }) {
+  return (
+    <div data-card-face={face} className="id-card-print w-full overflow-hidden rounded-[22px] shadow-2xl">
+      <div className="w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: renderCardSvg(data, face, qrDataUrl) }} />
+    </div>
+  );
+}
 
 export function IdCard({ data, className = "", face = "both" }: { data: IdCardData; className?: string; face?: "front" | "back" | "both" }) {
   const [qrDataUrl, setQrDataUrl] = useState("");
@@ -18,17 +27,38 @@ export function IdCard({ data, className = "", face = "both" }: { data: IdCardDa
   }, [data.qrPayload]);
 
   return (
-    <div dir="rtl" className={`print-card-grid grid grid-cols-1 gap-5 justify-items-center ${className}`}>
-      {(face === "front" || face === "both") && (
-        <div data-card-face="front" className="id-card-print w-full max-w-[430px] overflow-hidden rounded-[22px] shadow-2xl">
-          <div dangerouslySetInnerHTML={{ __html: renderCardSvg(data, "front", qrDataUrl) }} />
-        </div>
-      )}
-      {(face === "back" || face === "both") && (
-        <div data-card-face="back" className="id-card-print w-full max-w-[430px] overflow-hidden rounded-[22px] shadow-2xl">
-          <div dangerouslySetInnerHTML={{ __html: renderCardSvg(data, "back", qrDataUrl) }} />
-        </div>
-      )}
+    <div dir="rtl" className={`print-card-grid grid w-full grid-cols-1 gap-5 justify-items-center ${className}`}>
+      {(face === "front" || face === "both") && <CardFace data={data} face="front" qrDataUrl={qrDataUrl} />}
+      {(face === "back" || face === "both") && <CardFace data={data} face="back" qrDataUrl={qrDataUrl} />}
+    </div>
+  );
+}
+
+export function CardPreviewStage({ data, face = "front" }: { data: IdCardData; face?: "front" | "back" }) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const update = () => setStageSize({ width: stage.clientWidth, height: stage.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  const availableWidth = Math.max(0, stageSize.width - 32);
+  const availableHeight = Math.max(0, stageSize.height - 32);
+  const scale = stageSize.width && stageSize.height
+    ? getContainScale(availableWidth, availableHeight, CARD_WIDTH, CARD_HEIGHT)
+    : 1;
+
+  return (
+    <div ref={stageRef} className="flex h-[min(62vh,440px)] w-full items-center justify-center overflow-hidden rounded-2xl bg-black/20 p-4">
+      <div style={{ width: CARD_WIDTH, height: CARD_HEIGHT, transform: `scale(${scale})`, transformOrigin: "center center" }} className="shrink-0">
+        <IdCard data={data} face={face} />
+      </div>
     </div>
   );
 }
