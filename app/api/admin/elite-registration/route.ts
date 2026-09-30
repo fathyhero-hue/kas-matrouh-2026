@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { authorizeAdminRequest } from "@/lib/admin/authorization";
 import { auditAdminMutation } from "@/lib/admin/audit";
-import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { ensureEliteTeamRoster } from "@/lib/paymob/elite-roster-sync";
 
 export const runtime = "nodejs";
@@ -21,18 +20,19 @@ function generateAccessPassword() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// Admin-side "grant access without an online payment" — for cash/manual subscriptions.
-// Still enforced against the same fixed 10-team list and one-active-slot-per-team rule.
+// Admin-side cash confirmation. New confirmations are paid cash registrations;
+// legacy manual_access rows remain untouched until their meaning is reviewed.
 export async function POST(req: NextRequest) {
   const authorization = await authorizeAdminRequest(req, 'registrations.edit');
   if (authorization instanceof NextResponse) return authorization;
   try {
     const { teamName: teamNameRaw, managerName, phone } = await req.json();
     const teamName = String(teamNameRaw || "").trim();
-    const match = ELITE_CUP_ELIGIBLE_TEAMS.find((t) => normalizeTeamName(t) === normalizeTeamName(teamName));
-    if (!match) return NextResponse.json({ error: "هذا الفريق غير مدرج ضمن الفرق المسموح لها بالاشتراك في كأس النخبة." }, { status: 400 });
-
     const supabase = createServiceRoleClient();
+    const { data: officialTeams, error: teamsError } = await supabase.from("elite_teams").select("name").order("name", { ascending: true });
+    if (teamsError) throw teamsError;
+    const match = (officialTeams || []).map((row: { name: string }) => row.name).find((t) => normalizeTeamName(t) === normalizeTeamName(teamName));
+    if (!match) return NextResponse.json({ error: "هذا الفريق غير مدرج ضمن الفرق المسموح لها بالاشتراك في كأس النخبة." }, { status: 400 });
 
     const { data: existingOrders } = await supabase
       .from("orders")
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       .eq("type", "tournament_registration")
       .in("payment_status", ["paid", "manual_access"]);
 
-    const alreadyActive = (existingOrders || []).some((o: any) => normalizeTeamName(o.team_name || "") === normalizeTeamName(match));
+    const alreadyActive = (existingOrders || []).some((o: { team_name: string | null }) => normalizeTeamName(o.team_name || "") === normalizeTeamName(match));
     if (alreadyActive) return NextResponse.json({ error: `فريق "${match}" مفعّل بالفعل.` }, { status: 400 });
 
     const { data: settings } = await supabase.from("registration_settings").select("price").eq("tournament", "elite").maybeSingle();
@@ -63,13 +63,15 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         total: price,
         currency: "EGP",
-        payment_method: "manual_admin",
-        payment_status: "manual_access",
-        status_label: "تفعيل يدوي من الإدارة",
+        payment_method: "cash",
+        payment_status: "paid",
+        status_label: "تم الدفع نقداً وتأكيده من الإدارة",
+        paid_at: new Date().toISOString(),
+        confirmed_by: authorization.userId,
         access_password: accessPassword,
         roster_access_password: accessPassword,
         roster_access_active: true,
-        admin_manual_access: true,
+        admin_manual_access: false,
       })
       .select()
       .single();
@@ -78,11 +80,19 @@ export async function POST(req: NextRequest) {
 
     await ensureEliteTeamRoster(supabase, { teamName: match, managerName, phone });
 
-    await auditAdminMutation({ actorUserId: authorization.userId, action: "orders.mutation", permission: "registrations.edit", entityType: "orders", request: req });
+    await auditAdminMutation({
+      actorUserId: authorization.userId,
+      action: "elite_registration.cash_payment.confirm",
+      permission: "registrations.edit",
+      entityType: "orders",
+      entityId: order.id,
+      metadata: { changed_fields: ["payment_status", "payment_method", "paid_at", "confirmed_by"] },
+      request: req,
+    });
     return NextResponse.json({ ok: true, order });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Elite manual activation error:", error);
-    return NextResponse.json({ error: error?.message || "فشل التفعيل اليدوي." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "فشل تأكيد الدفع النقدي." }, { status: 500 });
   }
 }
 
@@ -110,8 +120,8 @@ export async function DELETE(req: NextRequest) {
 
     await auditAdminMutation({ actorUserId: authorization.userId, action: "orders.mutation", permission: "registrations.edit", entityType: "orders", request: req });
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Elite manual deactivation error:", error);
-    return NextResponse.json({ error: error?.message || "فشل إلغاء التفعيل." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "فشل إلغاء التفعيل." }, { status: 500 });
   }
 }

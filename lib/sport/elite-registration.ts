@@ -1,14 +1,15 @@
+// Compatibility export for the retired group-editor code path. New
+// registration and participation flows read the official rows from elite_teams.
 export const ELITE_CUP_ELIGIBLE_TEAMS = [
   "غوط رباح",
-  "القدس",
-  "أصدقاء حاتم",
   "وادي ماجد",
-  "براني",
-  "المثاني",
-  "النسور",
-  "الوادي",
+  "القدس",
   "أبناء باسط",
+  "الوادي",
+  "المثاني",
   "أم القبائل",
+  "براني",
+  "النسور",
 ];
 
-export const ELITE_CUP_MAX_TEAMS = ELITE_CUP_ELIGIBLE_TEAMS.length;
+export const ELITE_CUP_MAX_TEAMS = 9;

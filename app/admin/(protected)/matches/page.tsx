@@ -2,6 +2,9 @@ import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
 import { MatchesManager } from "@/components/admin/matches-manager";
+import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
+import { StandingsTable, type StandingsRow } from "@/components/sport/standings-table";
+import { computeEliteBracket, getEliteQualificationZone, getEliteStandings, type BracketMatch, type EliteBracket } from "@/lib/sport/elite-bracket";
 import { getBracketRosterTeams } from "@/lib/sport/roster-link";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +16,6 @@ export default async function AdminMatchesPage({
 }) {
   const { tournament: rawSlug, edition: editionKey } = await searchParams;
   const slug: TournamentSlug = isTournamentSlug(rawSlug || "") ? (rawSlug as TournamentSlug) : "matrouh-cup";
-  const config = TOURNAMENTS[slug];
   const edition = resolveEdition(slug, editionKey);
 
   const supabase = createServiceRoleClient();
@@ -24,23 +26,25 @@ export default async function AdminMatchesPage({
     ? await supabase.from("matches").select("*").eq("bracket_id", bracketId).order("match_date", { ascending: false }).order("match_time", { ascending: false })
     : { data: [] };
 
-  let eliteGroupA: string[] = [];
-  let eliteGroupB: string[] = [];
-  if (slug === "elite-cup") {
-    const { data: groupsSetting } = await supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
-    eliteGroupA = (groupsSetting?.value as any)?.groupA || [];
-    eliteGroupB = (groupsSetting?.value as any)?.groupB || [];
-  }
-
   const rosterTeams = bracketId
     ? (await getBracketRosterTeams(supabase, bracketId)).map((t) => ({ team: t.team, logoUrl: t.logoUrl }))
     : [];
+
+  let eliteTeams: string[] = [];
+  let eliteStandings: StandingsRow[] = [];
+  let eliteBracket: EliteBracket | null = null;
+  if (slug === "elite-cup" && bracketId) {
+    const elite = await getEliteStandings(supabase, bracketId);
+    eliteTeams = elite.teams;
+    eliteStandings = elite.standings.map((row, index) => ({ ...row, zone: getEliteQualificationZone(index + 1) }));
+    eliteBracket = computeEliteBracket(elite.standings, (elite.allMatches || []) as BracketMatch[]);
+  }
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-h1 font-black">إدارة المباريات</h1>
-        <p className="mt-1 text-caption text-muted-foreground">التحكم في النتائج، اللايف، والعداد لحظة بلحظة</p>
+        <p className="mt-1 text-caption text-muted-foreground">التحكم في النتائج، اللايف، والإعداد لحظة بلحظة</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -55,7 +59,7 @@ export default async function AdminMatchesPage({
               }`}
             >
               {c.icon} {c.label}
-              {c.editions.length > 1 ? ` — ${e.label}` : ""}
+              {c.editions.length > 1 ? ` - ${e.label}` : ""}
             </Link>
           ));
         })}
@@ -63,10 +67,30 @@ export default async function AdminMatchesPage({
 
       {!bracketId ? (
         <div className="rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">
-          لا يوجد براكيت مطابق لهذه البطولة/النسخة.
+          لا يوجد براكت مطابق لهذه البطولة/النسخة.
         </div>
       ) : (
-        <MatchesManager bracketId={bracketId} initialMatches={matches || []} groupATeams={eliteGroupA} groupBTeams={eliteGroupB} rosterTeams={rosterTeams} />
+        <>
+          {slug === "elite-cup" && eliteBracket && (
+            <div className="space-y-5">
+              <section>
+                <h2 className="mb-3 text-h3 font-black">الترتيب الموحد</h2>
+                <StandingsTable rows={eliteStandings} />
+              </section>
+              <section>
+                <h2 className="mb-3 text-h3 font-black">مخطط كأس النخبة</h2>
+                <EliteBracketDiagram bracket={eliteBracket} />
+              </section>
+            </div>
+          )}
+          <MatchesManager
+            bracketId={bracketId}
+            initialMatches={matches || []}
+            rosterTeams={rosterTeams}
+            teamOptions={slug === "elite-cup" ? eliteTeams : undefined}
+            isElite={slug === "elite-cup"}
+          />
+        </>
       )}
     </div>
   );

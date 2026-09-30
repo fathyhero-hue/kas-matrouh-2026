@@ -115,6 +115,7 @@ async function handleCallback(req: NextRequest, body: any) {
       .from("orders")
       .update({
         payment_status: success ? "paid" : pending ? "pending_payment" : "failed",
+        payment_method: order.payment_method || "paymob",
         status_label: success ? "تم الدفع" : pending ? "في انتظار الدفع" : "فشل الدفع",
         paymob_transaction_id: transactionId || order.paymob_transaction_id,
         paymob_callback: body,

@@ -21,19 +21,22 @@ export type StandingsRow = {
   points: number;
 };
 
-// Group-stage, finished matches only — mirrors the points/tiebreak rules the
-// admin panel has always used (3/1/0, then goal difference, then goals for).
-// `logos`, when passed, fills in each row's real team logo from the roster
-// (see lib/sport/roster-link.ts) so standings tables show it automatically.
-export function buildStandings(matches: MatchRow[], logos?: Map<string, string>): StandingsRow[] {
+export function buildStandings(matches: MatchRow[], logos?: Map<string, string>, teamNames: string[] = []): StandingsRow[] {
   const teams = new Map<string, Omit<StandingsRow, "team" | "points">>();
   const ensure = (name: string) => {
     if (!teams.has(name)) teams.set(name, { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 });
     return teams.get(name)!;
   };
 
+  // Optional seed teams let a tournament show its registered participants
+  // before the later scheduling step creates group matches.
+  for (const team of teamNames) {
+    const name = String(team || "").trim();
+    if (name) ensure(name);
+  }
+
   for (const m of matches) {
-    if (m.stage !== "group" || m.status !== "انتهت" || !m.team_a || !m.team_b) continue;
+    if (m.stage !== "group" || m.status !== "\u0627\u0646\u062a\u0647\u062a" || !m.team_a || !m.team_b) continue;
     const a = ensure(m.team_a);
     const b = ensure(m.team_b);
     const hg = m.home_goals ?? 0;

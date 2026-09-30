@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const id = body.id;
-    const patch = pickAllowedFields(body, ["team_a", "team_b", "match_date", "match_time", "venue", "status", "is_live", "score_a", "score_b", "bracket_id", "group_name", "round", "notes"]);
+    const patch = pickAllowedFields(body, ["team_a", "team_a_logo", "team_b", "team_b_logo", "home_goals", "away_goals", "home_penalty_goals", "away_penalty_goals", "match_date", "match_time", "day_name", "venue", "status", "is_live", "live_minute", "live_minute_base", "timer_started_at", "timer_paused_total", "is_timer_running", "bracket_id", "round", "stage", "match_label", "qualified_team", "next_match_label", "next_match_slot"]);
     const supabase = createServiceRoleClient();
 
     if (id) {
@@ -29,9 +29,10 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     await auditAdminMutation({ actorUserId: authorization.userId, action: "matches.mutation", permission: "matches.edit", entityType: "matches", request: req });
     return NextResponse.json({ ok: true, match: data });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Admin match save error:", error);
-    return NextResponse.json({ error: error?.message || "فشل حفظ المباراة." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل حفظ المباراة.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -46,8 +47,9 @@ export async function DELETE(req: NextRequest) {
     if (error) throw error;
     await auditAdminMutation({ actorUserId: authorization.userId, action: "matches.mutation", permission: "matches.edit", entityType: "matches", request: req });
     return NextResponse.json({ ok: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Admin match delete error:", error);
-    return NextResponse.json({ error: error?.message || "فشل حذف المباراة." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "فشل حذف المباراة.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

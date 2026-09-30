@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildStandings, type MatchRow, type StandingsRow } from "./standings";
-import { getBracketTeamLogos } from "./roster-link";
+import { getBracketTeamLogos, normalize } from "./roster-link";
+
+export const ELITE_CUP_TEAM_COUNT = 9;
+export const ELITE_CUP_MATCHES_PER_TEAM = 4;
+export const ELITE_CUP_GROUP_MATCHES = 18;
 
 export type BracketMatch = {
   team_a: string | null;
@@ -10,6 +14,8 @@ export type BracketMatch = {
   home_penalty_goals?: number | null;
   away_penalty_goals?: number | null;
   status: string | null;
+  match_label?: string | null;
+  qualified_team?: string | null;
 };
 
 export type SlotResult = {
@@ -21,12 +27,8 @@ export type SlotResult = {
   winner?: string;
 };
 
-function normalizeTeamName(name: string): string {
-  return String(name || "").trim().toLowerCase();
-}
+const normalizeTeamName = (name: string) => normalize(name);
 
-// Finds a finished match between two named teams (in any round/order) and
-// resolves the winner — by goals, falling back to a penalty shootout if tied.
 export function resolveSlot(matches: BracketMatch[], teamA: string, teamB: string): SlotResult {
   const match = matches.find((m) => {
     const a = normalizeTeamName(m.team_a || "");
@@ -34,7 +36,7 @@ export function resolveSlot(matches: BracketMatch[], teamA: string, teamB: strin
     return (a === normalizeTeamName(teamA) && b === normalizeTeamName(teamB)) || (a === normalizeTeamName(teamB) && b === normalizeTeamName(teamA));
   });
 
-  if (!match || match.status !== "انتهت") return { teamA, teamB, played: false };
+  if (!match || match.status !== "\u0627\u0646\u062a\u0647\u062a") return { teamA, teamB, played: false };
 
   const hg = Number(match.home_goals || 0);
   const ag = Number(match.away_goals || 0);
@@ -47,77 +49,83 @@ export function resolveSlot(matches: BracketMatch[], teamA: string, teamB: strin
     if (hp > ap) winner = match.team_a || undefined;
     else if (ap > hp) winner = match.team_b || undefined;
   }
+  if (!winner && match.qualified_team) winner = match.qualified_team;
 
   return { teamA: match.team_a || teamA, teamB: match.team_b || teamB, played: true, homeGoals: hg, awayGoals: ag, winner };
 }
 
-// Shared by the tournament overview page and the dedicated standings page so
-// both always agree on group membership and the resulting two tables.
-export async function getEliteGroupStandings(supabase: SupabaseClient, bracketId: string) {
-  const [{ data: groupsSetting }, { data: matches }, logos] = await Promise.all([
-    supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle(),
+export async function getEliteCupTeamRecords(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("elite_teams")
+    .select("id, legacy_id, name, logo_url")
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return (data || []) as Array<{ id: string; legacy_id: string | null; name: string; logo_url: string | null }>;
+}
+
+export async function getEliteCupTeams(supabase: SupabaseClient, _bracketId: string): Promise<string[]> {
+  void _bracketId;
+  const records = await getEliteCupTeamRecords(supabase);
+  return records.map((team) => team.name).filter(Boolean);
+}
+
+export function getEliteQualificationZone(rank: number): "qualify" | "playoff" | "danger" {
+  if (rank <= 2) return "qualify";
+  if (rank <= 6) return "playoff";
+  return "danger";
+}
+
+export function isEliteGroupStageComplete(matches: MatchRow[], teamNames: string[]): boolean {
+  if (teamNames.length !== ELITE_CUP_TEAM_COUNT) return false;
+  const finished = matches.filter((m) => m.stage === "group" && m.status === "\u0627\u0646\u062a\u0647\u062a" && m.team_a && m.team_b);
+  if (finished.length !== ELITE_CUP_GROUP_MATCHES) return false;
+  const appearances = new Map<string, number>();
+  for (const match of finished) {
+    appearances.set(normalize(match.team_a!), (appearances.get(normalize(match.team_a!)) || 0) + 1);
+    appearances.set(normalize(match.team_b!), (appearances.get(normalize(match.team_b!)) || 0) + 1);
+  }
+  return teamNames.every((team) => (appearances.get(normalize(team)) || 0) === ELITE_CUP_MATCHES_PER_TEAM);
+}
+
+export async function getEliteStandings(supabase: SupabaseClient, bracketId: string) {
+  const [{ data: matches }, logos, teams] = await Promise.all([
     supabase.from("matches").select("*").eq("bracket_id", bracketId),
     getBracketTeamLogos(supabase, bracketId),
+    getEliteCupTeams(supabase, bracketId),
   ]);
-
-  const groupA: string[] = (groupsSetting?.value as any)?.groupA || [];
-  const groupB: string[] = (groupsSetting?.value as any)?.groupB || [];
   const allMatches = (matches || []) as (MatchRow & BracketMatch)[];
-  const inGroup = (team: string | null, group: string[]) => !!team && group.includes(team);
-
-  const groupAMatches = allMatches.filter((m) => inGroup(m.team_a, groupA) && inGroup(m.team_b, groupA));
-  const groupBMatches = allMatches.filter((m) => inGroup(m.team_a, groupB) && inGroup(m.team_b, groupB));
-
-  return {
-    groupA,
-    groupB,
-    groupAStandings: buildStandings(groupAMatches, logos),
-    groupBStandings: buildStandings(groupBMatches, logos),
-    allMatches,
-  };
+  return { teams, allMatches, logos, standings: buildStandings(allMatches, logos, teams) };
 }
 
 export type EliteBracket = {
-  groupA: { first?: string; second?: string; third?: string };
-  groupB: { first?: string; second?: string; third?: string };
-  playoff1: SlotResult | null; // 3rd Group A vs 2nd Group B
-  playoff2: SlotResult | null; // 2nd Group A vs 3rd Group B
-  semi1: SlotResult | null; // 1st Group A vs winner(playoff1)
-  semi2: SlotResult | null; // 1st Group B vs winner(playoff2)
-  final: SlotResult | null;
+  seeds: Array<string | undefined>;
+  playoff1: SlotResult;
+  playoff2: SlotResult;
+  semi1: SlotResult;
+  semi2: SlotResult;
+  final: SlotResult;
 };
 
-const TBD = "لم يتحدد بعد";
+const placeholderSeed = (rank: number) => "\u0627\u0644\u0645\u0631\u0643\u0632 " + rank;
+const placeholderWinner = (label: string) => "\u0627\u0644\u0641\u0627\u0626\u0632 \u0645\u0646 " + label;
 
-export function computeEliteBracket(groupAStandings: StandingsRow[], groupBStandings: StandingsRow[], matches: BracketMatch[]): EliteBracket {
-  const a1 = groupAStandings[0]?.team;
-  const a2 = groupAStandings[1]?.team;
-  const a3 = groupAStandings[2]?.team;
-  const b1 = groupBStandings[0]?.team;
-  const b2 = groupBStandings[1]?.team;
-  const b3 = groupBStandings[2]?.team;
+function findLabeledMatch(matches: BracketMatch[], label: string) {
+  return matches.find((match) => String(match.match_label || "").trim().toUpperCase() === label);
+}
 
-  const playoff1 = a3 && b2 ? resolveSlot(matches, a3, b2) : null;
-  const playoff2 = a2 && b3 ? resolveSlot(matches, a2, b3) : null;
+function resolveProgressionSlot(matches: BracketMatch[], label: string, teamA: string, teamB: string): SlotResult {
+  const labeled = findLabeledMatch(matches, label);
+  return labeled ? resolveSlot([labeled], teamA, teamB) : resolveSlot(matches, teamA, teamB);
+}
 
-  const playoff1Winner = playoff1?.winner || TBD;
-  const playoff2Winner = playoff2?.winner || TBD;
-
-  const semi1 = a1 ? resolveSlot(matches, a1, playoff1Winner) : null;
-  const semi2 = b1 ? resolveSlot(matches, b1, playoff2Winner) : null;
-
-  const semi1Winner = semi1?.winner || TBD;
-  const semi2Winner = semi2?.winner || TBD;
-
-  const final = semi1Winner !== TBD && semi2Winner !== TBD ? resolveSlot(matches, semi1Winner, semi2Winner) : null;
-
-  return {
-    groupA: { first: a1, second: a2, third: a3 },
-    groupB: { first: b1, second: b2, third: b3 },
-    playoff1,
-    playoff2,
-    semi1,
-    semi2,
-    final,
-  };
+export function computeEliteBracket(standings: StandingsRow[], matches: BracketMatch[]): EliteBracket {
+  const seeds = Array.from({ length: 6 }, (_, index) => standings[index]?.team);
+  const seed = (rank: number) => seeds[rank - 1] || placeholderSeed(rank);
+  const playoff1 = resolveProgressionSlot(matches, "P1", seed(3), seed(6));
+  const playoff2 = resolveProgressionSlot(matches, "P2", seed(4), seed(5));
+  const semi1 = resolveProgressionSlot(matches, "SF1", seed(1), playoff1.winner || placeholderWinner("P1"));
+  const semi2 = resolveProgressionSlot(matches, "SF2", seed(2), playoff2.winner || placeholderWinner("P2"));
+  const final = resolveProgressionSlot(matches, "FINAL", semi1.winner || placeholderWinner("SF1"), semi2.winner || placeholderWinner("SF2"));
+  return { seeds, playoff1, playoff2, semi1, semi2, final };
 }

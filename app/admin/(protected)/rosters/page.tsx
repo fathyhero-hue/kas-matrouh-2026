@@ -1,21 +1,11 @@
 import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, getRosterMaxPlayers, type TournamentSlug } from "@/lib/sport/tournaments";
-import { ELITE_CUP_ELIGIBLE_TEAMS } from "@/lib/sport/elite-registration";
 import { RostersManager } from "@/components/admin/rosters-manager";
 import { BannedListManager } from "@/components/admin/banned-list-manager";
 import { EliteTeamsStatus } from "@/components/admin/elite-teams-status";
-import { EliteGroupsManager } from "@/components/admin/elite-groups-manager";
-
-function normalizeTeamName(name: string): string {
-  return String(name || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .replace(/أ|إ|آ/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .toLowerCase();
-}
+import { getEliteCupTeams } from "@/lib/sport/elite-bracket";
+import { normalize } from "@/lib/sport/roster-link";
 
 const STATUS_PRIORITY: Record<string, number> = { paid: 3, manual_access: 3, pending_payment: 2, failed: 1, payment_init_failed: 1 };
 
@@ -74,19 +64,16 @@ export default async function AdminRostersPage({
   const { data: banned } = await supabase.from("banned_entities").select("*").order("name", { ascending: true });
 
   let eliteTeams: { name: string; order: any; roster: { is_submitted: boolean; playerCount: number } | null }[] | null = null;
-  let eliteGroups: { groupA: string[]; groupB: string[] } | null = null;
   if (slug === "elite-cup") {
-    const { data: groupsSetting } = await supabase.from("app_settings").select("value").eq("key", "elite_cup_groups").maybeSingle();
-    eliteGroups = { groupA: (groupsSetting?.value as any)?.groupA || [], groupB: (groupsSetting?.value as any)?.groupB || [] };
     const { data: eliteOrders } = await supabase
       .from("orders")
-      .select("id, team_name, payment_status, manager_name, phone, access_password, admin_manual_access")
+      .select("id, team_name, payment_status, payment_method, paid_at, confirmed_by, manager_name, phone, access_password, admin_manual_access")
       .eq("tournament", "elite_cup")
       .eq("type", "tournament_registration");
 
     const bestOrderByTeam = new Map<string, any>();
     for (const o of eliteOrders || []) {
-      const key = normalizeTeamName(o.team_name || "");
+      const key = normalize(o.team_name || "");
       if (!key) continue;
       const current = bestOrderByTeam.get(key);
       if (!current || (STATUS_PRIORITY[o.payment_status || ""] || 0) > (STATUS_PRIORITY[current.payment_status || ""] || 0)) {
@@ -96,13 +83,14 @@ export default async function AdminRostersPage({
 
     const rosterByTeam = new Map<string, { is_submitted: boolean; playerCount: number }>();
     for (const r of (rosters || []) as any[]) {
-      rosterByTeam.set(normalizeTeamName(r.team_name || ""), { is_submitted: r.is_submitted, playerCount: (r.roster_players || []).filter((p: any) => p.name?.trim()).length });
+      rosterByTeam.set(normalize(r.team_name || ""), { is_submitted: r.is_submitted, playerCount: (r.roster_players || []).filter((p: any) => p.name?.trim()).length });
     }
 
-    eliteTeams = ELITE_CUP_ELIGIBLE_TEAMS.map((name) => ({
+    const participatingTeams = await getEliteCupTeams(supabase, bracketId);
+    eliteTeams = participatingTeams.map((name) => ({
       name,
-      order: bestOrderByTeam.get(normalizeTeamName(name)) || null,
-      roster: rosterByTeam.get(normalizeTeamName(name)) || null,
+      order: bestOrderByTeam.get(normalize(name)) || null,
+      roster: rosterByTeam.get(normalize(name)) || null,
     }));
   }
 
@@ -132,7 +120,6 @@ export default async function AdminRostersPage({
       </div>
 
       {eliteTeams && <EliteTeamsStatus teams={eliteTeams} price={Number(settings?.price || 1500)} />}
-      {eliteGroups && <EliteGroupsManager initialGroupA={eliteGroups.groupA} initialGroupB={eliteGroups.groupB} />}
 
       {!bracketId ? (
         <div className="rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا يوجد براكيت مطابق لهذه البطولة/النسخة.</div>

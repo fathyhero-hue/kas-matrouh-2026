@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { hasRegistrationAccess } from "@/lib/sport/registration-payment";
 
 export const runtime = "nodejs";
 
@@ -43,8 +44,7 @@ export async function POST(req: NextRequest) {
     const { data: candidates } = await supabase.rpc("find_orders_by_access_code", { p_code: trimmedCode });
     const paidOrder = (candidates || []).find((o: any) => {
       const sameTournament = String(o.tournament || "") === tournament;
-      const hasAccess = o.payment_status === "paid" || o.payment_status === "manual_access" || o.roster_access_active === true || o.admin_manual_access === true;
-      return sameTournament && hasAccess;
+      return sameTournament && hasRegistrationAccess(o);
     });
 
     if (!paidOrder) {

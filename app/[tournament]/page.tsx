@@ -10,8 +10,7 @@ import { buildStandings } from "@/lib/sport/standings";
 import { MatchCard } from "@/components/sport/match-card";
 import { StandingsTable } from "@/components/sport/standings-table";
 import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
-import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
-import { computeEliteBracket, getEliteGroupStandings } from "@/lib/sport/elite-bracket";
+import { computeEliteBracket, getEliteCupTeams, getEliteQualificationZone, getEliteStandings, ELITE_CUP_TEAM_COUNT, type BracketMatch } from "@/lib/sport/elite-bracket";
 import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
@@ -33,14 +32,22 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
   let eliteRegistrationBanner: ReactNode = null;
   if (slug === "elite-cup") {
     const service = createServiceRoleClient();
-    const { data: paidOrders } = await service
-      .from("orders")
-      .select("team_name")
-      .eq("tournament", "elite_cup")
-      .eq("type", "tournament_registration")
-      .eq("payment_status", "paid");
-    const paidCount = new Set((paidOrders || []).map((o: any) => String(o.team_name || "").trim())).size;
-    const remaining = Math.max(0, ELITE_CUP_MAX_TEAMS - paidCount);
+    const [{ data: paidOrders }, officialTeams] = await Promise.all([
+      service
+        .from("orders")
+        .select("team_name")
+        .eq("tournament", "elite_cup")
+        .eq("type", "tournament_registration")
+        .in("payment_status", ["paid", "manual_access"]),
+      getEliteCupTeams(service, bracketId),
+    ]);
+    const officialKeys = new Set(officialTeams.map((team) => team.trim().toLowerCase()));
+    const paidCount = new Set(
+      (paidOrders || [])
+        .map((o: { team_name: string | null }) => String(o.team_name || "").trim().toLowerCase())
+        .filter((name) => officialKeys.has(name))
+    ).size;
+    const remaining = Math.max(0, (officialTeams.length || ELITE_CUP_TEAM_COUNT) - paidCount);
     eliteRegistrationBanner = remaining > 0 ? (
       <Link
         href="/elite-cup/register"
@@ -52,7 +59,7 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
           </div>
           <div>
             <div className="text-body font-black">الاشتراك في كأس النخبة مفتوح الآن</div>
-            <div className="text-caption text-muted-foreground">{remaining} من {ELITE_CUP_MAX_TEAMS} أماكن متاحة — 1,500 ج.م للفريق</div>
+            <div className="text-caption text-muted-foreground">{remaining} من {ELITE_CUP_TEAM_COUNT} أماكن متاحة - 1,500 ج.م للفريق</div>
           </div>
         </div>
         <ArrowLeft className="h-5 w-5 shrink-0 text-muted-foreground" />
@@ -81,8 +88,9 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
   const recentResults = allMatches.filter((m) => m.status === "انتهت").slice(0, 5);
 
   if (slug === "elite-cup") {
-    const { groupA, groupB, groupAStandings, groupBStandings } = await getEliteGroupStandings(supabase, bracketId);
-    const bracket = computeEliteBracket(groupAStandings, groupBStandings, allMatches as any);
+    const elite = await getEliteStandings(createServiceRoleClient(), bracketId);
+    const bracket = computeEliteBracket(elite.standings, allMatches as BracketMatch[]);
+    const eliteStandings = elite.standings.map((row, index) => ({ ...row, zone: getEliteQualificationZone(index + 1) }));
 
     return (
       <div>
@@ -108,19 +116,20 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
           </section>
         )}
 
-        {(groupA.length > 0 || groupB.length > 0) && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-h3 font-black text-muted-foreground">نظام كأس النخبة</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl bg-card p-4 ring-1 ring-white/10"><div className="text-h3 font-black">9</div><div className="text-caption text-muted-foreground">فرق في مجموعة واحدة</div></div>
+            <div className="rounded-xl bg-card p-4 ring-1 ring-white/10"><div className="text-h3 font-black">4</div><div className="text-caption text-muted-foreground">مباريات لكل فريق</div></div>
+            <div className="rounded-xl bg-card p-4 ring-1 ring-white/10"><div className="text-h3 font-black">18</div><div className="text-caption text-muted-foreground">مباراة في مرحلة المجموعة</div></div>
+            <div className="rounded-xl bg-card p-4 ring-1 ring-white/10"><div className="text-caption font-black text-accent-green">1-2 نصف النهائي</div><div className="mt-1 text-caption text-accent-blue">3-6 الملحق</div><div className="mt-1 text-caption text-destructive">7-9 خروج</div></div>
+          </div>
+        </section>
+
+        {eliteStandings.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-3 text-h3 font-black text-muted-foreground">ترتيب المجموعات</h2>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <div className="mb-2 text-caption font-black text-accent-blue">المجموعة الأولى</div>
-                <StandingsTable rows={groupAStandings} />
-              </div>
-              <div>
-                <div className="mb-2 text-caption font-black text-accent-green">المجموعة الثانية</div>
-                <StandingsTable rows={groupBStandings} />
-              </div>
-            </div>
+            <h2 className="mb-3 text-h3 font-black text-muted-foreground">الترتيب الموحد</h2>
+            <StandingsTable rows={eliteStandings} />
           </section>
         )}
 
@@ -160,7 +169,7 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
       <div>
         {eliteRegistrationBanner}
         <div className="rounded-2xl bg-card p-10 text-center ring-1 ring-white/10">
-          <p className="text-h3 font-black text-muted-foreground">لسه مفيش مباريات مسجّلة للبطولة دي</p>
+          <p className="text-h3 font-black text-muted-foreground">لسه مفيش مباريات مسجلة للبطولة دي</p>
           <p className="mt-2 text-body text-muted-foreground">تابعونا قريبًا لأول تحديث.</p>
         </div>
       </div>

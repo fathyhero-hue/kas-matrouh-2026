@@ -4,8 +4,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
-import { NextRequest, NextResponse } from 'next/server.js';
 const require = createRequire(import.meta.url);
+
+class NextRequest {
+  constructor(url, init = {}) {
+    this.url = url;
+    this.method = init.method || 'GET';
+    this.headers = new Headers(init.headers);
+    this.cookies = { getAll: () => [] };
+    this.nextUrl = new URL(url);
+    this._body = init.body;
+  }
+
+  async json() {
+    return JSON.parse(this._body);
+  }
+}
+
+class NextResponse extends Response {
+  static json(body, init = {}) {
+    return new NextResponse(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json' } });
+  }
+
+  async json() {
+    return JSON.parse(await this.text());
+  }
+}
 export const ACTOR = '00000000-0000-4000-8000-000000000001';
 export const TARGET = '00000000-0000-4000-8000-000000000002';
 export const CREATED = '00000000-0000-4000-8000-000000000003';
@@ -14,7 +38,7 @@ export function harness() {
   const cache = new Map();
   const db = {
     from(table) {
-      const filters = []; let selected = '*', operation = 'select', payload, single = false, start = 0, end = Infinity;
+      const filters = []; let selected = '*', operation = 'select', payload, single = false, start = 0, end = Infinity, conflictKey;
       const query = {
         select(columns) { selected = columns; return query; },
         eq(key, value) { filters.push(row => row[key] === value); return query; },
@@ -24,6 +48,7 @@ export function harness() {
         order() { return query; }, range(a, b) { start = a; end = b; return query; },
         maybeSingle() { single = true; return query; }, single() { single = true; return query; },
         insert(value) { operation = 'insert'; payload = value; return query; },
+        upsert(value, options = {}) { operation = 'upsert'; payload = value; conflictKey = options.onConflict; return query; },
         then(resolve, reject) {
           return Promise.resolve().then(() => {
             state.calls.push({ table, operation, payload });
@@ -31,6 +56,13 @@ export function harness() {
               if (table === 'admin_profiles' && state.profileFailure) return { data: null, error: { code: 'FAIL' } };
               (state.tables[table] ??= []).push(payload);
               return { data: payload, error: null };
+            }
+            if (operation === 'upsert') {
+              const rows = (state.tables[table] ??= []);
+              const index = conflictKey ? rows.findIndex(row => row[conflictKey] === payload[conflictKey]) : -1;
+              if (index >= 0) rows[index] = { ...rows[index], ...payload };
+              else rows.push(payload);
+              return { data: index >= 0 ? rows[index] : payload, error: null };
             }
             const rows = (state.tables[table] ?? []).filter(row => filters.every(f => f(row)));
             const projected = rows.slice(start, end + 1).map(row => selected === '*' ? row : Object.fromEntries(selected.split(',').map(key => [key.trim(), row[key.trim()]])));

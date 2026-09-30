@@ -16,6 +16,8 @@ type Match = {
   home_penalty_goals: number;
   away_penalty_goals: number;
   round: string;
+  match_label?: string | null;
+  qualified_team?: string | null;
   stage: string;
   match_date: string;
   match_time: string;
@@ -30,6 +32,8 @@ type Match = {
 };
 
 const ROUNDS = ["دور المجموعات", "دور الأربعة", "نصف النهائي", "دور الـ 16", "دور الثمانية", "دور الـ 4", "النهائي"];
+const ELITE_ROUNDS = ["دور المجموعات", "الملحق المؤهل لنصف النهائي", "نصف النهائي", "النهائي"];
+const ELITE_MATCH_LABELS = ["", "P1", "P2", "SF1", "SF2", "FINAL"];
 const STATUSES = ["لم تبدأ", "ستبدأ بعد قليل", "الشوط الأول", "استراحة", "الشوط الثاني", "ضربات جزاء", "انتهت", "تأجلت", "ملغاة"];
 
 const DAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -46,6 +50,7 @@ function emptyForm(bracketId: string) {
     home_penalty_goals: 0,
     away_penalty_goals: 0,
     round: "دور المجموعات",
+    match_label: "",
     status: "لم تبدأ",
     match_date: new Date().toISOString().slice(0, 10),
     match_time: "15:30",
@@ -69,12 +74,16 @@ export function MatchesManager({
   groupATeams = [],
   groupBTeams = [],
   rosterTeams = [],
+  teamOptions: configuredTeamOptions = [],
+  isElite = false,
 }: {
   bracketId: string;
   initialMatches: Match[];
   groupATeams?: string[];
   groupBTeams?: string[];
   rosterTeams?: { team: string; logoUrl: string | null }[];
+  teamOptions?: string[];
+  isElite?: boolean;
 }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [form, setForm] = useState<any>(emptyForm(bracketId));
@@ -84,12 +93,15 @@ export function MatchesManager({
   const [now, setNow] = useState(Date.now());
   const [matchGroup, setMatchGroup] = useState<"A" | "B">("A");
 
-  const hasGroups = groupATeams.length > 0 || groupBTeams.length > 0;
+  const hasGroups = !isElite && (groupATeams.length > 0 || groupBTeams.length > 0);
   const isGroupStage = form.round === "دور المجموعات";
+  const roundOptions = isElite ? ELITE_ROUNDS : ROUNDS;
   // Elite-cup groups (when assigned) win as the team source during group-stage
   // matches; otherwise fall back to whichever teams have a real submitted
   // roster for this bracket — this covers matrouh-cup/ramadan-cup too.
-  const teamOptions = hasGroups
+  const teamOptions = configuredTeamOptions.length > 0
+    ? configuredTeamOptions
+    : hasGroups
     ? isGroupStage
       ? matchGroup === "A"
         ? groupATeams
@@ -164,6 +176,7 @@ export function MatchesManager({
       home_penalty_goals: m.home_penalty_goals || 0,
       away_penalty_goals: m.away_penalty_goals || 0,
       round: m.round || "دور المجموعات",
+      match_label: m.match_label || "",
       status: m.status || "لم تبدأ",
       match_date: m.match_date,
       match_time: m.match_time?.slice(0, 5) || "15:30",
@@ -308,10 +321,17 @@ export function MatchesManager({
           <input type="date" value={form.match_date} onChange={(e) => setForm({ ...form, match_date: e.target.value })} className={inputCls} />
           <input type="time" value={form.match_time} onChange={(e) => setForm({ ...form, match_time: e.target.value })} className={`${inputCls} text-center`} />
           <select value={form.round} onChange={(e) => setForm({ ...form, round: e.target.value })} className={inputCls}>
-            {ROUNDS.map((r) => (
+            {roundOptions.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
+          {isElite && (
+            <select value={form.match_label} onChange={(e) => setForm({ ...form, match_label: e.target.value })} className={inputCls}>
+              {ELITE_MATCH_LABELS.map((label) => (
+                <option key={label || "none"} value={label}>{label || "بدون وسم"}</option>
+              ))}
+            </select>
+          )}
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputCls}>
             {STATUSES.map((s) => (
               <option key={s} value={s}>{s}</option>

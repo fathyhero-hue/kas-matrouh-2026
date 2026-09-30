@@ -1,6 +1,7 @@
 import { Trophy } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { ELITE_CUP_ELIGIBLE_TEAMS, ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
+import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
+import { getEliteCupTeams } from "@/lib/sport/elite-bracket";
 import { EliteRegistrationForm } from "@/components/elite/registration-form";
 import { EmptyState } from "@/components/sport/empty-state";
 
@@ -18,15 +19,18 @@ function normalizeTeamName(name: string): string {
 
 export default async function EliteRegisterPage() {
   const supabase = createServiceRoleClient();
-  const [{ data: settings }, { data: paidOrders }] = await Promise.all([
+  const [{ data: settings }, { data: paidOrders }, officialTeams] = await Promise.all([
     supabase.from("registration_settings").select("price, deadline").eq("tournament", "elite").maybeSingle(),
-    supabase.from("orders").select("team_name").eq("tournament", "elite_cup").eq("type", "tournament_registration").eq("payment_status", "paid"),
+    supabase.from("orders").select("team_name").eq("tournament", "elite_cup").eq("type", "tournament_registration").in("payment_status", ["paid", "manual_access"]),
+    getEliteCupTeams(supabase, ""),
   ]);
 
-  const paidTeamKeys = new Set((paidOrders || []).map((o: any) => normalizeTeamName(o.team_name || "")));
-  const teams = ELITE_CUP_ELIGIBLE_TEAMS.map((name) => ({ name, taken: paidTeamKeys.has(normalizeTeamName(name)) }));
+  const paidTeamKeys = new Set((paidOrders || []).map((o: { team_name: string | null }) => normalizeTeamName(o.team_name || "")));
+  const teams = officialTeams.map((name) => ({ name, taken: paidTeamKeys.has(normalizeTeamName(name)) }));
   const availableTeams = teams.filter((t) => !t.taken).map((t) => t.name);
   const price = Number(settings?.price || 1500);
+  // This is a server-rendered page; the deadline is intentionally evaluated per request.
+  // eslint-disable-next-line react-hooks/purity
   const deadlinePassed = settings?.deadline ? Date.now() > new Date(settings.deadline).getTime() : false;
 
   return (
@@ -41,10 +45,12 @@ export default async function EliteRegisterPage() {
         </div>
       </div>
 
-      {deadlinePassed ? (
+      {officialTeams.length === 0 ? (
+        <EmptyState message="لم يتم تجهيز قائمة فرق كأس النخبة للتسجيل بعد." />
+      ) : deadlinePassed ? (
         <EmptyState message="عذراً، انتهى موعد التسجيل في كأس النخبة." />
       ) : availableTeams.length === 0 ? (
-        <EmptyState message="اكتمل عدد الفرق المشتركة (10 فرق). التسجيل مقفول." />
+        <EmptyState message={`اكتمل عدد الفرق المشتركة (${ELITE_CUP_MAX_TEAMS} فرق). التسجيل مقفول.`} />
       ) : (
         <EliteRegistrationForm teams={teams} price={price} />
       )}

@@ -7,6 +7,9 @@ import { CheckCircle2, Clock, Copy, ShieldCheck, XCircle } from "lucide-react";
 type TeamOrder = {
   id: string;
   payment_status: string | null;
+  payment_method: string | null;
+  paid_at: string | null;
+  confirmed_by: string | null;
   manager_name: string | null;
   phone: string | null;
   access_password: string | null;
@@ -21,8 +24,9 @@ const inputCls = "h-9 w-full rounded-lg bg-secondary px-3 text-[12px] font-bold 
 
 function statusBadge(order: TeamOrder | null) {
   if (!order) return { label: "لسه ماسجلش", tone: "bg-white/5 text-muted-foreground", Icon: Clock };
-  if (order.payment_status === "paid") return { label: "دفع الاشتراك", tone: "bg-accent-green/15 text-accent-green", Icon: CheckCircle2 };
-  if (order.payment_status === "manual_access") return { label: "تفعيل يدوي", tone: "bg-accent-blue/15 text-accent-blue", Icon: ShieldCheck };
+  if (order.payment_status === "paid" && order.payment_method === "cash") return { label: "مدفوع نقداً", tone: "bg-accent-green/15 text-accent-green", Icon: CheckCircle2 };
+  if (order.payment_status === "paid") return { label: "مدفوع إلكترونياً", tone: "bg-accent-green/15 text-accent-green", Icon: CheckCircle2 };
+  if (order.payment_status === "manual_access") return { label: "تفعيل قديم — راجع طريقة الدفع", tone: "bg-accent-blue/15 text-accent-blue", Icon: ShieldCheck };
   if (order.payment_status === "pending_payment") return { label: "بانتظار الدفع", tone: "bg-accent-orange/15 text-accent-orange", Icon: Clock };
   if (order.payment_status === "cancelled") return { label: "تم إلغاء التفعيل", tone: "bg-white/5 text-muted-foreground", Icon: XCircle };
   return { label: "فشل الدفع", tone: "bg-red-500/15 text-red-400", Icon: XCircle };
@@ -51,8 +55,8 @@ export function EliteTeamsStatus({ teams: initialTeams, price }: { teams: TeamRo
       setManagerName("");
       setPhone("");
       toast.success(`تم تفعيل فريق ${teamName}`);
-    } catch (e: any) {
-      toast.error(e?.message || "فشل التفعيل");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "فشل التفعيل");
     } finally {
       setSaving(false);
     }
@@ -70,8 +74,8 @@ export function EliteTeamsStatus({ teams: initialTeams, price }: { teams: TeamRo
       if (!res.ok) throw new Error(data?.error || "فشل الإلغاء");
       setTeams((prev) => prev.map((t) => (t.name === teamName ? { ...t, order: { ...t.order!, payment_status: "cancelled" } } : t)));
       toast.success(`تم إلغاء تفعيل فريق ${teamName}`);
-    } catch (e: any) {
-      toast.error(e?.message || "فشل الإلغاء");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "فشل الإلغاء");
     }
   };
 
@@ -120,7 +124,7 @@ export function EliteTeamsStatus({ teams: initialTeams, price }: { teams: TeamRo
                     onClick={() => setActivatingFor(activatingFor === t.name ? null : t.name)}
                     className="rounded-lg bg-accent-green/15 px-3 py-1.5 text-[11px] font-black text-accent-green"
                   >
-                    تفعيل يدوي
+                    تأكيد الدفع النقدي
                   </button>
                 )}
               </div>

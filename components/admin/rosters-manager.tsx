@@ -20,6 +20,16 @@ type Roster = {
   roster_players: Player[];
 };
 
+type RegistrationSettings = { deadline?: string | null; password?: string | null; price?: number | null };
+
+function normalizeSettings(value: RegistrationSettings | null | undefined) {
+  return {
+    deadline: value?.deadline ? value.deadline.slice(0, 10) : "",
+    password: value?.password || "",
+    price: Number(value?.price || 0),
+  };
+}
+
 const inputCls = "h-10 w-full rounded-lg bg-secondary px-3 text-caption font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue";
 
 function slugify(name: string) {
@@ -79,14 +89,14 @@ export function RostersManager({
   bracketId: string;
   initialRosters: Roster[];
   registrationKey?: string;
-  initialSettings: { deadline: string; password: string; price: number } | null;
+  initialSettings: RegistrationSettings | null;
   maxPlayers: number;
   allowCreate?: boolean;
 }) {
   const [rosters, setRosters] = useState<Roster[]>(initialRosters);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<any>(null);
-  const [settings, setSettings] = useState(initialSettings || { deadline: "", password: "", price: 0 });
+  const [settings, setSettings] = useState(normalizeSettings(initialSettings));
   const [savingSettings, setSavingSettings] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");

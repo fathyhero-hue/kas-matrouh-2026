@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
 import { createPublicClient } from "@/lib/supabase/public";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { MatchCard } from "@/components/sport/match-card";
 import { EmptyState } from "@/components/sport/empty-state";
+import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
+import { computeEliteBracket, getEliteStandings, type BracketMatch } from "@/lib/sport/elite-bracket";
 import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 30;
@@ -16,6 +19,58 @@ export default async function KnockoutPage({ params, searchParams }: TournamentP
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
+
+  if (slug === "elite-cup") {
+    const [{ data: matches }, elite] = await Promise.all([
+      supabase
+        .from("matches")
+        .select("*")
+        .eq("bracket_id", bracketId)
+        .eq("stage", "knockout")
+        .order("match_date", { ascending: true }),
+      getEliteStandings(createServiceRoleClient(), bracketId),
+    ]);
+    const rows = matches || [];
+    const bracket = computeEliteBracket(elite.standings, (elite.allMatches || []) as BracketMatch[]);
+    const logos = elite.logos;
+    const rounds = Array.from(new Set(rows.map((m) => m.round || "")));
+
+    return (
+      <div className="space-y-8">
+        <section>
+          <h2 className="mb-3 text-h3 font-black text-muted-foreground">مخطط كأس النخبة</h2>
+          <EliteBracketDiagram bracket={bracket} />
+        </section>
+        {rows.length > 0 ? rounds.map((round) => (
+          <section key={round}>
+            <h2 className="mb-3 text-h3 font-black text-muted-foreground">{round || "دور إقصائي"}</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {rows.filter((m) => (m.round || "") === round).map((m) => (
+                <div key={m.id}>
+                  <MatchCard
+                    teamA={m.team_a}
+                    teamALogo={lookupTeamLogo(logos, m.team_a) || m.team_a_logo}
+                    teamB={m.team_b}
+                    teamBLogo={lookupTeamLogo(logos, m.team_b) || m.team_b_logo}
+                    homeGoals={m.home_goals}
+                    awayGoals={m.away_goals}
+                    status={m.status}
+                    matchDate={m.match_date}
+                    matchTime={m.match_time}
+                    round={m.match_label || m.round}
+                    isLive={m.is_live}
+                    liveMinute={m.live_minute}
+                  />
+                  {m.qualified_team && <p className="mt-1.5 text-center text-caption font-bold text-accent-green">✓ تأهل: {m.qualified_team}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )) : <EmptyState message="لم تبدأ الأدوار الإقصائية بعد" />}
+      </div>
+    );
+  }
+
   const [{ data: matches }, logos] = await Promise.all([
     supabase
       .from("matches")

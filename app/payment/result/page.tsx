@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { isRegistrationPaid } from "@/lib/sport/registration-payment";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,6 +25,8 @@ type OrderStatus = {
   customer_phone: string | null;
 };
 
+type OrderStatusRpcRow = OrderStatus & { payment_method?: string | null; paid_at?: string | null };
+
 function PaymentResultInner() {
   const params = useSearchParams();
   const [order, setOrder] = useState<OrderStatus | null>(null);
@@ -31,6 +34,7 @@ function PaymentResultInner() {
   const [polling, setPolling] = useState(true);
 
   const rawOrderId = params.get("orderId") || params.get("merchant_order_id") || params.get("special_reference") || "";
+  const invalidOrderId = !rawOrderId || !UUID_RE.test(rawOrderId);
   const successValue = params.get("success");
   const pendingValue = params.get("pending");
 
@@ -46,11 +50,7 @@ function PaymentResultInner() {
   // sole writer of payment status. We just poll briefly in case the webhook
   // hasn't landed yet by the time the customer's browser redirects back here.
   useEffect(() => {
-    if (!rawOrderId || !UUID_RE.test(rawOrderId)) {
-      setError("تعذّر قراءة رقم الطلب من نتيجة الدفع.");
-      setPolling(false);
-      return;
-    }
+    if (invalidOrderId) return;
 
     let cancelled = false;
     let attempts = 0;
@@ -69,7 +69,7 @@ function PaymentResultInner() {
         return;
       }
 
-      const row = data as any;
+      const row = data as OrderStatusRpcRow;
       setOrder({
         id: row.id,
         tournament: row.tournament,
@@ -78,7 +78,7 @@ function PaymentResultInner() {
         customer_phone: row.customer_phone,
       });
 
-      if (row.payment_status === "paid" || row.payment_status === "failed" || attempts >= 8) {
+      if (isRegistrationPaid(row) || row.payment_status === "failed" || attempts >= 8) {
         setPolling(false);
       }
     }
@@ -92,7 +92,7 @@ function PaymentResultInner() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [rawOrderId]);
+  }, [invalidOrderId, rawOrderId]);
 
   const accessPassword = order?.access_password || "";
   const tournament = order?.tournament || "";
@@ -113,7 +113,7 @@ function PaymentResultInner() {
         </p>
       )}
 
-      {order?.payment_status === "paid" && accessPassword && (
+      {order && isRegistrationPaid(order) && accessPassword && (
         <div className="mt-5 space-y-3 rounded-2xl bg-accent-green/10 p-5 ring-1 ring-accent-green/30">
           <p className="text-body font-black text-accent-green">الرقم السري لتسجيل قائمة الفريق</p>
           <div className="text-display font-black tracking-[0.25em] text-accent-orange" dir="ltr">{accessPassword}</div>
@@ -130,7 +130,9 @@ function PaymentResultInner() {
         </p>
       )}
 
-      {error && <p className="mt-4 text-caption font-bold text-destructive">{error}</p>}
+      {(invalidOrderId ? "تعذّر قراءة رقم الطلب من نتيجة الدفع." : error) && (
+        <p className="mt-4 text-caption font-bold text-destructive">{invalidOrderId ? "تعذّر قراءة رقم الطلب من نتيجة الدفع." : error}</p>
+      )}
 
       <a
         href={returnUrl}
