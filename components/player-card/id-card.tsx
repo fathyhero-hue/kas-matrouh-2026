@@ -9,7 +9,7 @@ export type IdCardData = CardRenderData;
 
 function CardFace({ data, face, qrDataUrl }: { data: IdCardData; face: "front" | "back"; qrDataUrl: string }) {
   return (
-    <div data-card-face={face} className="id-card-print w-full overflow-hidden rounded-[22px] shadow-2xl">
+    <div data-card-face={face} className="id-card-print w-full overflow-hidden rounded-[22px] shadow-[0_18px_45px_rgba(0,0,0,.32)] ring-1 ring-white/10">
       <div className="w-full [&>svg]:block [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: renderCardSvg(data, face, qrDataUrl) }} />
     </div>
   );
@@ -34,7 +34,7 @@ export function IdCard({ data, className = "", face = "both" }: { data: IdCardDa
   );
 }
 
-export function CardPreviewStage({ data, face = "front" }: { data: IdCardData; face?: "front" | "back" }) {
+export function CardPreviewStage({ data, face = "front", className = "" }: { data: IdCardData; face?: "front" | "back"; className?: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
@@ -55,7 +55,7 @@ export function CardPreviewStage({ data, face = "front" }: { data: IdCardData; f
     : 1;
 
   return (
-    <div ref={stageRef} className="flex h-[min(62vh,440px)] w-full items-center justify-center overflow-hidden rounded-2xl bg-black/20 p-4">
+    <div ref={stageRef} className={`flex min-h-[260px] h-[min(68vh,520px)] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#0d1626] p-4 shadow-inner sm:p-6 ${className}`}>
       <div style={{ width: CARD_WIDTH, height: CARD_HEIGHT, transform: `scale(${scale})`, transformOrigin: "center center" }} className="shrink-0">
         <IdCard data={data} face={face} />
       </div>

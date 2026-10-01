@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { calculateA4Pages } from "../lib/player-cards/pagination.ts";
-import { renderCardSvg } from "../lib/player-cards/renderer.ts";
+import { CARD_HEIGHT, CARD_WIDTH, renderCardSvg } from "../lib/player-cards/renderer.ts";
 import { A4_CARD_WIDTH_MM, A4_HEIGHT_MM, A4_WIDTH_MM, containRect, getA4CardRect, getContainScale } from "../lib/player-cards/layout.ts";
 
 test("A4 pagination never exceeds four cards", () => {
@@ -61,4 +61,23 @@ test("export and print paths do not use viewport or DOM preview dimensions", () 
   assert.match(printSource, /face: "front"/);
   assert.match(printSource, /face: "back"/);
   assert.match(printSource, /chunk\(cards, 4\)/);
+});
+
+test("front renderer keeps long names and national IDs inside the card contract", () => {
+  const data = {
+    fullName: "\u0639\u0628\u062f\u0627\u0644\u0631\u062d\u0645\u0646 \u0645\u062d\u0645\u062f \u0639\u0628\u062f\u0627\u0644\u0631\u062d\u0645\u0646 \u0627\u0644\u0633\u0646\u0648\u0633\u064a",
+    role: "player",
+    roleLabel: "\u0644\u0627\u0639\u0628",
+    team: "\u0641\u0631\u064a\u0642 \u063a\u0648\u0637 \u0631\u0628\u0627\u062d \u0627\u0644\u0631\u064a\u0627\u0636\u064a",
+    tournament: "\u0643\u0623\u0633 \u0627\u0644\u0646\u062e\u0628\u0629",
+    serial: "MTR-TEST",
+    qrPayload: "test",
+    nationalId: "12345678901234",
+  };
+  const svg = renderCardSvg(data, "front");
+  assert.match(svg, new RegExp(`width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}"`));
+  assert.equal((svg.match(/<tspan /g) || []).length >= 5, true);
+  assert.match(svg, /\*{10}1234/);
+  assert.doesNotMatch(svg, /12345678901234/);
+  assert.match(renderCardSvg(data, "back"), /viewBox="0 0 640 404"/);
 });
