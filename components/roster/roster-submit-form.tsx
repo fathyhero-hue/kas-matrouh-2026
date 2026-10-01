@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Lock, Camera, CheckCircle2, Loader2, ShieldCheck, Clock } from "lucide-react";
+import { isRegistrationOpen } from "@/lib/sport/registration-settings";
 
 type PlayerRow = {
   name: string;
@@ -14,6 +15,28 @@ type PlayerRow = {
   idPreview: string;
   idIsExisting: boolean;
 };
+
+type ExistingRosterPlayer = {
+  slot_index: number;
+  name?: string | null;
+  number?: string | null;
+  personal_image_url?: string | null;
+  id_image_url?: string | null;
+};
+
+type ExistingRosterResponse = {
+  found?: boolean;
+  managerName?: string;
+  managerPhone?: string;
+  logoUrl?: string;
+  coachName?: string;
+  coachPhotoUrl?: string;
+  players?: ExistingRosterPlayer[];
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 function emptyPlayers(count: number): PlayerRow[] {
   return Array.from({ length: count }, () => ({
@@ -41,17 +64,17 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
   const [managerPhone, setManagerPhone] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
-  const [logoIsExisting, setLogoIsExisting] = useState(false);
+  const [, setLogoIsExisting] = useState(false);
   const [coachName, setCoachName] = useState("");
   const [coachFile, setCoachFile] = useState<File | null>(null);
   const [coachPreview, setCoachPreview] = useState("");
-  const [coachIsExisting, setCoachIsExisting] = useState(false);
+  const [, setCoachIsExisting] = useState(false);
   const [players, setPlayers] = useState<PlayerRow[]>(() => emptyPlayers(maxPlayers));
   const [submitting, setSubmitting] = useState(false);
   const [progressLabel, setProgressLabel] = useState("");
   const [completedCount, setCompletedCount] = useState(0);
 
-  const applyExistingRoster = (data: any) => {
+  const applyExistingRoster = (data: ExistingRosterResponse) => {
     if (!data?.found) return;
     setResumedNotice(true);
     if (data.managerName) setManagerName(data.managerName);
@@ -65,7 +88,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       setCoachPreview(data.coachPhotoUrl);
       setCoachIsExisting(true);
     }
-    const bySlot = new Map<number, any>((data.players || []).map((p: any) => [p.slot_index, p]));
+    const bySlot = new Map<number, ExistingRosterPlayer>((data.players || []).map((p) => [p.slot_index, p]));
     setPlayers(
       Array.from({ length: maxPlayers }, (_, i) => {
         const existing = bySlot.get(i);
@@ -89,7 +112,7 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
     try {
       const res = await fetch(`/api/roster/my-roster?suffix=${encodeURIComponent(suffix)}&teamName=${encodeURIComponent(name.trim())}`);
       const data = await res.json().catch(() => ({}));
-      applyExistingRoster(data);
+      applyExistingRoster(data as ExistingRosterResponse);
     } catch {
       // silent — worst case they just start from a blank form
     }
@@ -106,14 +129,15 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "الرقم السري غير صحيح.");
+      if (data.deadline && !isRegistrationOpen(data.deadline)) throw new Error("انتهت فترة تقديم وتعديل القوائم");
       if (data.deadline) setDeadline(data.deadline);
       if (data.teamName) {
         setTeamName(data.teamName);
         await fetchExistingRoster(data.teamName);
       }
       setStep("form");
-    } catch (e: any) {
-      toast.error(e?.message || "تعذر التحقق من الرقم السري.");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "تعذر التحقق من الرقم السري."));
     } finally {
       setUnlocking(false);
     }
@@ -232,8 +256,8 @@ export function RosterSubmitForm({ tournament, suffix, maxPlayers }: { tournamen
       setCompletedCount(touched);
       setStep("success");
       toast.success("تم حفظ القائمة بنجاح ✅");
-    } catch (e: any) {
-      toast.error(e?.message || "حدث خطأ أثناء رفع الصور، يرجى المحاولة مرة أخرى.");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "حدث خطأ أثناء رفع الصور، يرجى المحاولة مرة أخرى."));
     } finally {
       setSubmitting(false);
       setProgressLabel("");

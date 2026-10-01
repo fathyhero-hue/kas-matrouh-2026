@@ -4,6 +4,7 @@ import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
 import { getEliteCupTeams } from "@/lib/sport/elite-bracket";
 import { EliteRegistrationForm } from "@/components/elite/registration-form";
 import { EmptyState } from "@/components/sport/empty-state";
+import { isRegistrationOpen } from "@/lib/sport/registration-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,7 @@ export default async function EliteRegisterPage() {
   const availableTeams = teams.filter((t) => !t.taken).map((t) => t.name);
   const price = Number(settings?.price || 1500);
   // This is a server-rendered page; the deadline is intentionally evaluated per request.
-  // eslint-disable-next-line react-hooks/purity
-  const deadlinePassed = settings?.deadline ? Date.now() > new Date(settings.deadline).getTime() : false;
+  const deadlinePassed = !isRegistrationOpen(settings?.deadline);
 
   return (
     <main dir="rtl" className="mx-auto max-w-xl px-4 pb-16 pt-8 sm:px-6">

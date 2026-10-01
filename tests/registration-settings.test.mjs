@@ -41,3 +41,39 @@ test('invalid deadlines fail before any database write', async () => {
   assert.equal(response.status, 400);
   assert.equal(h.state.calls.some(call => call.table === 'registration_settings'), false);
 });
+
+test('date-only registration deadlines are inclusive in the Cairo timezone', () => {
+  const h = harness();
+  const settings = h.load('lib/sport/registration-settings.ts');
+  assert.equal(settings.isRegistrationOpen('2026-10-02', new Date('2026-10-01T23:59:59.999+03:00')), true);
+  assert.equal(settings.isRegistrationOpen('2026-10-01', new Date('2026-10-01T23:59:59.999+03:00')), true);
+  assert.equal(settings.isRegistrationOpen('2026-10-01', new Date('2026-10-02T00:00:00.000+03:00')), false);
+  assert.equal(settings.isRegistrationOpen('2026-09-30', new Date('2026-10-01T12:00:00.000+03:00')), false);
+  assert.equal(settings.isRegistrationOpen(null, new Date('2026-10-01T12:00:00.000+03:00')), true);
+});
+
+test('Elite unlock uses the elite settings row and accepts the shared code while open', async () => {
+  const h = harness();
+  h.state.tables.registration_settings = [{ tournament: 'elite', deadline: '2099-12-31', password: 'shared-code' }];
+  const response = await h.load('app/api/roster/unlock/route.ts').POST(h.request('POST', { tournament: 'elite_cup', code: 'shared-code' }, '/api/roster/unlock'));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ok, true);
+  assert.equal(h.state.calls.find(call => call.table === 'registration_settings').payload, undefined);
+});
+
+test('Elite unlock returns a clear expired-deadline error and does not try the password RPC', async () => {
+  const h = harness();
+  h.state.tables.registration_settings = [{ tournament: 'elite', deadline: '2026-09-30', password: 'shared-code' }];
+  const response = await h.load('app/api/roster/unlock/route.ts').POST(h.request('POST', { tournament: 'elite_cup', code: 'wrong-code' }, '/api/roster/unlock'));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, 'انتهت فترة تقديم وتعديل القوائم');
+  assert.equal(h.state.calls.some(call => call.rpc), false);
+});
+
+test('Elite unlock rejects a wrong code with the dedicated code error', async () => {
+  const h = harness();
+  h.state.tables.registration_settings = [{ tournament: 'elite', deadline: '2099-12-31', password: 'shared-code' }];
+  const response = await h.load('app/api/roster/unlock/route.ts').POST(h.request('POST', { tournament: 'elite_cup', code: 'wrong-code' }, '/api/roster/unlock'));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, 'الرقم السري غير صحيح');
+});

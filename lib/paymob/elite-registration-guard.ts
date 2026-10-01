@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ELITE_CUP_MAX_TEAMS } from "@/lib/sport/elite-registration";
+import { isRegistrationOpen } from "@/lib/sport/registration-settings";
 
 function normalizeTeamName(name: string): string {
   return String(name || "")
@@ -39,7 +40,7 @@ export async function guardEliteRegistration(supabase: SupabaseClient, teamNameR
   }
 
   const { data: settings } = await supabase.from("registration_settings").select("price, deadline").eq("tournament", "elite").maybeSingle();
-  if (settings?.deadline && Date.now() > new Date(settings.deadline).getTime()) {
+  if (!isRegistrationOpen(settings?.deadline)) {
     return { ok: false as const, error: "انتهى موعد التسجيل في كأس النخبة." };
   }
 

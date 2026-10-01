@@ -2,27 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { authorizeAdminRequest } from "@/lib/admin/authorization";
 import { auditAdminMutation } from "@/lib/admin/audit";
+import { parseDeadline, parseRegistrationKey } from "@/lib/sport/registration-settings";
 
 export const runtime = "nodejs";
-
-const REGISTRATION_KEYS = new Set(["matrouh", "elite", "ramadan"]);
-
-function parseRegistrationKey(value: unknown) {
-  return typeof value === "string" && REGISTRATION_KEYS.has(value) ? value : null;
-}
-
-function isDateOnly(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return date.getUTCFullYear() === Number(value.slice(0, 4))
-    && date.getUTCMonth() + 1 === Number(value.slice(5, 7))
-    && date.getUTCDate() === Number(value.slice(8, 10));
-}
-
-function parseDeadline(value: unknown) {
-  if (value === "" || value === null || value === undefined) return null;
-  return isDateOnly(value) ? value : undefined;
-}
 
 export async function GET(req: NextRequest) {
   const authorization = await authorizeAdminRequest(req, "rosters.view");

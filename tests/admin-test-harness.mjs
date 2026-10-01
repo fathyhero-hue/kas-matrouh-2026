@@ -34,7 +34,7 @@ export const ACTOR = '00000000-0000-4000-8000-000000000001';
 export const TARGET = '00000000-0000-4000-8000-000000000002';
 export const CREATED = '00000000-0000-4000-8000-000000000003';
 export function harness() {
-  const state = { userId: ACTOR, tables: {}, calls: [], profileFailure: false, cleanupFailure: false, authFailure: false, rpcError: null, lookupError: null, recoveryError: null };
+  const state = { userId: ACTOR, tables: {}, calls: [], profileFailure: false, cleanupFailure: false, authFailure: false, rpcError: null, rpcData: [], lookupError: null, recoveryError: null };
   const cache = new Map();
   const db = {
     from(table) {
@@ -80,7 +80,7 @@ export function harness() {
       },
       async resetPasswordForEmail(email, options) { state.calls.push({ recovery: email, options }); return { error: state.recoveryError }; },
     },
-    async rpc(name, args) { state.calls.push({ rpc: name, args }); return { data: { user_id: args.p_target }, error: state.rpcError }; },
+    async rpc(name, args) { state.calls.push({ rpc: name, args }); return { data: state.rpcData, error: state.rpcError }; },
   };
   function load(relative) {
     const filename = path.resolve(relative);
