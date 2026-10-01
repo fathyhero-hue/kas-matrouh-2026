@@ -1,11 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildStandings } from "../lib/sport/standings.ts";
-import {
-  computeEliteBracket,
-  getEliteQualificationZone,
-  isEliteGroupStageComplete,
-} from "../lib/sport/elite-bracket.ts";
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import ts from "typescript";
+
+// Keep this test independent from Node's ESM extension rules. Next/Turbopack
+// resolves these imports in production, while Node's native test runner does not.
+const require = createRequire(import.meta.url);
+const moduleCache = new Map();
+function load(relative) {
+  const filename = path.resolve(relative);
+  if (moduleCache.has(filename)) return moduleCache.get(filename).exports;
+  const loaded = { exports: {} };
+  moduleCache.set(filename, loaded);
+  const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+  }).outputText;
+  function localRequire(id) {
+    if (id.startsWith(".")) {
+      const resolved = path.resolve(path.dirname(filename), id);
+      return load(resolved.endsWith(".ts") ? resolved : `${resolved}.ts`);
+    }
+    return require(id);
+  }
+  new Function("require", "module", "exports", compiled)(localRequire, loaded, loaded.exports);
+  return loaded.exports;
+}
+
+const { buildStandings } = load("lib/sport/standings.ts");
+const { computeEliteBracket, getEliteQualificationZone, isEliteGroupStageComplete } = load("lib/sport/elite-bracket.ts");
 
 const teams = ["Team 1", "Team 2", "Team 3", "Team 4", "Team 5", "Team 6", "Team 7", "Team 8", "Team 9"];
 

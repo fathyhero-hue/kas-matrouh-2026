@@ -1,10 +1,21 @@
 export const A4_WIDTH_MM = 210;
 export const A4_HEIGHT_MM = 297;
-export const A4_CARD_GAP_MM = 6;
-export const A4_CARD_WIDTH_MM = 92;
+export const PRINT_CARD_WIDTH_MM = 90;
+export const PRINT_CARD_HEIGHT_MM = 50;
+export const PRINT_CARD_ASPECT_RATIO = PRINT_CARD_WIDTH_MM / PRINT_CARD_HEIGHT_MM;
 export const A4_CARD_COLUMNS = 2;
-export const A4_CARD_ROWS = 2;
-export const A4_CARDS_PER_PAGE = A4_CARD_COLUMNS * A4_CARD_ROWS;
+export const A4_CARD_ROWS = 4;
+export const A4_CARDS_PER_PAGE = 4;
+export const A4_CARD_FACES_PER_PAGE = A4_CARDS_PER_PAGE * 2;
+export const A4_HORIZONTAL_MARGIN_MM = 10;
+export const A4_HORIZONTAL_GAP_MM = 10;
+export const A4_VERTICAL_GAP_MM = 8;
+export const A4_FRONT_BACK_GAP_MM = 40;
+export const A4_VERTICAL_MARGIN_MM = (A4_HEIGHT_MM - (PRINT_CARD_HEIGHT_MM * A4_CARD_ROWS) - (A4_VERTICAL_GAP_MM * 2) - A4_FRONT_BACK_GAP_MM) / 2;
+export const CUT_GUIDE_OFFSET_MM = 1;
+
+export type CardFace = "front" | "back";
+export type A4CardRect = { x: number; y: number; width: number; height: number; face: CardFace; playerIndex: number };
 
 export type ContainedRect = { x: number; y: number; width: number; height: number; scale: number };
 
@@ -30,20 +41,37 @@ export function getContainedRect(availableWidth: number, availableHeight: number
   return { x: (availableWidth - width) / 2, y: (availableHeight - height) / 2, width, height, scale };
 }
 
-export function getA4CardRect(index: number, cardAspectRatio: number) {
-  const position = index % A4_CARDS_PER_PAGE;
-  const row = Math.floor(position / A4_CARD_COLUMNS);
-  const column = position % A4_CARD_COLUMNS;
-  const marginX = 10;
-  const marginY = 10;
-  const cellWidth = (A4_WIDTH_MM - marginX * 2 - A4_CARD_GAP_MM) / A4_CARD_COLUMNS;
-  const cellHeight = (A4_HEIGHT_MM - marginY * 2 - A4_CARD_GAP_MM) / A4_CARD_ROWS;
-  const cardHeight = A4_CARD_WIDTH_MM / cardAspectRatio;
+export function getA4CardRect(playerIndex: number, face: CardFace): A4CardRect {
+  const slot = Math.max(0, Math.min(A4_CARDS_PER_PAGE - 1, playerIndex));
+  const rowWithinFace = Math.floor(slot / A4_CARD_COLUMNS);
+  const column = slot % A4_CARD_COLUMNS;
+  const faceStartY = face === "front"
+    ? A4_VERTICAL_MARGIN_MM
+    : A4_VERTICAL_MARGIN_MM + PRINT_CARD_HEIGHT_MM * 2 + A4_VERTICAL_GAP_MM + A4_FRONT_BACK_GAP_MM;
   return {
-    x: marginX + column * (cellWidth + A4_CARD_GAP_MM) + (cellWidth - A4_CARD_WIDTH_MM) / 2,
-    y: marginY + row * (cellHeight + A4_CARD_GAP_MM) + (cellHeight - cardHeight) / 2,
-    width: A4_CARD_WIDTH_MM,
-    height: cardHeight,
+    x: A4_HORIZONTAL_MARGIN_MM + column * (PRINT_CARD_WIDTH_MM + A4_HORIZONTAL_GAP_MM),
+    y: faceStartY + rowWithinFace * (PRINT_CARD_HEIGHT_MM + A4_VERTICAL_GAP_MM),
+    width: PRINT_CARD_WIDTH_MM,
+    height: PRINT_CARD_HEIGHT_MM,
+    face,
+    playerIndex: slot,
+  };
+}
+
+export function getA4SheetRects(playerCount: number) {
+  const count = Math.max(0, Math.min(A4_CARDS_PER_PAGE, playerCount));
+  return Array.from({ length: count }, (_, playerIndex) => [
+    getA4CardRect(playerIndex, "front"),
+    getA4CardRect(playerIndex, "back"),
+  ]).flat();
+}
+
+export function getCutGuideRect(rect: Pick<A4CardRect, "x" | "y" | "width" | "height">) {
+  return {
+    x: rect.x - CUT_GUIDE_OFFSET_MM,
+    y: rect.y - CUT_GUIDE_OFFSET_MM,
+    width: rect.width + CUT_GUIDE_OFFSET_MM * 2,
+    height: rect.height + CUT_GUIDE_OFFSET_MM * 2,
   };
 }
 

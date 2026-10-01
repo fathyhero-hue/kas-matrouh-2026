@@ -1,12 +1,16 @@
 export const CARD_WIDTH = 640;
 export const CARD_HEIGHT = 404;
 export const CARD_ASPECT_RATIO = CARD_WIDTH / CARD_HEIGHT;
+export const PRINT_WIDTH = 900;
+export const PRINT_HEIGHT = 500;
+export const PRINT_ASPECT_RATIO = PRINT_WIDTH / PRINT_HEIGHT;
 export type CardRenderData = {
   fullName: string;
   role: "player" | "manager" | string;
   roleLabel: string;
   team: string;
   teamLogoUrl?: string;
+  brandLogoUrl?: string;
   tournament: string;
   tournamentLogoUrl?: string;
   serial: string;
@@ -120,35 +124,39 @@ function qrMarkup(qrDataUrl?: string) {
   if (!qrDataUrl) return `<rect x="54" y="316" width="54" height="54" rx="7" fill="#e2e8f0"/><text x="81" y="349" text-anchor="middle" fill="#64748b" font-size="10" font-weight="800">QR</text>`;
   return `<image href="${xmlImage(qrDataUrl)}" x="54" y="316" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>`;
 }
-function svgOpen(data: CardRenderData) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${xmlText(data.fullName || data.tournament)}" style="font-family:Cairo,Tajawal,Arial,sans-serif">`;
+function svgOpen(data: CardRenderData, background: string) {
+  const scale = PRINT_HEIGHT / CARD_HEIGHT;
+  const offsetX = (PRINT_WIDTH - CARD_WIDTH * scale) / 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PRINT_WIDTH}" height="${PRINT_HEIGHT}" viewBox="0 0 ${PRINT_WIDTH} ${PRINT_HEIGHT}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${xmlText(data.fullName || data.tournament)}" style="font-family:Cairo,Tajawal,Arial,sans-serif"><rect x="0" y="0" width="${PRINT_WIDTH}" height="${PRINT_HEIGHT}" fill="${background}"/><g transform="translate(${offsetX.toFixed(3)} 0) scale(${scale.toFixed(6)})">`;
 }
 function renderBack(data: CardRenderData) {
+  const brandLogo = data.brandLogoUrl || BRAND_LOGO;
   return [
-    svgOpen(data),
+    svgOpen(data, "#24134b"),
     `<defs><linearGradient id="back-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#24134b"/><stop offset=".48" stop-color="#4b1690"/><stop offset=".82" stop-color="#155eaa"/><stop offset="1" stop-color="#0f766e"/></linearGradient><radialGradient id="back-glow" cx="1" cy="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs>`,
     `<rect x="0" y="0" width="640" height="404" rx="26" fill="url(#back-gradient)"/>`,
     `<rect x="0" y="0" width="640" height="404" rx="26" fill="url(#back-glow)"/>`,
     `<path d="M24 326L178 172L250 244L382 112L616 346" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="24"/>`,
     `<circle cx="92" cy="72" r="52" fill="#ffffff" fill-opacity=".05"/><circle cx="548" cy="332" r="74" fill="#22c55e" fill-opacity=".08"/>`,
-    `<image href="${xmlImage(BRAND_LOGO)}" x="270" y="58" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`,
+    `<image href="${xmlImage(brandLogo)}" x="270" y="58" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`,
     `<text x="320" y="216" text-anchor="middle" fill="#ffffff" font-size="28" font-weight="900" direction="rtl">${xmlText(data.tournament)}</text>`,
     `<text x="320" y="258" text-anchor="middle" fill="#fde047" font-size="19" font-weight="900" direction="rtl">${data.role === "manager" ? LABELS.manager : LABELS.card}</text>`,
     `<line x1="230" y1="286" x2="410" y2="286" stroke="#ffffff" stroke-opacity=".28"/>`,
     `<text x="320" y="319" text-anchor="middle" fill="#ffffff" fill-opacity=".86" font-size="13" font-weight="700" direction="rtl">${LABELS.brand}</text>`,
-    `</svg>`,
+    `</g></svg>`,
   ].join("");
 }
 function renderFront(data: CardRenderData, qrDataUrl?: string) {
+  const brandLogo = data.brandLogoUrl || BRAND_LOGO;
   const tournamentLogo = data.tournamentLogoUrl || BRAND_LOGO;
   const role = data.role === "manager" ? LABELS.manager : data.roleLabel || LABELS.player;
   return [
-    svgOpen(data),
+    svgOpen(data, "#ffffff"),
     `<defs><linearGradient id="front-wash" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".58" stop-color="#f1f5f9"/><stop offset="1" stop-color="#e8f7f4"/></linearGradient><linearGradient id="top-bar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4b1690"/><stop offset=".5" stop-color="#1da1f2"/><stop offset="1" stop-color="#14b8a6"/></linearGradient><linearGradient id="role-pill" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4b1690"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>`,
     `<rect x="0" y="0" width="640" height="404" rx="26" fill="url(#front-wash)" stroke="#cbd5e1" stroke-width="2"/>`,
     `<path d="M24 104H616M24 108H616" stroke="#4b1690" stroke-opacity=".07" stroke-width="2"/>`,
     `<rect x="24" y="20" width="592" height="4" rx="2" fill="url(#top-bar)"/>`,
-    `<image href="${xmlImage(BRAND_LOGO)}" x="536" y="30" width="52" height="52" preserveAspectRatio="xMidYMid meet"/>`,
+    `<image href="${xmlImage(brandLogo)}" x="536" y="30" width="52" height="52" preserveAspectRatio="xMidYMid meet"/>`,
     `<image href="${xmlImage(tournamentLogo)}" x="30" y="18" width="62" height="62" preserveAspectRatio="xMidYMid meet"/>`,
     textBlock(data.tournament, { x: 61, y: 96, anchor: "end", fill: "#64748b", fontSize: 11, maxChars: 21, maxLines: 2, lineHeight: 13, fontWeight: 800 }),
     "",
@@ -178,7 +186,7 @@ function renderFront(data: CardRenderData, qrDataUrl?: string) {
     `<path d="M126 344h270" stroke="#ffffff" stroke-width="2" stroke-dasharray="2 8 4 5 1 7" opacity=".85"/>`,
     `<text x="261" y="378" text-anchor="middle" fill="#475569" font-size="9" font-weight="900" direction="ltr">${xmlText(data.serial)}</text>`,
     qrMarkup(qrDataUrl),
-    `</svg>`,
+    `</g></svg>`,
   ].join("");
 }
 export function renderCardSvg(data: CardRenderData, face: "front" | "back", qrDataUrl?: string) {
