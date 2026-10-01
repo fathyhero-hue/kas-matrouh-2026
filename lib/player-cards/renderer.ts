@@ -1,7 +1,6 @@
 export const CARD_WIDTH = 640;
 export const CARD_HEIGHT = 404;
 export const CARD_ASPECT_RATIO = CARD_WIDTH / CARD_HEIGHT;
-
 export type CardRenderData = {
   fullName: string;
   role: "player" | "manager" | string;
@@ -20,9 +19,7 @@ export type CardRenderData = {
   cropY?: number;
   zoom?: number;
 };
-
 export const BRAND_LOGO = "/tournament-logos/matrouh-sports.png";
-
 const LABELS = {
   brand: "\u0645\u0637\u0631\u0648\u062d \u0627\u0644\u0631\u064a\u0627\u0636\u064a\u0629",
   card: "\u0628\u0637\u0627\u0642\u0629 \u0631\u064a\u0627\u0636\u064a\u0629",
@@ -37,7 +34,6 @@ const LABELS = {
   noPhoto: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0635\u0648\u0631\u0629",
   unavailable: "\u063a\u064a\u0631 \u0645\u0639\u0631\u0648\u0636",
 } as const;
-
 function escapeXml(value: unknown) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -46,14 +42,11 @@ function escapeXml(value: unknown) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
 }
-
 const xmlText = (value: unknown, fallback = "") => escapeXml(value || fallback);
 const xmlImage = (value?: string) => (value ? escapeXml(value) : "");
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
-
 function wrapLines(value: string, maxChars: number, maxLines = 2) {
   const words = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (!words.length) return ["..."];
@@ -75,7 +68,6 @@ function wrapLines(value: string, maxChars: number, maxLines = 2) {
   result[maxLines - 1] = `${last.slice(0, Math.max(1, maxChars - 1))}\u2026`;
   return result;
 }
-
 function textBlock(
   value: unknown,
   options: {
@@ -97,18 +89,16 @@ function textBlock(
   const tspans = lines.map((line, index) => `<tspan x="${options.x}" dy="${index === 0 ? 0 : options.lineHeight ?? fontSize * 1.18}">${xmlText(line)}</tspan>`).join("");
   return `<text x="${options.x}" y="${options.y}" text-anchor="${options.anchor ?? "end"}" fill="${options.fill}" font-size="${fontSize.toFixed(1)}" font-weight="${options.fontWeight ?? 700}" direction="${options.direction ?? "rtl"}" unicode-bidi="plaintext">${tspans}</text>`;
 }
-
 function maskNationalId(value?: string) {
   const digits = String(value || "").replace(/\D/g, "");
   if (!digits) return LABELS.unavailable;
   return `${"*".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
 }
-
 function photoMarkup(data: CardRenderData) {
-  const x = 28;
+  const x = 500;
   const y = 116;
-  const width = 176;
-  const height = 208;
+  const width = 122;
+  const height = 158;
   if (!data.photoUrl) {
     return [
       `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="20" fill="#e2e8f0"/>`,
@@ -126,16 +116,13 @@ function photoMarkup(data: CardRenderData) {
     `<g clip-path="url(#player-photo-clip)"><image href="${xmlImage(data.photoUrl)}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" transform="translate(${translateX.toFixed(2)} ${translateY.toFixed(2)}) translate(${x} ${y}) scale(${zoom.toFixed(3)}) translate(${-x} ${-y})"/></g>`,
   ].join("");
 }
-
 function qrMarkup(qrDataUrl?: string) {
-  if (!qrDataUrl) return `<rect x="536" y="316" width="64" height="64" rx="7" fill="#e2e8f0"/><text x="568" y="353" text-anchor="middle" fill="#64748b" font-size="10" font-weight="800">QR</text>`;
-  return `<image href="${xmlImage(qrDataUrl)}" x="536" y="316" width="64" height="64" preserveAspectRatio="xMidYMid meet"/>`;
+  if (!qrDataUrl) return `<rect x="54" y="316" width="54" height="54" rx="7" fill="#e2e8f0"/><text x="81" y="349" text-anchor="middle" fill="#64748b" font-size="10" font-weight="800">QR</text>`;
+  return `<image href="${xmlImage(qrDataUrl)}" x="54" y="316" width="54" height="54" preserveAspectRatio="xMidYMid meet"/>`;
 }
-
 function svgOpen(data: CardRenderData) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${xmlText(data.fullName || data.tournament)}" style="font-family:Cairo,Tajawal,Arial,sans-serif">`;
 }
-
 function renderBack(data: CardRenderData) {
   return [
     svgOpen(data),
@@ -152,7 +139,6 @@ function renderBack(data: CardRenderData) {
     `</svg>`,
   ].join("");
 }
-
 function renderFront(data: CardRenderData, qrDataUrl?: string) {
   const tournamentLogo = data.tournamentLogoUrl || BRAND_LOGO;
   const role = data.role === "manager" ? LABELS.manager : data.roleLabel || LABELS.player;
@@ -163,40 +149,38 @@ function renderFront(data: CardRenderData, qrDataUrl?: string) {
     `<path d="M24 104H616M24 108H616" stroke="#4b1690" stroke-opacity=".07" stroke-width="2"/>`,
     `<rect x="24" y="20" width="592" height="4" rx="2" fill="url(#top-bar)"/>`,
     `<image href="${xmlImage(BRAND_LOGO)}" x="536" y="30" width="52" height="52" preserveAspectRatio="xMidYMid meet"/>`,
-    `<image href="${xmlImage(tournamentLogo)}" x="404" y="34" width="42" height="42" preserveAspectRatio="xMidYMid meet"/>`,
-    textBlock(data.tournament, { x: 612, y: 97, anchor: "end", fill: "#64748b", fontSize: 11, maxChars: 21, maxLines: 2, lineHeight: 13, fontWeight: 800 }),
-    `<image href="${xmlImage(data.teamLogoUrl)}" x="28" y="30" width="52" height="52" preserveAspectRatio="xMidYMid meet"/>`,
-    textBlock(data.team, { x: 54, y: 98, anchor: "middle", fill: "#334155", fontSize: 11, maxChars: 14, maxLines: 2, lineHeight: 13, fontWeight: 900 }),
+    `<image href="${xmlImage(tournamentLogo)}" x="30" y="18" width="62" height="62" preserveAspectRatio="xMidYMid meet"/>`,
+    textBlock(data.tournament, { x: 61, y: 96, anchor: "end", fill: "#64748b", fontSize: 11, maxChars: 21, maxLines: 2, lineHeight: 13, fontWeight: 800 }),
+    "",
     `<text x="532" y="55" text-anchor="end" fill="#4b1690" font-size="16" font-weight="900" direction="rtl">${LABELS.brand}</text>`,
     `<text x="532" y="76" text-anchor="end" fill="#64748b" font-size="10" font-weight="700" direction="rtl">${LABELS.card}</text>`,
     photoMarkup(data),
-    `<rect x="40" y="332" width="152" height="26" rx="13" fill="url(#role-pill)"/>`,
-    `<text x="116" y="350" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="900" direction="rtl">${xmlText(role)}</text>`,
-    `<text x="116" y="382" text-anchor="middle" fill="#475569" font-size="10" font-weight="900" direction="ltr">${xmlText(data.serial)}</text>`,
+    `<rect x="500" y="286" width="122" height="27" rx="13" fill="url(#role-pill)"/>`,
+    `<text x="561" y="305" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="900" direction="rtl">${xmlText(role)}</text>`,
+    `<text x="561" y="335" text-anchor="middle" fill="#475569" font-size="10" font-weight="900" direction="ltr">${xmlText(data.serial)}</text>`,
     `<g>
-      <text x="612" y="132" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.name}</text>
-      ${textBlock(data.fullName, { x: 612, y: 160, anchor: "end", fill: "#0f172a", fontSize: 22, maxChars: 25, maxLines: 2, lineHeight: 24, fontWeight: 900 })}
-      <line x1="230" y1="204" x2="612" y2="204" stroke="#cbd5e1"/>
-      <text x="612" y="228" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.team}</text>
-      ${textBlock(data.team, { x: 540, y: 250, anchor: "end", fill: "#0f766e", fontSize: 14, maxChars: 18, maxLines: 2, lineHeight: 16, fontWeight: 900 })}
-      <image href="${xmlImage(data.teamLogoUrl)}" x="552" y="226" width="28" height="28" preserveAspectRatio="xMidYMid meet"/>
-      <text x="412" y="228" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.role}</text>
-      ${textBlock(role, { x: 412, y: 250, anchor: "end", fill: "#4b1690", fontSize: 14, maxChars: 12, maxLines: 2, lineHeight: 16, fontWeight: 900 })}
-      <text x="612" y="278" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.birthDate}</text>
-      <text x="612" y="299" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(data.birthDate, "----/--/--")}</text>
-      <text x="412" y="278" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.registrationDate}</text>
-      <text x="412" y="299" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(data.registrationDate, "----/--/--")}</text>
-      <text x="612" y="326" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.nationalId}</text>
-      <text x="612" y="347" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(maskNationalId(data.nationalId))}</text>
+      <text x="474" y="135" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.name}</text>
+      ${textBlock(data.fullName, { x: 474, y: 158, anchor: "end", fill: "#0f172a", fontSize: 22, maxChars: 25, maxLines: 2, lineHeight: 24, fontWeight: 900 })}
+      <line x1="126" y1="168" x2="474" y2="168" stroke="#cbd5e1"/>
+      <text x="474" y="192" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.team}</text>
+      ${textBlock(data.team, { x: 300, y: 214, anchor: "end", fill: "#0f766e", fontSize: 14, maxChars: 18, maxLines: 2, lineHeight: 16, fontWeight: 900 })}
+      <image href="${xmlImage(data.teamLogoUrl)}" x="330" y="190" width="28" height="28" preserveAspectRatio="xMidYMid meet"/>
+      <text x="474" y="192" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.role}</text>
+      ${textBlock(role, { x: 474, y: 214, anchor: "end", fill: "#4b1690", fontSize: 14, maxChars: 12, maxLines: 2, lineHeight: 16, fontWeight: 900 })}
+      <text x="474" y="244" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.birthDate}</text>
+      <text x="474" y="265" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(data.birthDate, "----/--/--")}</text>
+      <text x="300" y="244" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.registrationDate}</text>
+      <text x="300" y="265" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(data.registrationDate, "----/--/--")}</text>
+      <text x="474" y="294" text-anchor="end" fill="#64748b" font-size="10" font-weight="900" direction="rtl">${LABELS.nationalId}</text>
+      <text x="474" y="315" text-anchor="end" fill="#0f172a" font-size="14" font-weight="900" direction="ltr">${xmlText(maskNationalId(data.nationalId))}</text>
     </g>`,
-    `<rect x="230" y="363" width="232" height="12" rx="3" fill="#111827"/>`,
-    `<path d="M230 363h232" stroke="#ffffff" stroke-width="2" stroke-dasharray="2 8 4 5 1 7" opacity=".85"/>`,
-    `<text x="346" y="394" text-anchor="middle" fill="#475569" font-size="9" font-weight="900" direction="ltr">${xmlText(data.serial)}</text>`,
+    `<rect x="126" y="344" width="270" height="14" rx="3" fill="#111827"/>`,
+    `<path d="M126 344h270" stroke="#ffffff" stroke-width="2" stroke-dasharray="2 8 4 5 1 7" opacity=".85"/>`,
+    `<text x="261" y="378" text-anchor="middle" fill="#475569" font-size="9" font-weight="900" direction="ltr">${xmlText(data.serial)}</text>`,
     qrMarkup(qrDataUrl),
     `</svg>`,
   ].join("");
 }
-
 export function renderCardSvg(data: CardRenderData, face: "front" | "back", qrDataUrl?: string) {
   return face === "back" ? renderBack(data) : renderFront(data, qrDataUrl);
 }

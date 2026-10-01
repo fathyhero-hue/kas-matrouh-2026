@@ -194,16 +194,16 @@ function PreviewModal({ data, onClose, onDownload }: { data: IdCardData; onClose
             <h2 className="truncate text-body font-black">{data.fullName}</h2>
             <p className="mt-1 text-caption text-muted-foreground" dir="ltr">{data.serial}</p>
           </div>
-          <button onClick={onClose} aria-label="\u0625\u063a\u0644\u0627\u0642" className="shrink-0 rounded-lg p-1 hover:bg-white/10"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} aria-label={`\u0625\u063a\u0644\u0627\u0642`} className="shrink-0 rounded-lg p-1 hover:bg-white/10"><X className="h-5 w-5" /></button>
         </div>
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setFace("front")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "front" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u0623\u0645\u0627\u0645\u064a</button>
-          <button type="button" onClick={() => setFace("back")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "back" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u062e\u0644\u0641\u064a</button>
+          <button type="button" onClick={() => setFace("front")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "front" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>{`\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u0623\u0645\u0627\u0645\u064a`}</button>
+          <button type="button" onClick={() => setFace("back")} className={`rounded-xl px-3 py-2 text-caption font-black ${face === "back" ? "bg-primary text-primary-foreground" : "bg-white/10"}`}>{`\u0627\u0644\u0648\u062c\u0647 \u0627\u0644\u062e\u0644\u0641\u064a`}</button>
         </div>
         <CardPreviewStage data={data} face={face} className="mx-auto max-w-[680px]" />
         <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={onDownload} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-caption font-black text-primary-foreground"><Download className="h-4 w-4" />\u062a\u062d\u0645\u064a\u0644 PDF</button>
-          <button type="button" onClick={onClose} className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-caption font-black"><X className="h-4 w-4" />\u0625\u063a\u0644\u0627\u0642</button>
+          <button type="button" onClick={onDownload} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-caption font-black text-primary-foreground"><Download className="h-4 w-4" />{`\u062a\u062d\u0645\u064a\u0644 PDF`}</button>
+          <button type="button" onClick={onClose} className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2 text-caption font-black"><X className="h-4 w-4" />{`\u0625\u063a\u0644\u0627\u0642`}</button>
         </div>
       </div>
     </div>
@@ -223,7 +223,7 @@ function EditModal({ player, data, onClose, onSave, busy }: { player: PlayerCard
       <div className="max-h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-[1100px] overflow-y-auto overflow-x-hidden rounded-2xl bg-brand-dark p-4 sm:max-h-[calc(100vh-32px)]" onClick={(event) => event.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-body font-black">{`\u062a\u0639\u062f\u064a\u0644 \u0628\u0637\u0627\u0642\u0629 ${player.name}`}</h2>
-          <button onClick={onClose} aria-label="\u0625\u063a\u0644\u0627\u0642"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} aria-label={`\u0625\u063a\u0644\u0627\u0642`}><X className="h-5 w-5" /></button>
         </div>
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
           <section className="min-w-0">
@@ -237,7 +237,7 @@ function EditModal({ player, data, onClose, onSave, busy }: { player: PlayerCard
             <Range label={`\u0627\u0644\u0642\u0635 \u0627\u0644\u0623\u0641\u0642\u064a`} value={cropX} min={0} max={100} step={1} onChange={setCropX} />
             <Range label={`\u0627\u0644\u0642\u0635 \u0627\u0644\u0631\u0623\u0633\u064a`} value={cropY} min={0} max={100} step={1} onChange={setCropY} />
             <Range label={`\u0627\u0644\u062a\u0643\u0628\u064a\u0631`} value={zoom} min={1} max={2} step={0.05} onChange={setZoom} />
-            <button type="button" onClick={() => { setCropX(50); setCropY(50); setZoom(1); }} className="w-full rounded-xl border border-white/10 px-4 py-2 text-caption font-black text-muted-foreground hover:bg-white/5">\u0625\u0639\u0627\u062f\u0629 \u0636\u0628\u0637 \u0627\u0644\u0635\u0648\u0631\u0629</button>
+            <button type="button" onClick={() => { setCropX(50); setCropY(50); setZoom(1); }} className="w-full rounded-xl border border-white/10 px-4 py-2 text-caption font-black text-muted-foreground hover:bg-white/5">{`\u0625\u0639\u0627\u062f\u0629 \u0636\u0628\u0637 \u0627\u0644\u0635\u0648\u0631\u0629`}</button>
             <button onClick={() => onSave({ cropX, cropY, zoom })} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-caption font-black text-primary-foreground disabled:opacity-50">
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {`\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a`}
