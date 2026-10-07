@@ -11,7 +11,7 @@ test('audit API paginates, filters, resolves actors and sanitizes existing metad
   h.state.tables.admin_audit_logs = Array.from({ length: 30 }, (_, id) => ({ id, actor_user_id: ACTOR, action: 'admins.edit', entity_type: 'admin_profile', entity_id: ACTOR, created_at: '2026-09-27T12:00:00Z', metadata: { password: 'SECRET', changed_fields: ['role_key', 'SECRET', 'token'] } }));
   const route = h.load('app/api/admin/audit/route.ts');
   const response = await route.GET(h.request('GET', undefined, `/api/admin/audit?page=2&actor=${ACTOR}&action=admins.edit&from=2026-09-27&to=2026-09-27`));
-  assert.equal(response.status, 200); const body = await response.json(); assert.equal(body.total, 30); assert.equal(body.logs.length, 5); assert.equal(body.logs[0].actor_name, 'Actor'); assert.doesNotMatch(JSON.stringify(body), /SECRET|token|password/);
+  assert.equal(response.status, 200); const body = await response.json(); assert.equal(body.total, 30); assert.equal(body.logs.length, 5); assert.equal(body.logs[0].actor_name, 'Actor'); assert.equal(body.logs[0].action_label, 'تعديل بيانات مسؤول'); assert.equal(body.logs[0].resource_label, 'المسؤولون'); assert.doesNotMatch(JSON.stringify(body), /SECRET|token|password/);
   assert.equal((await route.GET(h.request('GET', undefined, '/api/admin/audit?from=2026-02-30'))).status, 400);
   h.role('match_manager'); assert.equal((await route.GET(h.request())).status, 403);
 });
