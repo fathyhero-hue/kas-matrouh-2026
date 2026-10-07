@@ -25,6 +25,7 @@ function load(relative) {
 }
 
 const { UNKNOWN_PLAYER, UNKNOWN_TEAM, groupCardsByPlayer, groupGoalsByPlayer, resolveStatsPlayer, validateStatsPlayerSelection } = load("lib/sport/stats-player.ts");
+const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
 
 const teamA = {
   id: "team-a",
@@ -122,4 +123,9 @@ test("stats API contract derives snapshots from roster IDs", () => {
   assert.match(route, /player: validation\.playerName/);
   assert.match(route, /team: validation\.teamName/);
   assert.doesNotMatch(route, /fieldsByTable:.*player_name.*team_name/s);
+});
+
+test("team logo source links official Elite teams with roster logos", () => {
+  assert.match(rosterLinkSource, /from\("elite_teams"\)\.select\("name, logo_url"\)/);
+  assert.match(rosterLinkSource, /officialLogoByName\.get\(normalize\(r\.team_name/);
 });

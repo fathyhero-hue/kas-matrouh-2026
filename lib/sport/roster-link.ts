@@ -12,6 +12,7 @@ export type RosterTeamLite = {
 
 type RosterQueryPlayer = { id: string; name: string | null; personal_image_url: string | null };
 type RosterQueryRow = { id: string; team_name: string | null; logo_url: string | null; coach_name: string | null; coach_photo_url: string | null; roster_players: RosterQueryPlayer[] | null };
+type OfficialTeamRow = { name: string | null; logo_url: string | null };
 
 // Same normalization strategy used elsewhere for team-name matching
 // (elite-bracket.ts, roster/submit route) — trim + collapse spaces + lowercase.
@@ -24,18 +25,26 @@ export function normalize(value: string): string {
 // The single source of truth for "who's really registered" in a bracket —
 // real team logos and real player photos, as uploaded at roster submission.
 export async function getBracketRosterTeams(supabase: SupabaseClient, bracketId: string): Promise<RosterTeamLite[]> {
-  const { data } = await supabase
-    .from("team_rosters")
-    .select("id, team_name, logo_url, coach_name, coach_photo_url, roster_players(id, name, personal_image_url)")
-    .eq("bracket_id", bracketId);
+  const [{ data }, { data: officialTeams }] = await Promise.all([
+    supabase
+      .from("team_rosters")
+      .select("id, team_name, logo_url, coach_name, coach_photo_url, roster_players(id, name, personal_image_url)")
+      .eq("bracket_id", bracketId),
+    supabase.from("elite_teams").select("name, logo_url"),
+  ]);
 
   const rows = (data as RosterQueryRow[] | null) || [];
+  const officialLogoByName = new Map(
+    ((officialTeams as OfficialTeamRow[] | null) || [])
+      .filter((team) => team.name && team.logo_url)
+      .map((team) => [normalize(team.name as string), team.logo_url as string]),
+  );
   return rows
     .filter((r) => r.team_name)
     .map((r) => ({
       id: r.id as string,
       team: r.team_name as string,
-      logoUrl: (r.logo_url as string) || null,
+      logoUrl: (r.logo_url as string) || officialLogoByName.get(normalize(r.team_name as string)) || null,
       coachName: (r.coach_name as string) || null,
       coachPhotoUrl: (r.coach_photo_url as string) || null,
       players: (r.roster_players || [])
