@@ -18,6 +18,7 @@ export type GoalCreatePayload = StatsPlayerSelection & {
 export type CardCreatePayload = StatsPlayerSelection & {
   table: "cards";
   bracket_id: string;
+  match_id: string;
   yellow: number;
   red: number;
 };

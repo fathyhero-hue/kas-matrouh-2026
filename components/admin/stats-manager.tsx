@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { Trash2, Plus, Star, Upload, Pencil, Check, X } from "lucide-react";
 import { resolveStatsPlayer } from "@/lib/sport/stats-player";
 import type { GoalCreatePayload, CardCreatePayload } from "@/lib/sport/stats-contract";
+import { getSuspensionState } from "@/lib/sport/suspensions";
 
 type Goal = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; goals: number; image_url: string | null };
-type Card = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
+type Card = { id: string; bracket_id?: string | null; player: string | null; team: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
@@ -175,6 +176,7 @@ export function StatsManager({
   initialMotm,
   initialFormations,
   rosterTeams,
+  matches,
 }: {
   bracketId: string;
   initialGoals: Goal[];
@@ -182,6 +184,7 @@ export function StatsManager({
   initialMotm: Motm[];
   initialFormations: Formation[];
   rosterTeams: RosterTeam[];
+  matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[];
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("goals");
 
@@ -200,7 +203,7 @@ export function StatsManager({
       </div>
 
       {tab === "goals" && <GoalsTab bracketId={bracketId} initial={initialGoals} rosterTeams={rosterTeams} />}
-      {tab === "cards" && <CardsTab bracketId={bracketId} initial={initialCards} rosterTeams={rosterTeams} />}
+      {tab === "cards" && <CardsTab bracketId={bracketId} initial={initialCards} rosterTeams={rosterTeams} matches={matches} />}
       {tab === "motm" && <MotmTab bracketId={bracketId} initial={initialMotm} rosterTeams={rosterTeams} />}
       {tab === "totw" && <FormationTab bracketId={bracketId} initial={initialFormations[0] || null} rosterTeams={rosterTeams} />}
     </div>
@@ -332,20 +335,21 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
   );
 }
 
-function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; initial: Card[]; rosterTeams: RosterTeam[] }) {
+function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: string; initial: Card[]; rosterTeams: RosterTeam[]; matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[] }) {
   const [rows, setRows] = useState(initial);
-  const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
+  const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
+  const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
 
   const add = async () => {
-    if (!form.roster_player_id || !form.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    if (!form.roster_player_id || !form.team_roster_id || !form.match_id) return toast.error("اختر اللاعب والمباراة");
     try {
       const payload: CardCreatePayload = {
         table: "cards",
         bracket_id: bracketId,
         roster_player_id: form.roster_player_id,
         team_roster_id: form.team_roster_id,
+        match_id: form.match_id,
         player_name: form.player,
         team_name: form.team,
         yellow: 0,
@@ -359,7 +363,7 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
       setRows((prev) => [...prev, data.row]);
-      setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
+      setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
     } catch (e: unknown) {
       toast.error(errorMessage(e, "فشل الحفظ"));
     }
@@ -388,7 +392,7 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
     const team = rosterTeams.find((item) => item.id === row.team_roster_id) || rosterTeams.find((item) => item.team === row.team);
     const player = team?.players.find((item) => item.id === row.roster_player_id) || team?.players.find((item) => item.name === row.player);
     setEditingId(row.id);
-    setEditForm({ player: player?.name || row.player || "", team: team?.team || row.team || "", roster_player_id: player?.id || row.roster_player_id || "", team_roster_id: team?.id || row.team_roster_id || "" });
+    setEditForm({ player: player?.name || row.player || "", team: team?.team || row.team || "", roster_player_id: player?.id || row.roster_player_id || "", team_roster_id: team?.id || row.team_roster_id || "", match_id: row.match_id || "" });
   };
 
   const saveEdit = async (id: string) => {
@@ -413,6 +417,10 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
           trackPhoto={false}
           onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
+        <select value={form.match_id} onChange={(e) => setForm((f) => ({ ...f, match_id: e.target.value }))} className={`${inputCls} min-w-56`}>
+          <option value="">اختر المباراة</option>
+          {matches.map((match) => <option key={match.id} value={match.id}>{match.team_a} - {match.team_b} ({match.match_date || ""})</option>)}
+        </select>
         <button onClick={add} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
       </div>
       <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-white/10">
@@ -421,11 +429,14 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
         ) : (
           rows.map((c) => {
             const display = resolveStatsPlayer(c, rosterTeams);
+            const suspension = getSuspensionState(rows.filter((card) => card.roster_player_id === c.roster_player_id), matches, rosterTeams);
             return (
             <div key={c.id} className="relative flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-caption font-black">{display.player}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
+                {suspension.needsMatchAssignment && <div className="text-[11px] font-bold text-accent-orange">يحتاج تحديد المباراة</div>}
+                {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">موقوف مباراة · {suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}</div> : <div className="text-[11px] font-bold text-accent-green">متاح</div>)}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateCard(c, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">−</button>
@@ -442,6 +453,7 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
               {editingId === c.id && (
                 <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
                   <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />
+                  <select value={editForm.match_id} onChange={(e) => setEditForm((current) => ({ ...current, match_id: e.target.value }))} className={`${inputCls} min-w-56`}><option value="">اختر المباراة</option>{matches.map((match) => <option key={match.id} value={match.id}>{match.team_a} - {match.team_b} ({match.match_date || ""})</option>)}</select>
                   <button onClick={() => void saveEdit(c.id)} aria-label="حفظ اللاعب" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
                   <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
                 </div>

@@ -26,6 +26,7 @@ function load(relative) {
 
 const { UNKNOWN_PLAYER, UNKNOWN_TEAM, groupCardsByPlayer, groupGoalsByPlayer, resolveStatsPlayer, validateStatsPlayerSelection } = load("lib/sport/stats-player.ts");
 const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
+const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/suspensions.ts");
 
 const teamA = {
   id: "team-a",
@@ -128,4 +129,55 @@ test("stats API contract derives snapshots from roster IDs", () => {
 test("team logo source links official Elite teams with roster logos", () => {
   assert.match(rosterLinkSource, /from\("elite_teams"\)\.select\("name, logo_url"\)/);
   assert.match(rosterLinkSource, /officialLogoByName\.get\(normalize\(r\.team_name/);
+});
+
+
+test("suspension engine applies three-yellow cycle to next team match", () => {
+  const matches = [
+    { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-01-01", match_time: "10:00", status: "انتهت" },
+    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "مجدولة" },
+  ];
+  const cards = [1, 2, 3].map((n, i) => ({ id: `c${n}`, bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 1, red: 0 }));
+  const state = getSuspensionState(cards, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
+  assert.equal(state.isSuspended, true);
+  assert.equal(state.suspensionMatchId, "m2");
+});
+
+test("completed suspension match clears state and legacy cards need assignment", () => {
+  const matches = [{ id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "انتهت" }];
+  const cards = [{ id: "c", bracket_id: "b", match_id: null, roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 3, red: 0 }];
+  const state = getSuspensionState(cards, matches);
+  assert.equal(state.isSuspended, false);
+  assert.equal(state.needsMatchAssignment, true);
+});
+
+test("eligibility is match-specific and does not globally block another match", () => {
+  const state = { isSuspended: true, reason: "direct_red", suspensionMatchId: "m2" };
+  assert.equal(getPlayerEligibilityForMatch(state, "m2").eligible, false);
+  assert.equal(getPlayerEligibilityForMatch(state, "m3").eligible, true);
+});
+
+test("direct red remains active until the next team match is completed", () => {
+  const base = [
+    { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-02-01", match_time: "10:00", status: "انتهت" },
+    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "مجدولة" },
+    { id: "m3", bracket_id: "b", team_a: "A", team_b: "D", match_date: "2026-02-03", match_time: "10:00", status: "مجدولة" },
+  ];
+  const cards = [{ id: "red", bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 0, red: 1 }];
+  const before = getSuspensionState(cards, base);
+  assert.equal(before.isSuspended, true);
+  assert.equal(before.reason, "direct_red");
+  assert.equal(before.suspensionMatchId, "m2");
+  assert.equal(getPlayerEligibilityForMatch(before, "m2").eligible, false);
+  const after = getSuspensionState(cards, base.map((match) => match.id === "m2" ? { ...match, status: "انتهت" } : match));
+  assert.equal(after.isSuspended, false);
+  assert.equal(getPlayerEligibilityForMatch(after, "m3").eligible, true);
+});
+
+test("public and admin consumers receive the same suspension state", () => {
+  const matches = [{ id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-02-01", match_time: "10:00", status: "انتهت" }, { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "مجدولة" }];
+  const cards = [{ id: "red", bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 0, red: 1 }];
+  const publicState = getSuspensionState(cards, matches);
+  const adminState = getSuspensionState(cards, matches);
+  assert.deepEqual(adminState, publicState);
 });

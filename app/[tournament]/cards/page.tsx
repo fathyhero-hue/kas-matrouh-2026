@@ -5,6 +5,7 @@ import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 import { getBracketRosterTeams } from "@/lib/sport/roster-link";
 import { groupCardsByPlayer } from "@/lib/sport/stats-player";
+import { getSuspensionState } from "@/lib/sport/suspensions";
 
 export const revalidate = 30;
 
@@ -16,8 +17,9 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const [{ data: cards }, rosterTeams] = await Promise.all([
+  const [{ data: cards }, { data: matches }, rosterTeams] = await Promise.all([
     supabase.from("cards").select("*").eq("bracket_id", bracketId),
+    supabase.from("matches").select("id, bracket_id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId),
     getBracketRosterTeams(supabase, bracketId),
   ]);
 
@@ -42,6 +44,7 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
               <td className="px-3 py-3 text-right text-muted-foreground">{c.team}</td>
               <td className="px-3 py-3 font-bold">{c.yellow || 0}</td>
               <td className="px-3 py-3 font-bold text-destructive">{c.red || 0}</td>
+              <td className="px-3 py-3 text-caption font-bold">{getSuspensionState((cards || []).filter((card) => card.roster_player_id === c.rosterPlayerId), matches || [], rosterTeams).isSuspended ? <span className="text-destructive">Ù…ÙˆÙ‚ÙˆÙ Ù…Ø¨Ø§Ø±Ø§Ø©</span> : <span className="text-accent-green">Ù…ØªØ§Ø­</span>}</td>
             </tr>
           ))}
         </tbody>

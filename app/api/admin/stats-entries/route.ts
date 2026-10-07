@@ -46,6 +46,17 @@ async function resolvePlayerIdentity(supabase: ReturnType<typeof createServiceRo
   };
 }
 
+async function validateCardMatch(supabase: ReturnType<typeof createServiceRoleClient>, body: Record<string, unknown>, bracketId: string, teamName: string) {
+  const matchId = stringValue(body.match_id);
+  if (!matchId) throw new StatsInputError("يجب اختيار المباراة المرتبطة بالبطاقة.");
+  const { data: match, error } = await supabase.from("matches").select("id, bracket_id, team_a, team_b").eq("id", matchId).maybeSingle();
+  if (error) throw error;
+  if (!match || match.bracket_id !== bracketId) throw new StatsInputError("المباراة غير موجودة في هذه البطولة.");
+  const teamKey = teamName.trim();
+  if (match.team_a !== teamKey && match.team_b !== teamKey) throw new StatsInputError("المباراة لا تخص فريق اللاعب.");
+  return matchId;
+}
+
 export async function POST(req: NextRequest) {
   const authorization = await authorizeAdminRequest(req, 'stats.goals.manage');
   if (authorization instanceof NextResponse) return authorization;
@@ -58,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     if (IDENTITY_TABLES.has(table)) {
       const existing = id
-        ? await supabase.from(table).select("id, bracket_id, roster_player_id, team_roster_id, player, team").eq("id", id).maybeSingle()
+        ? await supabase.from(table).select("id, bracket_id, match_id, roster_player_id, team_roster_id, player, team").eq("id", id).maybeSingle()
         : { data: null, error: null };
       if (existing.error) throw existing.error;
       if (id && !existing.data) throw new StatsInputError("السجل المطلوب غير موجود.");
@@ -73,6 +84,10 @@ export async function POST(req: NextRequest) {
         patch.bracket_id = bracketId;
       }
       if (identityRequested || !id) Object.assign(patch, await resolvePlayerIdentity(supabase, body, bracketId));
+      if (table === "cards") {
+        const identity = patch.team as string || String((existingRow as { team?: string } | null)?.team || "");
+        patch.match_id = await validateCardMatch(supabase, body, bracketId, identity);
+      }
 
       if (table === "goals") {
         if (body.goals !== undefined) patch.goals = Number(body.goals) || 0;
