@@ -80,20 +80,16 @@ export function validateStatsPlayerSelection({
   bracketId,
   roster,
   player,
-  matches,
 }: {
   bracketId: string;
   roster: ValidationRoster | null;
   player: ValidationPlayer | null;
-  matches: ValidationMatch[];
+  matches?: ValidationMatch[];
 }) {
   if (!roster || roster.bracket_id !== bracketId || !roster.team_name?.trim()) {
     return { ok: false as const, error: "الفريق غير مشارك في هذه البطولة." };
   }
   if (!player || !player.name?.trim()) return { ok: false as const, error: "اللاعب غير موجود." };
   if (player.roster_id !== roster.id) return { ok: false as const, error: "اللاعب لا ينتمي إلى قائمة الفريق." };
-  const teamKey = normalize(roster.team_name);
-  const participates = matches.some((match) => normalize(match.team_a || "") === teamKey || normalize(match.team_b || "") === teamKey);
-  if (!participates) return { ok: false as const, error: "الفريق غير موجود في مباريات هذه البطولة." };
   return { ok: true as const, playerName: player.name.trim(), teamName: roster.team_name.trim() };
 }

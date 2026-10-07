@@ -96,14 +96,14 @@ test("server validation rejects unknown players and cross-team players", () => {
   assert.equal(validateStatsPlayerSelection({ bracketId: "bracket-1", roster, player: null, matches }).ok, false);
 });
 
-test("server validation rejects a team absent from the bracket matches", () => {
+test("server validation accepts an official bracket team before its first match", () => {
   const result = validateStatsPlayerSelection({
     bracketId: "bracket-1",
     roster: { id: "team-c", bracket_id: "bracket-1", team_name: "الفريق ج" },
     player: { id: "player-c-1", roster_id: "team-c", name: "لاعب ج" },
     matches: [{ team_a: "الفريق أ", team_b: "الفريق ب" }],
   });
-  assert.equal(result.ok, false);
+  assert.equal(result.ok, true);
 });
 
 test("stats identity migration is additive and nullable", () => {

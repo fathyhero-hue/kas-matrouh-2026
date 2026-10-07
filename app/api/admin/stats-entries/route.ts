@@ -29,16 +29,13 @@ async function resolvePlayerIdentity(supabase: ReturnType<typeof createServiceRo
     throw new StatsInputError("يجب اختيار لاعب وقائمة فريق صحيحة.");
   }
 
-  const [{ data: roster, error: rosterError }, { data: player, error: playerError }, { data: matches, error: matchesError }] = await Promise.all([
+  const [{ data: roster, error: rosterError }, { data: player, error: playerError }] = await Promise.all([
     supabase.from("team_rosters").select("id, bracket_id, team_name").eq("id", teamRosterId).maybeSingle(),
     supabase.from("roster_players").select("id, roster_id, name").eq("id", rosterPlayerId).maybeSingle(),
-    supabase.from("matches").select("team_a, team_b").eq("bracket_id", bracketId),
   ]);
   if (rosterError) throw rosterError;
   if (playerError) throw playerError;
-  if (matchesError) throw matchesError;
-
-  const validation = validateStatsPlayerSelection({ bracketId, roster, player, matches: matches || [] });
+  const validation = validateStatsPlayerSelection({ bracketId, roster, player });
   if (!validation.ok) throw new StatsInputError(validation.error);
 
   return {
