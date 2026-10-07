@@ -181,3 +181,11 @@ test("public and admin consumers receive the same suspension state", () => {
   const adminState = getSuspensionState(cards, matches);
   assert.deepEqual(adminState, publicState);
 });
+
+test("public suspension status rendering uses readable Arabic labels", () => {
+  const source = fs.readFileSync("app/[tournament]/cards/page.tsx", "utf8");
+  assert.match(source, /الحالة/);
+  assert.match(source, /متاح/);
+  assert.match(source, /موقوف مباراة/);
+  assert.doesNotMatch(source, /[ÙØ]/);
+});

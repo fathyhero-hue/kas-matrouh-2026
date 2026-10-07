@@ -35,6 +35,7 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
             <th className="px-3 py-3 text-right">الفريق</th>
             <th className="px-3 py-3">🟨</th>
             <th className="px-3 py-3">🟥</th>
+            <th className="px-3 py-3">الحالة</th>
           </tr>
         </thead>
         <tbody>
@@ -44,7 +45,7 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
               <td className="px-3 py-3 text-right text-muted-foreground">{c.team}</td>
               <td className="px-3 py-3 font-bold">{c.yellow || 0}</td>
               <td className="px-3 py-3 font-bold text-destructive">{c.red || 0}</td>
-              <td className="px-3 py-3 text-caption font-bold">{getSuspensionState((cards || []).filter((card) => card.roster_player_id === c.rosterPlayerId), matches || [], rosterTeams).isSuspended ? <span className="text-destructive">Ù…ÙˆÙ‚ÙˆÙ Ù…Ø¨Ø§Ø±Ø§Ø©</span> : <span className="text-accent-green">Ù…ØªØ§Ø­</span>}</td>
+              <td className="px-3 py-3 text-caption font-bold">{getSuspensionState((cards || []).filter((card) => card.roster_player_id === c.rosterPlayerId), matches || [], rosterTeams).isSuspended ? <span className="text-destructive">موقوف مباراة</span> : <span className="text-accent-green">متاح</span>}</td>
             </tr>
           ))}
         </tbody>
