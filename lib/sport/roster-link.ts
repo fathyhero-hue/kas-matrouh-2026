@@ -1,13 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type RosterPlayerLite = { name: string; photoUrl: string | null };
+export type RosterPlayerLite = { id: string; name: string; photoUrl: string | null };
 export type RosterTeamLite = {
+  id: string;
   team: string;
   logoUrl: string | null;
   coachName: string | null;
   coachPhotoUrl: string | null;
   players: RosterPlayerLite[];
 };
+
+type RosterQueryPlayer = { id: string; name: string | null; personal_image_url: string | null };
+type RosterQueryRow = { id: string; team_name: string | null; logo_url: string | null; coach_name: string | null; coach_photo_url: string | null; roster_players: RosterQueryPlayer[] | null };
 
 // Same normalization strategy used elsewhere for team-name matching
 // (elite-bracket.ts, roster/submit route) — trim + collapse spaces + lowercase.
@@ -22,19 +26,21 @@ export function normalize(value: string): string {
 export async function getBracketRosterTeams(supabase: SupabaseClient, bracketId: string): Promise<RosterTeamLite[]> {
   const { data } = await supabase
     .from("team_rosters")
-    .select("team_name, logo_url, coach_name, coach_photo_url, roster_players(name, personal_image_url)")
+    .select("id, team_name, logo_url, coach_name, coach_photo_url, roster_players(id, name, personal_image_url)")
     .eq("bracket_id", bracketId);
 
-  return (data || [])
-    .filter((r: any) => r.team_name)
-    .map((r: any) => ({
+  const rows = (data as RosterQueryRow[] | null) || [];
+  return rows
+    .filter((r) => r.team_name)
+    .map((r) => ({
+      id: r.id as string,
       team: r.team_name as string,
       logoUrl: (r.logo_url as string) || null,
       coachName: (r.coach_name as string) || null,
       coachPhotoUrl: (r.coach_photo_url as string) || null,
-      players: ((r.roster_players || []) as any[])
+      players: (r.roster_players || [])
         .filter((p) => p.name)
-        .map((p) => ({ name: p.name as string, photoUrl: (p.personal_image_url as string) || null })),
+        .map((p) => ({ id: p.id as string, name: p.name as string, photoUrl: (p.personal_image_url as string) || null })),
     }));
 }
 

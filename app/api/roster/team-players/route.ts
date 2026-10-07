@@ -4,6 +4,10 @@ import { getBracketRosterTeams } from "@/lib/sport/roster-link";
 
 export const runtime = "nodejs";
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "تعذر جلب بيانات الفريق.";
+}
+
 // Returns the real registered teams/players/coach for a bracket, called by
 // the player-card form after a team unlocks with their roster access code —
 // the same team/player names and photos are already public on the
@@ -16,9 +20,16 @@ export async function GET(req: NextRequest) {
     if (!bracket) return NextResponse.json({ error: "بطولة غير معروفة." }, { status: 400 });
 
     const teams = await getBracketRosterTeams(supabase, bracket.id as string);
-    return NextResponse.json({ ok: true, teams });
-  } catch (error: any) {
+    const publicTeams = teams.map((team) => ({
+      team: team.team,
+      logoUrl: team.logoUrl,
+      coachName: team.coachName,
+      coachPhotoUrl: team.coachPhotoUrl,
+      players: team.players.map((player) => ({ name: player.name, photoUrl: player.photoUrl })),
+    }));
+    return NextResponse.json({ ok: true, teams: publicTeams });
+  } catch (error: unknown) {
     console.error("Roster team-players fetch error:", error);
-    return NextResponse.json({ error: error?.message || "تعذر جلب بيانات الفريق." }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }

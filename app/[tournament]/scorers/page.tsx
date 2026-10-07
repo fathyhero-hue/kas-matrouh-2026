@@ -6,6 +6,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 import { getBracketRosterTeams, buildPlayerPhotoResolver } from "@/lib/sport/roster-link";
+import { groupGoalsByPlayer } from "@/lib/sport/stats-player";
 
 export const revalidate = 30;
 
@@ -23,7 +24,7 @@ export default async function ScorersPage({ params, searchParams }: TournamentPa
   ]);
   const resolvePhoto = buildPlayerPhotoResolver(rosterTeams);
 
-  const scorers = (goals || []).filter((g) => (g.goals || 0) > 0).map((g) => ({ ...g, image_url: g.image_url || resolvePhoto(g.team, g.player) }));
+  const scorers = groupGoalsByPlayer(goals || [], rosterTeams).map((g) => ({ ...g, image_url: g.image_url || resolvePhoto(g.team, g.player) }));
   if (scorers.length === 0) return <EmptyState message="لسه مفيش أهداف مسجّلة" />;
 
   return (

@@ -2,22 +2,28 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Trash2, Plus, Star, Upload } from "lucide-react";
+import { Trash2, Plus, Star, Upload, Pencil, Check, X } from "lucide-react";
+import { resolveStatsPlayer } from "@/lib/sport/stats-player";
+import type { GoalCreatePayload, CardCreatePayload } from "@/lib/sport/stats-contract";
 
-type Goal = { id: string; player: string; team: string; goals: number; image_url: string | null };
-type Card = { id: string; player: string; team: string; yellow: number; red: number };
+type Goal = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; goals: number; image_url: string | null };
+type Card = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
 type RosterTeam = {
+  id: string;
   team: string;
   logoUrl: string | null;
-  coachName?: string | null;
-  coachPhotoUrl?: string | null;
-  players: { name: string; photoUrl: string | null }[];
+  coachName: string | null;
+  coachPhotoUrl: string | null;
+  players: { id: string; name: string; photoUrl: string | null }[];
 };
 
 const inputCls = "h-10 w-full rounded-lg bg-secondary px-3 text-caption font-bold outline-none ring-1 ring-white/10 focus:ring-accent-blue";
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 const TABS = [
   { key: "goals", label: "الهدافين" },
   { key: "cards", label: "الكروت" },
@@ -41,8 +47,8 @@ function PhotoUploadButton({ onUploaded }: { onUploaded: (url: string) => void }
       if (!res.ok) throw new Error(data?.error || "فشل رفع الصورة");
       onUploaded(data.url);
       toast.success("تم رفع الصورة");
-    } catch (e: any) {
-      toast.error(e?.message || "فشل رفع الصورة");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "فشل رفع الصورة"));
     } finally {
       setUploading(false);
     }
@@ -81,62 +87,70 @@ function TeamPlayerPicker({
   rosterTeams,
   team,
   player,
+  teamRosterId,
+  rosterPlayerId,
   imageUrl,
+  requireRoster = false,
   trackPhoto = true,
   onChange,
 }: {
   rosterTeams: RosterTeam[];
   team: string;
   player: string;
+  teamRosterId?: string | null;
+  rosterPlayerId?: string | null;
   imageUrl?: string;
+  requireRoster?: boolean;
   trackPhoto?: boolean;
-  onChange: (patch: { team?: string; player?: string; image_url?: string }) => void;
+  onChange: (patch: { team?: string; player?: string; team_roster_id?: string; roster_player_id?: string; image_url?: string }) => void;
 }) {
-  const [manual, setManual] = useState(rosterTeams.length === 0);
-  const selectedTeam = rosterTeams.find((t) => t.team === team);
+  const [manual, setManual] = useState(!requireRoster && rosterTeams.length === 0);
+  const selectedTeam = rosterTeams.find((t) => t.id === teamRosterId) || rosterTeams.find((t) => t.team === team);
   const players = selectedTeam?.players || [];
+  const selectedTeamValue = teamRosterId || selectedTeam?.id || "";
+  const selectedPlayerValue = rosterPlayerId || players.find((p) => p.name === player)?.id || "";
 
   return (
     <div className="flex-1 space-y-2">
       <div className="flex flex-wrap gap-2">
         {manual ? (
           <>
-            <input value={team} onChange={(e) => onChange({ team: e.target.value })} placeholder="اسم الفريق" className={`${inputCls} flex-1`} />
-            <input value={player} onChange={(e) => onChange({ player: e.target.value })} placeholder="اسم اللاعب" className={`${inputCls} flex-1`} />
+            <input value={team} onChange={(e) => onChange({ team: e.target.value, team_roster_id: "", roster_player_id: "" })} placeholder="اسم الفريق" className={`${inputCls} flex-1`} />
+            <input value={player} onChange={(e) => onChange({ player: e.target.value, roster_player_id: "" })} placeholder="اسم اللاعب" className={`${inputCls} flex-1`} />
           </>
         ) : (
           <>
-            <select value={team} onChange={(e) => onChange({ team: e.target.value, player: "", image_url: "" })} className={`${inputCls} flex-1`}>
+            <select value={selectedTeamValue} onChange={(e) => { const t = rosterTeams.find((item) => item.id === e.target.value); onChange({ team: t?.team || "", team_roster_id: t?.id || "", player: "", roster_player_id: "", image_url: "" }); }} className={`${inputCls} flex-1`}>
               <option value="">اختر الفريق</option>
               {rosterTeams.map((t) => (
-                <option key={t.team} value={t.team}>{t.team}</option>
+                <option key={t.id} value={t.id}>{t.team}</option>
               ))}
             </select>
             <select
-              value={player}
+              value={selectedPlayerValue}
               onChange={(e) => {
-                const p = players.find((pl) => pl.name === e.target.value);
-                onChange({ player: e.target.value, image_url: p?.photoUrl || "" });
+                const p = players.find((pl) => pl.id === e.target.value);
+                onChange({ player: p?.name || "", roster_player_id: p?.id || "", image_url: p?.photoUrl || "" });
               }}
-              disabled={!team}
+              disabled={!selectedTeamValue}
               className={`${inputCls} flex-1 disabled:opacity-50`}
             >
               <option value="">اختر اللاعب</option>
               {players.map((p) => (
-                <option key={p.name} value={p.name}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </>
         )}
       </div>
-      {(rosterTeams.length > 0 || (trackPhoto && manual)) && (
+      {!requireRoster && (rosterTeams.length > 0 || (trackPhoto && manual)) && (
         <div className="flex items-center gap-2">
           {rosterTeams.length > 0 && (
             <button
               type="button"
               onClick={() => {
                 setManual((m) => !m);
-                onChange({ team: "", player: "", image_url: "" });
+                onChange({ team: "", team_roster_id: "", player: "", roster_player_id: "", image_url: "" });
               }}
               className="text-[11px] font-bold text-muted-foreground underline"
             >
@@ -195,22 +209,34 @@ export function StatsManager({
 
 function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; initial: Goal[]; rosterTeams: RosterTeam[] }) {
   const [rows, setRows] = useState(initial);
-  const [form, setForm] = useState({ player: "", team: "", goals: "1", image_url: "" });
+  const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", goals: "1", image_url: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
 
   const add = async () => {
-    if (!form.player.trim() || !form.team.trim()) return toast.error("اكتب اسم اللاعب والفريق");
+    if (!form.roster_player_id || !form.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
     try {
+      const payload: GoalCreatePayload = {
+        table: "goals",
+        bracket_id: bracketId,
+        roster_player_id: form.roster_player_id,
+        team_roster_id: form.team_roster_id,
+        player_name: form.player,
+        team_name: form.team,
+        goals: Number(form.goals) || 1,
+        image_url: form.image_url,
+      };
       const res = await fetch("/api/admin/stats-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: "goals", bracket_id: bracketId, player: form.player.trim(), team: form.team.trim(), goals: Number(form.goals) || 1, image_url: form.image_url }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
       setRows((prev) => [...prev, data.row].sort((a, b) => (b.goals || 0) - (a.goals || 0)));
-      setForm({ player: "", team: "", goals: "1", image_url: "" });
-    } catch (e: any) {
-      toast.error(e?.message || "فشل الحفظ");
+      setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "", goals: "1", image_url: "" });
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "فشل الحفظ"));
     }
   };
 
@@ -237,6 +263,22 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
     }
   };
 
+  const beginEdit = (row: Goal) => {
+    const team = rosterTeams.find((item) => item.id === row.team_roster_id) || rosterTeams.find((item) => item.team === row.team);
+    const player = team?.players.find((item) => item.id === row.roster_player_id) || team?.players.find((item) => item.name === row.player);
+    setEditingId(row.id);
+    setEditForm({ player: player?.name || row.player || "", team: team?.team || row.team || "", roster_player_id: player?.id || row.roster_player_id || "", team_roster_id: team?.id || row.team_roster_id || "" });
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    const res = await fetch("/api/admin/stats-entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table: "goals", id, ...editForm, player_name: editForm.player, team_name: editForm.team }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(data?.error || "فشل تحديث اللاعب");
+    setRows((prev) => prev.map((row) => row.id === id ? data.row : row));
+    setEditingId(null);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
@@ -244,7 +286,10 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
           rosterTeams={rosterTeams}
           team={form.team}
           player={form.player}
+          rosterPlayerId={form.roster_player_id}
+          teamRosterId={form.team_roster_id}
           imageUrl={form.image_url}
+          requireRoster
           onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
         <input type="number" value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} className={`${inputCls} w-20 shrink-0`} />
@@ -254,22 +299,33 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
         {rows.length === 0 ? (
           <div className="p-8 text-center text-caption text-muted-foreground">لا يوجد هدافين</div>
         ) : (
-          rows.map((g) => (
-            <div key={g.id} className="flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
+          rows.map((g) => {
+            const display = resolveStatsPlayer(g, rosterTeams);
+            return (
+            <div key={g.id} className="relative flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
               {g.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={g.image_url} alt={g.player} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                <img src={g.image_url} alt={display.player} className="h-8 w-8 shrink-0 rounded-full object-cover" />
               ) : null}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-caption font-black">{g.player}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{g.team}</div>
+                <div className="truncate text-caption font-black">{display.player}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
               </div>
               <button onClick={() => updateGoals(g, -1)} className="h-7 w-7 rounded bg-red-500/15 font-black text-red-400">−</button>
               <span className="w-6 text-center text-caption font-black text-accent-orange">{g.goals}</span>
               <button onClick={() => updateGoals(g, 1)} className="h-7 w-7 rounded bg-accent-green/15 font-black text-accent-green">+</button>
+              <button onClick={() => beginEdit(g)} aria-label="تعديل اللاعب" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
               <button onClick={() => remove(g.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+              {editingId === g.id && (
+                <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
+                  <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />
+                  <button onClick={() => void saveEdit(g.id)} aria-label="حفظ اللاعب" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
+                  <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
+                </div>
+              )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -278,22 +334,34 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
 
 function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; initial: Card[]; rosterTeams: RosterTeam[] }) {
   const [rows, setRows] = useState(initial);
-  const [form, setForm] = useState({ player: "", team: "" });
+  const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
 
   const add = async () => {
-    if (!form.player.trim() || !form.team.trim()) return toast.error("اكتب اسم اللاعب والفريق");
+    if (!form.roster_player_id || !form.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
     try {
+      const payload: CardCreatePayload = {
+        table: "cards",
+        bracket_id: bracketId,
+        roster_player_id: form.roster_player_id,
+        team_roster_id: form.team_roster_id,
+        player_name: form.player,
+        team_name: form.team,
+        yellow: 0,
+        red: 0,
+      };
       const res = await fetch("/api/admin/stats-entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: "cards", bracket_id: bracketId, player: form.player.trim(), team: form.team.trim(), yellow: 0, red: 0 }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
       setRows((prev) => [...prev, data.row]);
-      setForm({ player: "", team: "" });
-    } catch (e: any) {
-      toast.error(e?.message || "فشل الحفظ");
+      setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "فشل الحفظ"));
     }
   };
 
@@ -316,6 +384,22 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
     }
   };
 
+  const beginEdit = (row: Card) => {
+    const team = rosterTeams.find((item) => item.id === row.team_roster_id) || rosterTeams.find((item) => item.team === row.team);
+    const player = team?.players.find((item) => item.id === row.roster_player_id) || team?.players.find((item) => item.name === row.player);
+    setEditingId(row.id);
+    setEditForm({ player: player?.name || row.player || "", team: team?.team || row.team || "", roster_player_id: player?.id || row.roster_player_id || "", team_roster_id: team?.id || row.team_roster_id || "" });
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    const res = await fetch("/api/admin/stats-entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table: "cards", id, ...editForm, player_name: editForm.player, team_name: editForm.team }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(data?.error || "فشل تحديث اللاعب");
+    setRows((prev) => prev.map((row) => row.id === id ? data.row : row));
+    setEditingId(null);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
@@ -323,8 +407,11 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
           rosterTeams={rosterTeams}
           team={form.team}
           player={form.player}
+          rosterPlayerId={form.roster_player_id}
+          teamRosterId={form.team_roster_id}
+          requireRoster
           trackPhoto={false}
-          onChange={(patch) => setForm((f) => ({ ...f, ...(patch.team !== undefined ? { team: patch.team } : {}), ...(patch.player !== undefined ? { player: patch.player } : {}) }))}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
         <button onClick={add} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
       </div>
@@ -332,11 +419,13 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
         {rows.length === 0 ? (
           <div className="p-8 text-center text-caption text-muted-foreground">لا توجد بطاقات</div>
         ) : (
-          rows.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
+          rows.map((c) => {
+            const display = resolveStatsPlayer(c, rosterTeams);
+            return (
+            <div key={c.id} className="relative flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-caption font-black">{c.player}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{c.team}</div>
+                <div className="truncate text-caption font-black">{display.player}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateCard(c, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">−</button>
@@ -348,9 +437,18 @@ function CardsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
                 <span className="w-8 text-center text-[11px] font-black">🟥{c.red || 0}</span>
                 <button onClick={() => updateCard(c, "red", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
               </div>
+              <button onClick={() => beginEdit(c)} aria-label="تعديل اللاعب" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
               <button onClick={() => remove(c.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+              {editingId === c.id && (
+                <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
+                  <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />
+                  <button onClick={() => void saveEdit(c.id)} aria-label="حفظ اللاعب" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
+                  <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
+                </div>
+              )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -373,8 +471,8 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
       if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
       setRows((prev) => [...prev, data.row]);
       setForm({ player: "", team: "", match_name: "", image_url: "" });
-    } catch (e: any) {
-      toast.error(e?.message || "فشل الحفظ");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "فشل الحفظ"));
     }
   };
 
@@ -404,21 +502,24 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
         {rows.length === 0 ? (
           <div className="col-span-full rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا يوجد نجوم مباريات</div>
         ) : (
-          rows.map((m) => (
+          rows.map((m) => {
+            const display = resolveStatsPlayer(m, rosterTeams);
+            return (
             <div key={m.id} className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-white/10">
               {m.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.image_url} alt={m.player} className="h-6 w-6 shrink-0 rounded-full object-cover" />
+                <img src={m.image_url} alt={display.player} className="h-6 w-6 shrink-0 rounded-full object-cover" />
               ) : (
                 <Star className="h-6 w-6 shrink-0 text-accent-orange" />
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-caption font-black">{m.player}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{m.team} {m.match_name ? `• ${m.match_name}` : ""}</div>
+                <div className="truncate text-caption font-black">{display.player}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{display.team} {m.match_name ? `• ${m.match_name}` : ""}</div>
               </div>
               <button onClick={() => remove(m.id)} className="shrink-0 rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
@@ -453,8 +554,8 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
       if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
       setFormationId(data.formation.id);
       toast.success("تم حفظ تشكيلة الجولة");
-    } catch (e: any) {
-      toast.error(e?.message || "فشل الحفظ");
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, "فشل الحفظ"));
     } finally {
       setSaving(false);
     }

@@ -3,6 +3,8 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
+import { getBracketRosterTeams } from "@/lib/sport/roster-link";
+import { groupCardsByPlayer } from "@/lib/sport/stats-player";
 
 export const revalidate = 30;
 
@@ -14,9 +16,12 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const { data: cards } = await supabase.from("cards").select("*").eq("bracket_id", bracketId);
+  const [{ data: cards }, rosterTeams] = await Promise.all([
+    supabase.from("cards").select("*").eq("bracket_id", bracketId),
+    getBracketRosterTeams(supabase, bracketId),
+  ]);
 
-  const rows = (cards || []).filter((c) => (c.yellow || 0) > 0 || (c.red || 0) > 0).sort((a, b) => (b.red || 0) - (a.red || 0) || (b.yellow || 0) - (a.yellow || 0));
+  const rows = groupCardsByPlayer(cards || [], rosterTeams).filter((c) => (c.yellow || 0) > 0 || (c.red || 0) > 0);
   if (rows.length === 0) return <EmptyState message="لسه مفيش بطاقات مسجّلة" />;
 
   return (

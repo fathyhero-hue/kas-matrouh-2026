@@ -6,6 +6,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 import { getBracketRosterTeams, buildPlayerPhotoResolver } from "@/lib/sport/roster-link";
+import { resolveStatsPlayer } from "@/lib/sport/stats-player";
 
 export const revalidate = 30;
 
@@ -23,7 +24,10 @@ export default async function MotmPage({ params, searchParams }: TournamentPageP
   ]);
   const resolvePhoto = buildPlayerPhotoResolver(rosterTeams);
 
-  const rows = (items || []).map((m) => ({ ...m, image_url: m.image_url || resolvePhoto(m.team, m.player) }));
+  const rows = (items || []).map((m) => {
+    const resolved = resolveStatsPlayer(m, rosterTeams);
+    return { ...m, player: resolved.player, team: resolved.team, image_url: m.image_url || resolvePhoto(resolved.team, resolved.player) };
+  });
   if (rows.length === 0) return <EmptyState message="لسه مفيش نجوم مباريات معلنة" />;
 
   return (

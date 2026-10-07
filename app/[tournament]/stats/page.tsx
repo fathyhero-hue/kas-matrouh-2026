@@ -6,6 +6,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 import { getBracketTeamLogos, getBracketRosterTeams, buildPlayerPhotoResolver, lookupTeamLogo, normalize } from "@/lib/sport/roster-link";
+import { groupCardsByPlayer, groupGoalsByPlayer } from "@/lib/sport/stats-player";
 
 export const revalidate = 30;
 
@@ -120,8 +121,10 @@ export default async function TournamentStatsPage({ params, searchParams }: Tour
   }
 
   const totalMatches = finished.length;
-  const totalYellow = (cards || []).reduce((sum, c) => sum + (Number(c.yellow) || 0), 0);
-  const totalRed = (cards || []).reduce((sum, c) => sum + (Number(c.red) || 0), 0);
+  const groupedGoals = groupGoalsByPlayer(goals || [], rosterTeams);
+  const groupedCards = groupCardsByPlayer(cards || [], rosterTeams);
+  const totalYellow = groupedCards.reduce((sum, c) => sum + (Number(c.yellow) || 0), 0);
+  const totalRed = groupedCards.reduce((sum, c) => sum + (Number(c.red) || 0), 0);
   const goalsPerMatch = totalMatches > 0 ? (totalGoals / totalMatches).toFixed(1) : "0";
 
   const teams = Array.from(teamStats.values());
@@ -132,7 +135,7 @@ export default async function TournamentStatsPage({ params, searchParams }: Tour
   const bestDefense = byDefense[0];
   const worstDefense = byDefense[byDefense.length - 1];
 
-  const topScorer = (goals || [])[0] || null;
+  const topScorer = groupedGoals[0] || null;
   const resolvePlayerPhoto = buildPlayerPhotoResolver(rosterTeams);
   const topScorerPhoto = topScorer ? topScorer.image_url || resolvePlayerPhoto(topScorer.team, topScorer.player) : null;
 
@@ -225,7 +228,7 @@ export default async function TournamentStatsPage({ params, searchParams }: Tour
           <h2 className="mb-3 text-h3 font-black text-muted-foreground">أبطال البطولة</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {topScorer && (
-              <SpotlightCard label="هداف البطولة" icon={<Goal className="h-4 w-4" />} name={topScorer.player} team={topScorer.team} value={topScorer.goals} valueLabel="هدف" photoUrl={topScorerPhoto} />
+              <SpotlightCard label="هداف البطولة" icon={<Goal className="h-4 w-4" />} name={topScorer.player} team={topScorer.team} value={Number(topScorer.goals) || 0} valueLabel="هدف" photoUrl={topScorerPhoto} />
             )}
             {topMotm && (
               <SpotlightCard label="الأكثر حصولاً على نجم المباراة" icon={<Star className="h-4 w-4" />} name={topMotm.player} team={topMotm.team} value={topMotm.count} valueLabel="مرة" photoUrl={topMotmPhoto} />
