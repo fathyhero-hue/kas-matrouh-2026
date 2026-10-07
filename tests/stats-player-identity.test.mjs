@@ -26,6 +26,7 @@ function load(relative) {
 
 const { UNKNOWN_PLAYER, UNKNOWN_TEAM, groupCardsByPlayer, groupGoalsByPlayer, resolveStatsPlayer, validateStatsPlayerSelection } = load("lib/sport/stats-player.ts");
 const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
+const matchCardSource = fs.readFileSync("components/sport/match-card.tsx", "utf8");
 const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/suspensions.ts");
 
 const teamA = {
@@ -129,6 +130,12 @@ test("stats API contract derives snapshots from roster IDs", () => {
 test("team logo source links official Elite teams with roster logos", () => {
   assert.match(rosterLinkSource, /from\("elite_teams"\)\.select\("name, logo_url"\)/);
   assert.match(rosterLinkSource, /officialLogoByName\.get\(normalize\(r\.team_name/);
+});
+
+test("public match cards render real logo URLs and keep the placeholder fallback", () => {
+  assert.match(matchCardSource, /<img src=\{src\}/);
+  assert.doesNotMatch(matchCardSource, /from ["']next\/image["']/);
+  assert.match(matchCardSource, /<Shield/);
 });
 
 

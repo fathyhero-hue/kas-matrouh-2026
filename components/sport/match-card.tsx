@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Shield, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +19,9 @@ export type MatchCardProps = {
 
 function TeamLogo({ src, name }: { src?: string | null; name: string }) {
   if (src) {
-    return <Image src={src} alt={name} width={48} height={48} className="h-10 w-10 rounded-full object-contain sm:h-12 sm:w-12" />;
+    // Signed Supabase Storage URLs are rendered directly, matching the admin logo path.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={name} width={48} height={48} className="h-10 w-10 rounded-full object-contain sm:h-12 sm:w-12" />;
   }
   return (
     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary sm:h-12 sm:w-12">
