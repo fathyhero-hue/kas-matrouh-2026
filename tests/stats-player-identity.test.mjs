@@ -200,6 +200,13 @@ test("public suspension status rendering uses readable Arabic labels", () => {
   assert.doesNotMatch(source, /[Ã™Ã˜]/);
 });
 
+test("Card Events UI files contain no common UTF-8 mojibake", () => {
+  for (const file of ["components/admin/stats-manager.tsx", "lib/sport/stats-player.ts", "app/[tournament]/cards/page.tsx"]) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.doesNotMatch(source, /[ÃÂØÙ][^\n]{0,3}[ÃÂØÙ]/);
+  }
+});
+
 test("card events migration is additive and event based", () => {
   const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
   assert.match(migration, /create table if not exists public\.card_events/);
