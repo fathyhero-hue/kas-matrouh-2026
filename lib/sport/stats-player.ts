@@ -72,6 +72,14 @@ export function groupCardsByPlayer(rows: CardStatsRow[], teams: RosterTeamLite[]
   return [...grouped.values()].sort((a, b) => (Number(b.red) || 0) - (Number(a.red) || 0) || (Number(b.yellow) || 0) - (Number(a.yellow) || 0));
 }
 
+export function getCardTotalsWithEvents(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null; is_historical_distribution?: boolean }[]) {
+  const newEvents = events.filter((event) => !(event.is_historical_distribution ?? Boolean(event.source_card_id)));
+  return {
+    yellow: (Number(legacy.yellow) || 0) + newEvents.filter((event) => event.card_type === "yellow").length,
+    red: (Number(legacy.red) || 0) + newEvents.filter((event) => event.card_type === "direct_red").length,
+  };
+}
+
 export type ValidationRoster = { id: string; bracket_id: string; team_name: string | null };
 export type ValidationPlayer = { id: string; roster_id: string; name: string | null };
 export type ValidationMatch = { team_a: string | null; team_b: string | null };

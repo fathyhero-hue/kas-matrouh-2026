@@ -19,15 +19,16 @@ export default async function AdminStatsPage({
   const { data: bracket } = await supabase.from("brackets").select("id").eq("legacy_suffix", edition.suffix).maybeSingle();
   const bracketId = bracket?.id as string | undefined;
 
-  const [goals, cards, motm, formations, matches] = bracketId
+  const [goals, cards, cardEvents, motm, formations, matches] = bracketId
     ? await Promise.all([
         supabase.from("goals").select("*").eq("bracket_id", bracketId).order("goals", { ascending: false }),
         supabase.from("cards").select("*").eq("bracket_id", bracketId),
+        supabase.from("card_events").select("*").eq("bracket_id", bracketId).order("created_at"),
         supabase.from("motm").select("*").eq("bracket_id", bracketId),
         supabase.from("formations").select("*, formation_players(*)").eq("bracket_id", bracketId).order("updated_at", { ascending: false }),
         supabase.from("matches").select("id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId).order("match_date").order("match_time"),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const rosterTeams = bracketId ? await getBracketRosterTeams(supabase, bracketId) : [];
 
@@ -63,6 +64,7 @@ export default async function AdminStatsPage({
           bracketId={bracketId}
           initialGoals={(goals.data || []) as never[]}
           initialCards={(cards.data || []) as never[]}
+          initialCardEvents={(cardEvents.data || []) as never[]}
           initialMotm={(motm.data || []) as never[]}
           initialFormations={(formations.data || []) as never[]}
           matches={(matches.data || []) as never[]}

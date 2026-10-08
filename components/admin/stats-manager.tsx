@@ -3,12 +3,14 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Plus, Star, Upload, Pencil, Check, X } from "lucide-react";
-import { resolveStatsPlayer } from "@/lib/sport/stats-player";
+import { getCardTotalsWithEvents, resolveStatsPlayer } from "@/lib/sport/stats-player";
 import type { GoalCreatePayload, CardCreatePayload } from "@/lib/sport/stats-contract";
-import { getSuspensionState } from "@/lib/sport/suspensions";
+import { getSuspensionStateFromEvents } from "@/lib/sport/suspensions";
+import { buildCardEventAssignments, countAssignedCardEvents } from "@/lib/sport/card-event-distribution";
 
 type Goal = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; goals: number; image_url: string | null };
 type Card = { id: string; bracket_id?: string | null; player: string | null; team: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
+type CardEvent = { id: string; bracket_id: string; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null };
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
@@ -173,6 +175,7 @@ export function StatsManager({
   bracketId,
   initialGoals,
   initialCards,
+  initialCardEvents,
   initialMotm,
   initialFormations,
   rosterTeams,
@@ -181,6 +184,7 @@ export function StatsManager({
   bracketId: string;
   initialGoals: Goal[];
   initialCards: Card[];
+  initialCardEvents: CardEvent[];
   initialMotm: Motm[];
   initialFormations: Formation[];
   rosterTeams: RosterTeam[];
@@ -203,7 +207,7 @@ export function StatsManager({
       </div>
 
       {tab === "goals" && <GoalsTab bracketId={bracketId} initial={initialGoals} rosterTeams={rosterTeams} />}
-      {tab === "cards" && <CardsTab bracketId={bracketId} initial={initialCards} rosterTeams={rosterTeams} matches={matches} />}
+      {tab === "cards" && <CardsTab bracketId={bracketId} initial={initialCards} initialEvents={initialCardEvents} rosterTeams={rosterTeams} matches={matches} />}
       {tab === "motm" && <MotmTab bracketId={bracketId} initial={initialMotm} rosterTeams={rosterTeams} />}
       {tab === "totw" && <FormationTab bracketId={bracketId} initial={initialFormations[0] || null} rosterTeams={rosterTeams} />}
     </div>
@@ -335,8 +339,40 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
   );
 }
 
-function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: string; initial: Card[]; rosterTeams: RosterTeam[]; matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[] }) {
+function HistoricalCardDistribution({ row, events, matches, onSaved }: { row: Card; events: CardEvent[]; matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[]; onSaved: (events: CardEvent[]) => void }) {
+  const total = Math.max(0, Number(row.yellow) || 0) + Math.max(0, Number(row.red) || 0);
+  const sourceEvents = events.filter((event) => event.source_card_id === row.id);
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Record<number, string>>(() => Object.fromEntries(sourceEvents.map((event) => [event.source_card_ordinal || 0, event.match_id])));
+  const [saving, setSaving] = useState(false);
+  if (!row.roster_player_id || !row.team_roster_id || total === 0) return null;
+  const team = row.team || "";
+  const options = matches.filter((match) => match.team_a === team || match.team_b === team);
+  const types = [...Array(Math.max(0, Number(row.yellow) || 0)).fill("yellow" as const), ...Array(Math.max(0, Number(row.red) || 0)).fill("direct_red" as const)];
+  const distributed = countAssignedCardEvents(row, selected);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const eventsToSave = buildCardEventAssignments(row, selected);
+      const res = await fetch("/api/admin/card-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_card_id: row.id, events: eventsToSave }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(data?.error || "تعذر توزيع البطاقات");
+      onSaved(data.rows || []);
+      setOpen(false);
+    } finally { setSaving(false); }
+  };
+  return <div className="basis-full rounded-lg bg-secondary/50 p-2 text-[11px]" dir="rtl">
+    <button type="button" className="font-bold underline" onClick={() => setOpen((value) => !value)}>{open ? "إخفاء توزيع البطاقات" : "توزيع البطاقات التاريخية"}</button>
+    <span className="mr-2 text-muted-foreground">موثق: {distributed} / {total} · متبقٍ: {total - distributed}</span>
+    {open && <div className="mt-2 space-y-2"><div className="text-muted-foreground">اختر المباراة الصحيحة لكل بطاقة. لا يتم اختيار أي مباراة تلقائيًا.</div>{types.map((card_type, index) => <label key={`${row.id}-${index + 1}`} className="flex items-center gap-2"><span className="w-20">{card_type === "yellow" ? "إنذار" : "طرد مباشر"} {index + 1}</span><select value={selected[index + 1] || ""} onChange={(event) => setSelected((current) => ({ ...current, [index + 1]: event.target.value }))} className={`${inputCls} max-w-sm`}><option value="">اختر المباراة</option>{options.map((match) => <option key={match.id} value={match.id}>{match.team_a} × {match.team_b} — {match.match_date || ""}</option>)}</select></label>)}<button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground">{saving ? "جارٍ الحفظ..." : "حفظ التوزيع"}</button>{distributed < total && <div className="font-bold text-accent-orange">التوزيع غير مكتمل، وقد تكون حالة الإيقاف غير مكتملة.</div>}</div>}
+  </div>;
+}
+
+function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: { bracketId: string; initial: Card[]; initialEvents: CardEvent[]; rosterTeams: RosterTeam[]; matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[] }) {
   const [rows, setRows] = useState(initial);
+  const [events, setEvents] = useState(initialEvents);
+  const [eventForm, setEventForm] = useState({ team: "", player: "", roster_player_id: "", team_roster_id: "", match_id: "", card_type: "yellow" as "yellow" | "direct_red" });
+  const eventIdempotencyKey = useRef<string | null>(null);
   const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
@@ -367,6 +403,23 @@ function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: str
     } catch (e: unknown) {
       toast.error(errorMessage(e, "فشل الحفظ"));
     }
+  };
+
+  const addEvent = async () => {
+    if (!eventForm.roster_player_id || !eventForm.team_roster_id || !eventForm.match_id) return toast.error("اختر الفريق واللاعب والمباراة");
+    eventIdempotencyKey.current ||= crypto.randomUUID();
+    const res = await fetch("/api/admin/card-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bracket_id: bracketId, ...eventForm, idempotency_key: eventIdempotencyKey.current }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return toast.error(data?.error || "تعذر حفظ الحدث");
+    setEvents((current) => current.some((event) => event.id === data.row.id) ? current : [...current, data.row]);
+    eventIdempotencyKey.current = null;
+    setEventForm({ team: "", player: "", roster_player_id: "", team_roster_id: "", match_id: "", card_type: "yellow" });
+  };
+
+  const removeEvent = async (id: string) => {
+    const res = await fetch(`/api/admin/card-events?id=${id}`, { method: "DELETE" });
+    if (!res.ok) return toast.error("تعذر حذف الحدث");
+    setEvents((current) => current.filter((event) => event.id !== id));
   };
 
   const updateCard = async (row: Card, field: "yellow" | "red", delta: number) => {
@@ -404,8 +457,20 @@ function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: str
     setEditingId(null);
   };
 
+  const updateDistributed = (cardId: string, next: CardEvent[]) => setEvents((current) => [...current.filter((event) => event.source_card_id !== cardId), ...next]);
+
   return (
     <div className="space-y-4">
+      <div className="space-y-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
+        <div className="text-caption font-black">أحداث البطاقات الموثقة لكل مباراة</div>
+        <div className="flex flex-wrap items-start gap-2">
+          <TeamPlayerPicker rosterTeams={rosterTeams} team={eventForm.team} player={eventForm.player} rosterPlayerId={eventForm.roster_player_id} teamRosterId={eventForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, ...patch, match_id: "" })); }} />
+          <select value={eventForm.match_id} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, match_id: e.target.value })); }} className={`${inputCls} min-w-56`}><option value="">اختر المباراة</option>{matches.filter((match) => eventForm.team && (match.team_a === eventForm.team || match.team_b === eventForm.team)).map((match) => <option key={match.id} value={match.id}>{match.team_a} × {match.team_b} — {match.match_date || ""}</option>)}</select>
+          <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as "yellow" | "direct_red" })); }} className={`${inputCls} min-w-40`}><option value="yellow">إنذار</option><option value="direct_red">طرد مباشر</option></select>
+          <button onClick={() => void addEvent()} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
+        </div>
+        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => <div key={event.id} className="flex items-center justify-between"><span>{event.card_type === "yellow" ? "إنذار" : "طرد مباشر"} · {matches.find((match) => match.id === event.match_id)?.team_a} × {matches.find((match) => match.id === event.match_id)?.team_b}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>)}</div>
+      </div>
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
         <TeamPlayerPicker
           rosterTeams={rosterTeams}
@@ -429,14 +494,16 @@ function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: str
         ) : (
           rows.map((c) => {
             const display = resolveStatsPlayer(c, rosterTeams);
-            const suspension = getSuspensionState(rows.filter((card) => card.roster_player_id === c.roster_player_id), matches, rosterTeams);
+            const suspension = getSuspensionStateFromEvents(events.filter((event) => event.roster_player_id === c.roster_player_id), matches, rosterTeams);
+            const totals = getCardTotalsWithEvents(c, events.filter((event) => event.roster_player_id === c.roster_player_id));
             return (
             <div key={c.id} className="relative flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-caption font-black">{display.player}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
+                <div className="text-[10px] text-muted-foreground">الإجمالي: {totals.yellow} إنذار · {totals.red} طرد · أحداث موثقة: {events.filter((event) => event.roster_player_id === c.roster_player_id).length}</div>
                 {suspension.needsMatchAssignment && <div className="text-[11px] font-bold text-accent-orange">يحتاج تحديد المباراة</div>}
-                {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">موقوف مباراة · {suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}</div> : <div className="text-[11px] font-bold text-accent-green">متاح</div>)}
+                {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">موقوف مباراة · {suspension.reason === "combined" ? "تراكم 3 إنذارات وطرد مباشر" : suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}</div> : <div className="text-[11px] font-bold text-accent-green">متاح</div>)}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateCard(c, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">−</button>
@@ -449,7 +516,8 @@ function CardsTab({ bracketId, initial, rosterTeams, matches }: { bracketId: str
                 <button onClick={() => updateCard(c, "red", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
               </div>
               <button onClick={() => beginEdit(c)} aria-label="تعديل اللاعب" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => remove(c.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+               <button onClick={() => remove(c.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+               <HistoricalCardDistribution row={c} events={events} matches={matches} onSaved={(next) => updateDistributed(c.id, next)} />
               {editingId === c.id && (
                 <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
                   <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />

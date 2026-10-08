@@ -28,6 +28,9 @@ const { UNKNOWN_PLAYER, UNKNOWN_TEAM, groupCardsByPlayer, groupGoalsByPlayer, re
 const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
 const matchCardSource = fs.readFileSync("components/sport/match-card.tsx", "utf8");
 const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/suspensions.ts");
+const { getSuspensionStateFromEvents } = load("lib/sport/suspensions.ts");
+const { getCardTotalsWithEvents } = load("lib/sport/stats-player.ts");
+const { buildCardEventAssignments, countAssignedCardEvents } = load("lib/sport/card-event-distribution.ts");
 
 const teamA = {
   id: "team-a",
@@ -195,4 +198,114 @@ test("public suspension status rendering uses readable Arabic labels", () => {
   assert.match(source, /متاح/);
   assert.match(source, /موقوف مباراة/);
   assert.doesNotMatch(source, /[ÙØ]/);
+});
+
+test("card events migration is additive and event based", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
+  assert.match(migration, /create table if not exists public\.card_events/);
+  assert.match(migration, /match_id uuid not null/);
+  assert.match(migration, /card_type text not null check \(card_type in \('yellow', 'direct_red'\)\)/);
+  assert.doesNotMatch(migration, /\bdrop\s+table\b|\bdelete\s+from\b|\btruncate\b|\bupdate\s+public\.cards\b/i);
+});
+
+test("card events count three yellows across three matches", () => {
+  const matches = [1, 2, 3, 4].map((id) => ({ id: `m${id}`, team_a: "A", team_b: "B", match_date: `2026-10-0${id}`, match_time: "10:00", status: "مجدولة" }));
+  const events = [1, 2, 3].map((n) => ({ id: `e${n}`, match_id: `m${n}`, roster_player_id: "p", team_roster_id: "t", card_type: "yellow" }));
+  const state = getSuspensionStateFromEvents(events, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
+  assert.equal(state.isSuspended, true);
+  assert.equal(state.suspensionMatchId, "m4");
+});
+
+test("third yellow and direct red in one match merge into one sanction", () => {
+  const matches = [1, 2, 3].map((id) => ({ id: `m${id}`, team_a: "A", team_b: "B", match_date: `2026-10-0${id}`, match_time: "10:00", status: "scheduled" }));
+  const events = [1, 2].map((n) => ({ id: `y${n}`, match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "yellow" })).concat([{ id: "y3", match_id: "m2", roster_player_id: "p", team_roster_id: "t", card_type: "yellow" }, { id: "r2", match_id: "m2", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" }]);
+  const state = getSuspensionStateFromEvents(events, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
+  assert.equal(state.reason, "combined");
+  assert.deepEqual(state.suspensionMatchIds, ["m3"]);
+});
+
+test("separate-match sanctions remain separate and later cycle resumes", () => {
+  const matches = [1, 2, 3, 4, 5].map((id) => ({ id: `m${id}`, team_a: "A", team_b: "B", match_date: `2026-10-0${id}`, match_time: "10:00", status: id === 2 ? "finished" : "scheduled" }));
+  const events = [1, 2, 3].map((n) => ({ id: `y${n}`, match_id: `m${n}`, roster_player_id: "p", team_roster_id: "t", card_type: "yellow" })).concat([{ id: "r4", match_id: "m4", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" }]);
+  const state = getSuspensionStateFromEvents(events, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
+  assert.equal(state.reason, "yellow_accumulation");
+  assert.deepEqual(state.suspensionMatchIds, ["m4", "m5"]);
+  assert.equal(getPlayerEligibilityForMatch(state, "m4").eligible, false);
+  assert.equal(getPlayerEligibilityForMatch(state, "m5").eligible, false);
+});
+
+test("card event migration has source identity and concurrency-safe uniqueness", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
+  assert.match(migration, /source_card_id uuid references public\.cards/);
+  assert.match(migration, /source_card_ordinal/);
+  assert.match(migration, /unique index if not exists card_events_source_ordinal_uidx/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /ordinal > coalesce\(source_row\.yellow, 0\) \+ coalesce\(source_row\.red, 0\)/);
+  assert.match(migration, /distribute_card_events/);
+});
+
+test("historical card events are immutable and distribution requires an actor", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
+  const route = fs.readFileSync("app/api/admin/card-events/route.ts", "utf8");
+  assert.match(migration, /HISTORICAL_CARD_EVENT_IMMUTABLE/);
+  assert.match(migration, /card_events_protect_historical_delete/);
+  assert.match(migration, /ACTOR_REQUIRED/);
+  assert.match(route, /source_card_id/);
+  assert.match(route, /Historical card events cannot be deleted/);
+});
+
+test("card event public access stays server-side and does not expose the base table", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
+  const publicPage = fs.readFileSync("app/[tournament]/cards/page.tsx", "utf8");
+  assert.doesNotMatch(migration, /create role card_events_public_reader|create or replace view public\.public_card_events/i);
+  assert.match(migration, /alter table public\.card_events force row level security/i);
+  assert.match(migration, /revoke all on table public\.card_events from public, anon, authenticated/i);
+  assert.doesNotMatch(migration, /grant select on table public\.card_events to anon, authenticated/i);
+  assert.match(publicPage, /getPublicCardEvents/);
+});
+
+test("new card events use payload-bound idempotency keys and protected RPC grants", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
+  const route = fs.readFileSync("app/api/admin/card-events/route.ts", "utf8");
+  const manager = fs.readFileSync("components/admin/stats-manager.tsx", "utf8");
+  assert.match(migration, /unique index if not exists card_events_idempotency_uidx/);
+  assert.match(migration, /create table if not exists public\.card_event_idempotency/);
+  assert.match(migration, /IDEMPOTENCY_KEY_PAYLOAD_MISMATCH/);
+  assert.match(migration, /IDEMPOTENCY_EVENT_ALREADY_DELETED/);
+  assert.match(migration, /existing_row\.bracket_id is distinct from p_bracket_id[\s\S]*existing_row\.card_type is distinct from p_card_type/);
+  assert.match(migration, /revoke all on function public\.create_card_event\([^;]+ from public, anon, authenticated/i);
+  assert.match(migration, /grant execute on function public\.create_card_event\([^;]+ to service_role/i);
+  assert.match(route, /authorizeAdminRequest\(req, "stats\.goals\.manage"\)/);
+  assert.match(route, /rpc\("create_card_event"/);
+  assert.match(route, /IDEMPOTENCY_EVENT_ALREADY_DELETED/);
+  assert.match(manager, /eventIdempotencyKey\.current \|\|= crypto\.randomUUID\(\)/);
+});
+
+test("public and admin card event consumers use identical suspension state", () => {
+  const matches = [{ id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", match_time: "10:00", status: "scheduled" }, { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-02", match_time: "10:00", status: "scheduled" }];
+  const events = [{ id: "r1", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" }];
+  const teams = [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }];
+  assert.deepEqual(getSuspensionStateFromEvents(events, matches, teams), getSuspensionStateFromEvents(events, matches, teams));
+});
+
+test("legacy distribution does not double count totals while new events are added", () => {
+  const totals = getCardTotalsWithEvents({ yellow: 3, red: 1 }, [
+    { card_type: "yellow", is_historical_distribution: true },
+    { card_type: "yellow", source_card_id: null },
+    { card_type: "direct_red", is_historical_distribution: true },
+    { card_type: "direct_red", source_card_id: null },
+  ]);
+  assert.deepEqual(totals, { yellow: 4, red: 2 });
+});
+
+test("three historical yellows require three explicit match assignments", () => {
+  const row = { yellow: 3, red: 0 };
+  assert.deepEqual(buildCardEventAssignments(row, {}), []);
+  const assignments = buildCardEventAssignments(row, { 1: "m1", 2: "m2", 3: "m3" });
+  assert.deepEqual(assignments, [
+    { ordinal: 1, match_id: "m1", card_type: "yellow" },
+    { ordinal: 2, match_id: "m2", card_type: "yellow" },
+    { ordinal: 3, match_id: "m3", card_type: "yellow" },
+  ]);
+  assert.equal(countAssignedCardEvents(row, { 1: "m1", 2: "m2", 3: "m3", 4: "m4" }), 3);
 });
