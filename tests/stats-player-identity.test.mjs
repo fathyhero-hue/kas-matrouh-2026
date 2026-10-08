@@ -264,6 +264,17 @@ test("card event public access stays server-side and does not expose the base ta
   assert.match(publicPage, /getPublicCardEvents/);
 });
 
+test("admin stats GET contracts accept a bracket and return empty-safe rows", () => {
+  const statsRoute = fs.readFileSync("app/api/admin/stats-entries/route.ts", "utf8");
+  const eventsRoute = fs.readFileSync("app/api/admin/card-events/route.ts", "utf8");
+  assert.match(statsRoute, /export async function GET/);
+  assert.match(statsRoute, /searchParams\.get\("bracket_id"\)/);
+  assert.match(statsRoute, /rows: query\.data \|\| \[\]/);
+  assert.match(eventsRoute, /export async function GET/);
+  assert.match(eventsRoute, /searchParams\.get\("bracket_id"\)/);
+  assert.match(eventsRoute, /rows: query\.data \|\| \[\]/);
+});
+
 test("new card events use payload-bound idempotency keys and protected RPC grants", () => {
   const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
   const route = fs.readFileSync("app/api/admin/card-events/route.ts", "utf8");

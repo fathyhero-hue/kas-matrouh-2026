@@ -8,6 +8,17 @@ export const runtime = "nodejs";
 function text(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
 function bad(message: string) { return NextResponse.json({ error: message }, { status: 400 }); }
 
+export async function GET(req: NextRequest) {
+  const auth = await authorizeAdminRequest(req, "stats.goals.manage");
+  if (auth instanceof NextResponse) return auth;
+  const bracketId = text(req.nextUrl.searchParams.get("bracket_id"));
+  if (!bracketId) return bad("bracket_id is required.");
+  const db = createServiceRoleClient();
+  const query = await db.from("card_events").select("*").eq("bracket_id", bracketId).order("created_at");
+  if (query.error) return NextResponse.json({ error: "Unable to load card events." }, { status: 500 });
+  return NextResponse.json({ rows: query.data || [] });
+}
+
 export async function POST(req: NextRequest) {
   const auth = await authorizeAdminRequest(req, "stats.goals.manage");
   if (auth instanceof NextResponse) return auth;

@@ -22,6 +22,19 @@ function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export async function GET(req: NextRequest) {
+  const authorization = await authorizeAdminRequest(req, "stats.goals.manage");
+  if (authorization instanceof NextResponse) return authorization;
+  const table = stringValue(req.nextUrl.searchParams.get("table"));
+  const bracketId = stringValue(req.nextUrl.searchParams.get("bracket_id"));
+  if (!ALLOWED_TABLES.has(table)) return NextResponse.json({ error: "Unsupported stats table." }, { status: 400 });
+  if (!bracketId) return NextResponse.json({ error: "bracket_id is required." }, { status: 400 });
+  const db = createServiceRoleClient();
+  const query = await db.from(table).select("*").eq("bracket_id", bracketId);
+  if (query.error) return NextResponse.json({ error: "Unable to load stats entries." }, { status: 500 });
+  return NextResponse.json({ rows: query.data || [] });
+}
+
 async function resolvePlayerIdentity(supabase: ReturnType<typeof createServiceRoleClient>, body: Record<string, unknown>, bracketId: string) {
   const rosterPlayerId = stringValue(body.roster_player_id);
   const teamRosterId = stringValue(body.team_roster_id);
