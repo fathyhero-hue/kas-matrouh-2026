@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Plus, Star, Upload, Pencil, Check, X } from "lucide-react";
-import { getCardTotalsWithEvents, resolveStatsPlayer } from "@/lib/sport/stats-player";
+import { addEventOnlyCardRows, getCardTotalsWithEvents, resolveStatsPlayer } from "@/lib/sport/stats-player";
 import type { GoalCreatePayload, CardCreatePayload } from "@/lib/sport/stats-contract";
 import { getSuspensionStateFromEvents } from "@/lib/sport/suspensions";
 import { buildCardEventAssignments, countAssignedCardEvents } from "@/lib/sport/card-event-distribution";
@@ -28,13 +28,13 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 const TABS = [
-  { key: "goals", label: "الهدافين" },
-  { key: "cards", label: "الكروت" },
-  { key: "motm", label: "نجم المباراة" },
-  { key: "totw", label: "تشكيلة الجولة" },
+  { key: "goals", label: "Ø§Ù„Ù‡Ø¯Ø§ÙÙŠÙ†" },
+  { key: "cards", label: "Ø§Ù„ÙƒØ±ÙˆØª" },
+  { key: "motm", label: "Ù†Ø¬Ù… Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©" },
+  { key: "totw", label: "ØªØ´ÙƒÙŠÙ„Ø© Ø§Ù„Ø¬ÙˆÙ„Ø©" },
 ] as const;
 
-// Manual-upload button used whenever a player isn't in any submitted roster —
+// Manual-upload button used whenever a player isn't in any submitted roster â€”
 // replaces what used to be a free-text "image URL" field everywhere.
 function PhotoUploadButton({ onUploaded }: { onUploaded: (url: string) => void }) {
   const [uploading, setUploading] = useState(false);
@@ -47,11 +47,11 @@ function PhotoUploadButton({ onUploaded }: { onUploaded: (url: string) => void }
       fd.append("photo", file);
       const res = await fetch("/api/admin/stats-photo", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل رفع الصورة");
+      if (!res.ok) throw new Error(data?.error || "ÙØ´Ù„ Ø±ÙØ¹ Ø§Ù„ØµÙˆØ±Ø©");
       onUploaded(data.url);
-      toast.success("تم رفع الصورة");
+      toast.success("ØªÙ… Ø±ÙØ¹ Ø§Ù„ØµÙˆØ±Ø©");
     } catch (e: unknown) {
-      toast.error(errorMessage(e, "فشل رفع الصورة"));
+      toast.error(errorMessage(e, "ÙØ´Ù„ Ø±ÙØ¹ Ø§Ù„ØµÙˆØ±Ø©"));
     } finally {
       setUploading(false);
     }
@@ -76,13 +76,13 @@ function PhotoUploadButton({ onUploaded }: { onUploaded: (url: string) => void }
         disabled={uploading}
         className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-blue/15 px-3 py-2 text-[11px] font-black text-accent-blue disabled:opacity-60"
       >
-        <Upload className="h-3.5 w-3.5" /> {uploading ? "جاري الرفع..." : "رفع صورة"}
+        <Upload className="h-3.5 w-3.5" /> {uploading ? "Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø±ÙØ¹..." : "Ø±ÙØ¹ ØµÙˆØ±Ø©"}
       </button>
     </>
   );
 }
 
-// Team → player picker sourced from real submitted rosters, with a manual
+// Team â†’ player picker sourced from real submitted rosters, with a manual
 // fallback (free-text name + real photo upload) for players not in any
 // roster yet. `trackPhoto=false` skips the photo UI entirely for tables that
 // don't store one (e.g. cards).
@@ -118,13 +118,13 @@ function TeamPlayerPicker({
       <div className="flex flex-wrap gap-2">
         {manual ? (
           <>
-            <input value={team} onChange={(e) => onChange({ team: e.target.value, team_roster_id: "", roster_player_id: "" })} placeholder="اسم الفريق" className={`${inputCls} flex-1`} />
-            <input value={player} onChange={(e) => onChange({ player: e.target.value, roster_player_id: "" })} placeholder="اسم اللاعب" className={`${inputCls} flex-1`} />
+            <input value={team} onChange={(e) => onChange({ team: e.target.value, team_roster_id: "", roster_player_id: "" })} placeholder="Ø§Ø³Ù… Ø§Ù„ÙØ±ÙŠÙ‚" className={`${inputCls} flex-1`} />
+            <input value={player} onChange={(e) => onChange({ player: e.target.value, roster_player_id: "" })} placeholder="Ø§Ø³Ù… Ø§Ù„Ù„Ø§Ø¹Ø¨" className={`${inputCls} flex-1`} />
           </>
         ) : (
           <>
             <select value={selectedTeamValue} onChange={(e) => { const t = rosterTeams.find((item) => item.id === e.target.value); onChange({ team: t?.team || "", team_roster_id: t?.id || "", player: "", roster_player_id: "", image_url: "" }); }} className={`${inputCls} flex-1`}>
-              <option value="">اختر الفريق</option>
+              <option value="">Ø§Ø®ØªØ± Ø§Ù„ÙØ±ÙŠÙ‚</option>
               {rosterTeams.map((t) => (
                 <option key={t.id} value={t.id}>{t.team}</option>
               ))}
@@ -138,7 +138,7 @@ function TeamPlayerPicker({
               disabled={!selectedTeamValue}
               className={`${inputCls} flex-1 disabled:opacity-50`}
             >
-              <option value="">اختر اللاعب</option>
+              <option value="">Ø§Ø®ØªØ± Ø§Ù„Ù„Ø§Ø¹Ø¨</option>
               {players.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -157,7 +157,7 @@ function TeamPlayerPicker({
               }}
               className="text-[11px] font-bold text-muted-foreground underline"
             >
-              {manual ? "اختيار من القائمة المسجّلة" : "اللاعب مش موجود فى القائمة"}
+              {manual ? "Ø§Ø®ØªÙŠØ§Ø± Ù…Ù† Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ù…Ø³Ø¬Ù‘Ù„Ø©" : "Ø§Ù„Ù„Ø§Ø¹Ø¨ Ù…Ø´ Ù…ÙˆØ¬ÙˆØ¯ ÙÙ‰ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø©"}
             </button>
           )}
           {trackPhoto && manual && <PhotoUploadButton onUploaded={(url) => onChange({ image_url: url })} />}
@@ -221,7 +221,7 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
   const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "" });
 
   const add = async () => {
-    if (!form.roster_player_id || !form.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    if (!form.roster_player_id || !form.team_roster_id) return toast.error("Ø§Ø®ØªØ± Ù„Ø§Ø¹Ø¨Ù‹Ø§ Ù…Ù† Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ÙØ±ÙŠÙ‚ Ø§Ù„Ø±Ø³Ù…ÙŠØ©");
     try {
       const payload: GoalCreatePayload = {
         table: "goals",
@@ -239,11 +239,11 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
+      if (!res.ok) throw new Error(data?.error || "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸");
       setRows((prev) => [...prev, data.row].sort((a, b) => (b.goals || 0) - (a.goals || 0)));
       setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "", goals: "1", image_url: "" });
     } catch (e: unknown) {
-      toast.error(errorMessage(e, "فشل الحفظ"));
+      toast.error(errorMessage(e, "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸"));
     }
   };
 
@@ -257,7 +257,7 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
         body: JSON.stringify({ table: "goals", id: row.id, goals: newGoals }),
       });
     } catch {
-      toast.error("فشل التحديث");
+      toast.error("ÙØ´Ù„ Ø§Ù„ØªØ­Ø¯ÙŠØ«");
     }
   };
 
@@ -266,7 +266,7 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
       await fetch(`/api/admin/stats-entries?table=goals&id=${id}`, { method: "DELETE" });
       setRows((prev) => prev.filter((r) => r.id !== id));
     } catch {
-      toast.error("فشل الحذف");
+      toast.error("ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù");
     }
   };
 
@@ -278,10 +278,10 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
   };
 
   const saveEdit = async (id: string) => {
-    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("Ø§Ø®ØªØ± Ù„Ø§Ø¹Ø¨Ù‹Ø§ Ù…Ù† Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ÙØ±ÙŠÙ‚ Ø§Ù„Ø±Ø³Ù…ÙŠØ©");
     const res = await fetch("/api/admin/stats-entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table: "goals", id, ...editForm, player_name: editForm.player, team_name: editForm.team }) });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return toast.error(data?.error || "فشل تحديث اللاعب");
+    if (!res.ok) return toast.error(data?.error || "ÙØ´Ù„ ØªØ­Ø¯ÙŠØ« Ø§Ù„Ù„Ø§Ø¹Ø¨");
     setRows((prev) => prev.map((row) => row.id === id ? data.row : row));
     setEditingId(null);
   };
@@ -304,7 +304,7 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
       </div>
       <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-white/10">
         {rows.length === 0 ? (
-          <div className="p-8 text-center text-caption text-muted-foreground">لا يوجد هدافين</div>
+          <div className="p-8 text-center text-caption text-muted-foreground">Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù‡Ø¯Ø§ÙÙŠÙ†</div>
         ) : (
           rows.map((g) => {
             const display = resolveStatsPlayer(g, rosterTeams);
@@ -318,16 +318,16 @@ function GoalsTab({ bracketId, initial, rosterTeams }: { bracketId: string; init
                 <div className="truncate text-caption font-black">{display.player}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
               </div>
-              <button onClick={() => updateGoals(g, -1)} className="h-7 w-7 rounded bg-red-500/15 font-black text-red-400">−</button>
+              <button onClick={() => updateGoals(g, -1)} className="h-7 w-7 rounded bg-red-500/15 font-black text-red-400">âˆ’</button>
               <span className="w-6 text-center text-caption font-black text-accent-orange">{g.goals}</span>
               <button onClick={() => updateGoals(g, 1)} className="h-7 w-7 rounded bg-accent-green/15 font-black text-accent-green">+</button>
-              <button onClick={() => beginEdit(g)} aria-label="تعديل اللاعب" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+              <button onClick={() => beginEdit(g)} aria-label="ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
               <button onClick={() => remove(g.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
               {editingId === g.id && (
                 <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
                   <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />
-                  <button onClick={() => void saveEdit(g.id)} aria-label="حفظ اللاعب" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
-                  <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
+                  <button onClick={() => void saveEdit(g.id)} aria-label="Ø­ÙØ¸ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
+                  <button onClick={() => setEditingId(null)} aria-label="Ø¥Ù„ØºØ§Ø¡ ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
                 </div>
               )}
             </div>
@@ -356,15 +356,15 @@ function HistoricalCardDistribution({ row, events, matches, onSaved }: { row: Ca
       const eventsToSave = buildCardEventAssignments(row, selected);
       const res = await fetch("/api/admin/card-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_card_id: row.id, events: eventsToSave }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) return toast.error(data?.error || "تعذر توزيع البطاقات");
+      if (!res.ok) return toast.error(data?.error || "ØªØ¹Ø°Ø± ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª");
       onSaved(data.rows || []);
       setOpen(false);
     } finally { setSaving(false); }
   };
   return <div className="basis-full rounded-lg bg-secondary/50 p-2 text-[11px]" dir="rtl">
-    <button type="button" className="font-bold underline" onClick={() => setOpen((value) => !value)}>{open ? "إخفاء توزيع البطاقات" : "توزيع البطاقات التاريخية"}</button>
-    <span className="mr-2 text-muted-foreground">موثق: {distributed} / {total} · متبقٍ: {total - distributed}</span>
-    {open && <div className="mt-2 space-y-2"><div className="text-muted-foreground">اختر المباراة الصحيحة لكل بطاقة. لا يتم اختيار أي مباراة تلقائيًا.</div>{types.map((card_type, index) => <label key={`${row.id}-${index + 1}`} className="flex items-center gap-2"><span className="w-20">{card_type === "yellow" ? "إنذار" : "طرد مباشر"} {index + 1}</span><select value={selected[index + 1] || ""} onChange={(event) => setSelected((current) => ({ ...current, [index + 1]: event.target.value }))} className={`${inputCls} max-w-sm`}><option value="">اختر المباراة</option>{options.map((match) => <option key={match.id} value={match.id}>{match.team_a} × {match.team_b} — {match.match_date || ""}</option>)}</select></label>)}<button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground">{saving ? "جارٍ الحفظ..." : "حفظ التوزيع"}</button>{distributed < total && <div className="font-bold text-accent-orange">التوزيع غير مكتمل، وقد تكون حالة الإيقاف غير مكتملة.</div>}</div>}
+    <button type="button" className="font-bold underline" onClick={() => setOpen((value) => !value)}>{open ? "Ø¥Ø®ÙØ§Ø¡ ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª" : "ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„ØªØ§Ø±ÙŠØ®ÙŠØ©"}</button>
+    <span className="mr-2 text-muted-foreground">Ù…ÙˆØ«Ù‚: {distributed} / {total} Â· Ù…ØªØ¨Ù‚Ù: {total - distributed}</span>
+    {open && <div className="mt-2 space-y-2"><div className="text-muted-foreground">Ø§Ø®ØªØ± Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø© Ø§Ù„ØµØ­ÙŠØ­Ø© Ù„ÙƒÙ„ Ø¨Ø·Ø§Ù‚Ø©. Ù„Ø§ ÙŠØªÙ… Ø§Ø®ØªÙŠØ§Ø± Ø£ÙŠ Ù…Ø¨Ø§Ø±Ø§Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§.</div>{types.map((card_type, index) => <label key={`${row.id}-${index + 1}`} className="flex items-center gap-2"><span className="w-20">{card_type === "yellow" ? "Ø¥Ù†Ø°Ø§Ø±" : "Ø·Ø±Ø¯ Ù…Ø¨Ø§Ø´Ø±"} {index + 1}</span><select value={selected[index + 1] || ""} onChange={(event) => setSelected((current) => ({ ...current, [index + 1]: event.target.value }))} className={`${inputCls} max-w-sm`}><option value="">Ø§Ø®ØªØ± Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©</option>{options.map((match) => <option key={match.id} value={match.id}>{match.team_a} Ã— {match.team_b} â€” {match.match_date || ""}</option>)}</select></label>)}<button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-3 py-2 font-bold text-primary-foreground">{saving ? "Ø¬Ø§Ø±Ù Ø§Ù„Ø­ÙØ¸..." : "Ø­ÙØ¸ Ø§Ù„ØªÙˆØ²ÙŠØ¹"}</button>{distributed < total && <div className="font-bold text-accent-orange">Ø§Ù„ØªÙˆØ²ÙŠØ¹ ØºÙŠØ± Ù…ÙƒØªÙ…Ù„ØŒ ÙˆÙ‚Ø¯ ØªÙƒÙˆÙ† Ø­Ø§Ù„Ø© Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù ØºÙŠØ± Ù…ÙƒØªÙ…Ù„Ø©.</div>}</div>}
   </div>;
 }
 
@@ -377,8 +377,10 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
 
+  const displayRows = addEventOnlyCardRows(rows, events, rosterTeams);
+
   const add = async () => {
-    if (!form.roster_player_id || !form.team_roster_id || !form.match_id) return toast.error("اختر اللاعب والمباراة");
+    if (!form.roster_player_id || !form.team_roster_id || !form.match_id) return toast.error("Ø§Ø®ØªØ± Ø§Ù„Ù„Ø§Ø¹Ø¨ ÙˆØ§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©");
     try {
       const payload: CardCreatePayload = {
         table: "cards",
@@ -397,20 +399,20 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
+      if (!res.ok) throw new Error(data?.error || "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸");
       setRows((prev) => [...prev, data.row]);
       setForm({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
     } catch (e: unknown) {
-      toast.error(errorMessage(e, "فشل الحفظ"));
+      toast.error(errorMessage(e, "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸"));
     }
   };
 
   const addEvent = async () => {
-    if (!eventForm.roster_player_id || !eventForm.team_roster_id || !eventForm.match_id) return toast.error("اختر الفريق واللاعب والمباراة");
+    if (!eventForm.roster_player_id || !eventForm.team_roster_id || !eventForm.match_id) return toast.error("Ø§Ø®ØªØ± Ø§Ù„ÙØ±ÙŠÙ‚ ÙˆØ§Ù„Ù„Ø§Ø¹Ø¨ ÙˆØ§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©");
     eventIdempotencyKey.current ||= crypto.randomUUID();
     const res = await fetch("/api/admin/card-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bracket_id: bracketId, ...eventForm, idempotency_key: eventIdempotencyKey.current }) });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return toast.error(data?.error || "تعذر حفظ الحدث");
+    if (!res.ok) return toast.error(data?.error || "ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„Ø­Ø¯Ø«");
     setEvents((current) => current.some((event) => event.id === data.row.id) ? current : [...current, data.row]);
     eventIdempotencyKey.current = null;
     setEventForm({ team: "", player: "", roster_player_id: "", team_roster_id: "", match_id: "", card_type: "yellow" });
@@ -418,7 +420,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
 
   const removeEvent = async (id: string) => {
     const res = await fetch(`/api/admin/card-events?id=${id}`, { method: "DELETE" });
-    if (!res.ok) return toast.error("تعذر حذف الحدث");
+    if (!res.ok) return toast.error("ØªØ¹Ø°Ø± Ø­Ø°Ù Ø§Ù„Ø­Ø¯Ø«");
     setEvents((current) => current.filter((event) => event.id !== id));
   };
 
@@ -428,7 +430,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
     try {
       await fetch("/api/admin/stats-entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table: "cards", id: row.id, [field]: value }) });
     } catch {
-      toast.error("فشل التحديث");
+      toast.error("ÙØ´Ù„ Ø§Ù„ØªØ­Ø¯ÙŠØ«");
     }
   };
 
@@ -437,7 +439,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
       await fetch(`/api/admin/stats-entries?table=cards&id=${id}`, { method: "DELETE" });
       setRows((prev) => prev.filter((r) => r.id !== id));
     } catch {
-      toast.error("فشل الحذف");
+      toast.error("ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù");
     }
   };
 
@@ -449,10 +451,10 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   };
 
   const saveEdit = async (id: string) => {
-    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("اختر لاعبًا من قائمة الفريق الرسمية");
+    if (!editForm.roster_player_id || !editForm.team_roster_id) return toast.error("Ø§Ø®ØªØ± Ù„Ø§Ø¹Ø¨Ù‹Ø§ Ù…Ù† Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ÙØ±ÙŠÙ‚ Ø§Ù„Ø±Ø³Ù…ÙŠØ©");
     const res = await fetch("/api/admin/stats-entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ table: "cards", id, ...editForm, player_name: editForm.player, team_name: editForm.team }) });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return toast.error(data?.error || "فشل تحديث اللاعب");
+    if (!res.ok) return toast.error(data?.error || "ÙØ´Ù„ ØªØ­Ø¯ÙŠØ« Ø§Ù„Ù„Ø§Ø¹Ø¨");
     setRows((prev) => prev.map((row) => row.id === id ? data.row : row));
     setEditingId(null);
   };
@@ -462,14 +464,14 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   return (
     <div className="space-y-4">
       <div className="space-y-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
-        <div className="text-caption font-black">أحداث البطاقات الموثقة لكل مباراة</div>
+        <div className="text-caption font-black">Ø£Ø­Ø¯Ø§Ø« Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª Ø§Ù„Ù…ÙˆØ«Ù‚Ø© Ù„ÙƒÙ„ Ù…Ø¨Ø§Ø±Ø§Ø©</div>
         <div className="flex flex-wrap items-start gap-2">
           <TeamPlayerPicker rosterTeams={rosterTeams} team={eventForm.team} player={eventForm.player} rosterPlayerId={eventForm.roster_player_id} teamRosterId={eventForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, ...patch, match_id: "" })); }} />
-          <select value={eventForm.match_id} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, match_id: e.target.value })); }} className={`${inputCls} min-w-56`}><option value="">اختر المباراة</option>{matches.filter((match) => eventForm.team && (match.team_a === eventForm.team || match.team_b === eventForm.team)).map((match) => <option key={match.id} value={match.id}>{match.team_a} × {match.team_b} — {match.match_date || ""}</option>)}</select>
-          <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as "yellow" | "direct_red" })); }} className={`${inputCls} min-w-40`}><option value="yellow">إنذار</option><option value="direct_red">طرد مباشر</option></select>
+          <select value={eventForm.match_id} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, match_id: e.target.value })); }} className={`${inputCls} min-w-56`}><option value="">Ø§Ø®ØªØ± Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©</option>{matches.filter((match) => eventForm.team && (match.team_a === eventForm.team || match.team_b === eventForm.team)).map((match) => <option key={match.id} value={match.id}>{match.team_a} Ã— {match.team_b} â€” {match.match_date || ""}</option>)}</select>
+          <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as "yellow" | "direct_red" })); }} className={`${inputCls} min-w-40`}><option value="yellow">Ø¥Ù†Ø°Ø§Ø±</option><option value="direct_red">Ø·Ø±Ø¯ Ù…Ø¨Ø§Ø´Ø±</option></select>
           <button onClick={() => void addEvent()} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
         </div>
-        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => <div key={event.id} className="flex items-center justify-between"><span>{event.card_type === "yellow" ? "إنذار" : "طرد مباشر"} · {matches.find((match) => match.id === event.match_id)?.team_a} × {matches.find((match) => match.id === event.match_id)?.team_b}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>)}</div>
+        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => <div key={event.id} className="flex items-center justify-between"><span>{event.card_type === "yellow" ? "Ø¥Ù†Ø°Ø§Ø±" : "Ø·Ø±Ø¯ Ù…Ø¨Ø§Ø´Ø±"} Â· {matches.find((match) => match.id === event.match_id)?.team_a} Ã— {matches.find((match) => match.id === event.match_id)?.team_b}</span><button onClick={() => void removeEvent(event.id)} aria-label="Ø­Ø°Ù Ø§Ù„Ø­Ø¯Ø«"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>)}</div>
       </div>
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
         <TeamPlayerPicker
@@ -483,16 +485,16 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
           onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
         <select value={form.match_id} onChange={(e) => setForm((f) => ({ ...f, match_id: e.target.value }))} className={`${inputCls} min-w-56`}>
-          <option value="">اختر المباراة</option>
+          <option value="">Ø§Ø®ØªØ± Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©</option>
           {matches.map((match) => <option key={match.id} value={match.id}>{match.team_a} - {match.team_b} ({match.match_date || ""})</option>)}
         </select>
         <button onClick={add} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
       </div>
       <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-white/10">
-        {rows.length === 0 ? (
-          <div className="p-8 text-center text-caption text-muted-foreground">لا توجد بطاقات</div>
+        {displayRows.length === 0 ? (
+          <div className="p-8 text-center text-caption text-muted-foreground">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨Ø·Ø§Ù‚Ø§Øª</div>
         ) : (
-          rows.map((c) => {
+          displayRows.map((c) => {
             const display = resolveStatsPlayer(c, rosterTeams);
             const suspension = getSuspensionStateFromEvents(events.filter((event) => event.roster_player_id === c.roster_player_id), matches, rosterTeams);
             const totals = getCardTotalsWithEvents(c, events.filter((event) => event.roster_player_id === c.roster_player_id));
@@ -501,29 +503,29 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
               <div className="min-w-0 flex-1">
                 <div className="truncate text-caption font-black">{display.player}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
-                <div className="text-[10px] text-muted-foreground">الإجمالي: {totals.yellow} إنذار · {totals.red} طرد · أحداث موثقة: {events.filter((event) => event.roster_player_id === c.roster_player_id).length}</div>
-                {suspension.needsMatchAssignment && <div className="text-[11px] font-bold text-accent-orange">يحتاج تحديد المباراة</div>}
-                {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">موقوف مباراة · {suspension.reason === "combined" ? "تراكم 3 إنذارات وطرد مباشر" : suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}</div> : <div className="text-[11px] font-bold text-accent-green">متاح</div>)}
+                <div className="text-[10px] text-muted-foreground">Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {totals.yellow} Ø¥Ù†Ø°Ø§Ø± Â· {totals.red} Ø·Ø±Ø¯ Â· Ø£Ø­Ø¯Ø§Ø« Ù…ÙˆØ«Ù‚Ø©: {events.filter((event) => event.roster_player_id === c.roster_player_id).length}</div>
+                {suspension.needsMatchAssignment && <div className="text-[11px] font-bold text-accent-orange">ÙŠØ­ØªØ§Ø¬ ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©</div>}
+                {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">Ù…ÙˆÙ‚ÙˆÙ Ù…Ø¨Ø§Ø±Ø§Ø© Â· {suspension.reason === "combined" ? "ØªØ±Ø§ÙƒÙ… 3 Ø¥Ù†Ø°Ø§Ø±Ø§Øª ÙˆØ·Ø±Ø¯ Ù…Ø¨Ø§Ø´Ø±" : suspension.reason === "direct_red" ? "Ø¨Ø·Ø§Ù‚Ø© Ø­Ù…Ø±Ø§Ø¡ Ù…Ø¨Ø§Ø´Ø±Ø©" : "ØªØ±Ø§ÙƒÙ… 3 Ø¥Ù†Ø°Ø§Ø±Ø§Øª"}</div> : <div className="text-[11px] font-bold text-accent-green">Ù…ØªØ§Ø­</div>)}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => updateCard(c, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">−</button>
-                <span className="w-8 text-center text-[11px] font-black">🟨{c.yellow || 0}</span>
-                <button onClick={() => updateCard(c, "yellow", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
+                <button onClick={() => updateCard(c as Card, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">âˆ’</button>
+                <span className="w-8 text-center text-[11px] font-black">ðŸŸ¨{c.yellow || 0}</span>
+                <button onClick={() => updateCard(c as Card, "yellow", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => updateCard(c, "red", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">−</button>
-                <span className="w-8 text-center text-[11px] font-black">🟥{c.red || 0}</span>
-                <button onClick={() => updateCard(c, "red", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
+                <button onClick={() => updateCard(c as Card, "red", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">âˆ’</button>
+                <span className="w-8 text-center text-[11px] font-black">ðŸŸ¥{c.red || 0}</span>
+                <button onClick={() => updateCard(c as Card, "red", 1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">+</button>
               </div>
-              <button onClick={() => beginEdit(c)} aria-label="تعديل اللاعب" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-               <button onClick={() => remove(c.id)} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
-               <HistoricalCardDistribution row={c} events={events} matches={matches} onSaved={(next) => updateDistributed(c.id, next)} />
+              <button onClick={() => beginEdit(c as Card)} aria-label="ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-white/5 p-1.5 text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+               <button onClick={() => remove(c.id || "")} className="rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+               <HistoricalCardDistribution row={c as Card} events={events} matches={matches} onSaved={(next) => updateDistributed(c.id || "", next)} />
               {editingId === c.id && (
                 <div className="absolute inset-x-2 z-10 mt-24 flex flex-wrap items-center gap-2 rounded-xl bg-card p-3 ring-1 ring-accent-blue/40">
                   <TeamPlayerPicker rosterTeams={rosterTeams} team={editForm.team} player={editForm.player} rosterPlayerId={editForm.roster_player_id} teamRosterId={editForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))} />
-                  <select value={editForm.match_id} onChange={(e) => setEditForm((current) => ({ ...current, match_id: e.target.value }))} className={`${inputCls} min-w-56`}><option value="">اختر المباراة</option>{matches.map((match) => <option key={match.id} value={match.id}>{match.team_a} - {match.team_b} ({match.match_date || ""})</option>)}</select>
-                  <button onClick={() => void saveEdit(c.id)} aria-label="حفظ اللاعب" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
-                  <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
+                  <select value={editForm.match_id} onChange={(e) => setEditForm((current) => ({ ...current, match_id: e.target.value }))} className={`${inputCls} min-w-56`}><option value="">Ø§Ø®ØªØ± Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø©</option>{matches.map((match) => <option key={match.id} value={match.id}>{match.team_a} - {match.team_b} ({match.match_date || ""})</option>)}</select>
+                  <button onClick={() => void saveEdit(c.id || "")} aria-label="Ø­ÙØ¸ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-accent-green/15 p-2 text-accent-green"><Check className="h-4 w-4" /></button>
+                  <button onClick={() => setEditingId(null)} aria-label="Ø¥Ù„ØºØ§Ø¡ ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù„Ø§Ø¹Ø¨" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
                 </div>
               )}
             </div>
@@ -540,7 +542,7 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
   const [form, setForm] = useState({ player: "", team: "", match_name: "", image_url: "" });
 
   const add = async () => {
-    if (!form.player.trim() || !form.team.trim()) return toast.error("اكتب اسم اللاعب والفريق");
+    if (!form.player.trim() || !form.team.trim()) return toast.error("Ø§ÙƒØªØ¨ Ø§Ø³Ù… Ø§Ù„Ù„Ø§Ø¹Ø¨ ÙˆØ§Ù„ÙØ±ÙŠÙ‚");
     try {
       const res = await fetch("/api/admin/stats-entries", {
         method: "POST",
@@ -548,11 +550,11 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
         body: JSON.stringify({ table: "motm", bracket_id: bracketId, player: form.player.trim(), team: form.team.trim(), match_name: form.match_name, image_url: form.image_url }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
+      if (!res.ok) throw new Error(data?.error || "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸");
       setRows((prev) => [...prev, data.row]);
       setForm({ player: "", team: "", match_name: "", image_url: "" });
     } catch (e: unknown) {
-      toast.error(errorMessage(e, "فشل الحفظ"));
+      toast.error(errorMessage(e, "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸"));
     }
   };
 
@@ -561,7 +563,7 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
       await fetch(`/api/admin/stats-entries?table=motm&id=${id}`, { method: "DELETE" });
       setRows((prev) => prev.filter((r) => r.id !== id));
     } catch {
-      toast.error("فشل الحذف");
+      toast.error("ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù");
     }
   };
 
@@ -575,12 +577,12 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
           imageUrl={form.image_url}
           onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
         />
-        <input value={form.match_name} onChange={(e) => setForm({ ...form, match_name: e.target.value })} placeholder="اسم المباراة (اختياري)" className={`${inputCls} flex-1`} />
+        <input value={form.match_name} onChange={(e) => setForm({ ...form, match_name: e.target.value })} placeholder="Ø§Ø³Ù… Ø§Ù„Ù…Ø¨Ø§Ø±Ø§Ø© (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)" className={`${inputCls} flex-1`} />
         <button onClick={add} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {rows.length === 0 ? (
-          <div className="col-span-full rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا يوجد نجوم مباريات</div>
+          <div className="col-span-full rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù†Ø¬ÙˆÙ… Ù…Ø¨Ø§Ø±ÙŠØ§Øª</div>
         ) : (
           rows.map((m) => {
             const display = resolveStatsPlayer(m, rosterTeams);
@@ -594,7 +596,7 @@ function MotmTab({ bracketId, initial, rosterTeams }: { bracketId: string; initi
               )}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-caption font-black">{display.player}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{display.team} {m.match_name ? `• ${m.match_name}` : ""}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{display.team} {m.match_name ? `â€¢ ${m.match_name}` : ""}</div>
               </div>
               <button onClick={() => remove(m.id)} className="shrink-0 rounded-lg bg-red-500/15 p-1.5 text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
@@ -622,7 +624,7 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
   };
 
   const save = async () => {
-    if (!round.trim()) return toast.error("اكتب اسم الجولة/الدور");
+    if (!round.trim()) return toast.error("Ø§ÙƒØªØ¨ Ø§Ø³Ù… Ø§Ù„Ø¬ÙˆÙ„Ø©/Ø§Ù„Ø¯ÙˆØ±");
     setSaving(true);
     try {
       const res = await fetch("/api/admin/formations", {
@@ -631,11 +633,11 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
         body: JSON.stringify({ id: formationId, bracket_id: bracketId, round: round.trim(), coach_name: coachName, coach_team: coachTeam, coach_image_url: coachImageUrl, players }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل الحفظ");
+      if (!res.ok) throw new Error(data?.error || "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸");
       setFormationId(data.formation.id);
-      toast.success("تم حفظ تشكيلة الجولة");
+      toast.success("ØªÙ… Ø­ÙØ¸ ØªØ´ÙƒÙŠÙ„Ø© Ø§Ù„Ø¬ÙˆÙ„Ø©");
     } catch (e: unknown) {
-      toast.error(errorMessage(e, "فشل الحفظ"));
+      toast.error(errorMessage(e, "ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸"));
     } finally {
       setSaving(false);
     }
@@ -644,9 +646,9 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 rounded-2xl bg-card p-4 ring-1 ring-white/10 sm:grid-cols-3">
-        <input value={round} onChange={(e) => setRound(e.target.value)} placeholder="اسم الجولة/الدور" className={inputCls} />
-        <input value={coachName} onChange={(e) => setCoachName(e.target.value)} placeholder="اسم المدرب (اختياري)" className={inputCls} />
-        <input value={coachTeam} onChange={(e) => setCoachTeam(e.target.value)} placeholder="فريق المدرب" className={inputCls} />
+        <input value={round} onChange={(e) => setRound(e.target.value)} placeholder="Ø§Ø³Ù… Ø§Ù„Ø¬ÙˆÙ„Ø©/Ø§Ù„Ø¯ÙˆØ±" className={inputCls} />
+        <input value={coachName} onChange={(e) => setCoachName(e.target.value)} placeholder="Ø§Ø³Ù… Ø§Ù„Ù…Ø¯Ø±Ø¨ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)" className={inputCls} />
+        <input value={coachTeam} onChange={(e) => setCoachTeam(e.target.value)} placeholder="ÙØ±ÙŠÙ‚ Ø§Ù„Ù…Ø¯Ø±Ø¨" className={inputCls} />
       </div>
       {(() => {
         const registeredCoach = rosterTeams.find((t) => t.team === coachTeam && t.coachName);
@@ -660,7 +662,7 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
             }}
             className="flex w-full items-center justify-between gap-2 rounded-xl bg-accent-blue/10 px-4 py-2.5 text-caption font-bold text-accent-blue ring-1 ring-accent-blue/30"
           >
-            استخدام المدرب المسجّل: {registeredCoach.coachName}
+            Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø¯Ø±Ø¨ Ø§Ù„Ù…Ø³Ø¬Ù‘Ù„: {registeredCoach.coachName}
           </button>
         );
       })()}
@@ -671,7 +673,7 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
             // eslint-disable-next-line @next/next/no-img-element
             <img src={coachImageUrl} alt={coachName} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" />
           )}
-          <span className="text-[11px] text-muted-foreground">صورة المدرب (اختياري)</span>
+          <span className="text-[11px] text-muted-foreground">ØµÙˆØ±Ø© Ø§Ù„Ù…Ø¯Ø±Ø¨ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)</span>
         </div>
       )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -695,7 +697,7 @@ function FormationTab({ bracketId, initial, rosterTeams }: { bracketId: string; 
         ))}
       </div>
       <button onClick={save} disabled={saving} className="rounded-xl bg-primary px-5 py-2.5 text-caption font-black text-primary-foreground disabled:opacity-60">
-        حفظ تشكيلة الجولة
+        Ø­ÙØ¸ ØªØ´ÙƒÙŠÙ„Ø© Ø§Ù„Ø¬ÙˆÙ„Ø©
       </button>
     </div>
   );

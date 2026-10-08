@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -24,7 +24,7 @@ function load(relative) {
   return loaded.exports;
 }
 
-const { UNKNOWN_PLAYER, UNKNOWN_TEAM, groupCardsByPlayer, groupGoalsByPlayer, resolveStatsPlayer, validateStatsPlayerSelection } = load("lib/sport/stats-player.ts");
+const { UNKNOWN_PLAYER, UNKNOWN_TEAM, addEventOnlyCardRows, groupCardsByPlayer, groupGoalsByPlayer, resolveStatsPlayer, validateStatsPlayerSelection } = load("lib/sport/stats-player.ts");
 const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
 const matchCardSource = fs.readFileSync("components/sport/match-card.tsx", "utf8");
 const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/suspensions.ts");
@@ -34,36 +34,36 @@ const { buildCardEventAssignments, countAssignedCardEvents } = load("lib/sport/c
 
 const teamA = {
   id: "team-a",
-  team: "الفريق أ",
+  team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£",
   logoUrl: null,
   coachName: null,
   coachPhotoUrl: null,
   players: [
-    { id: "player-a-1", name: "محمد علي", photoUrl: null },
-    { id: "player-a-2", name: "محمد علي", photoUrl: null },
+    { id: "player-a-1", name: "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ", photoUrl: null },
+    { id: "player-a-2", name: "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ", photoUrl: null },
   ],
 };
 const teamB = {
   id: "team-b",
-  team: "الفريق ب",
+  team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¨",
   logoUrl: null,
   coachName: null,
   coachPhotoUrl: null,
-  players: [{ id: "player-b-1", name: "سعيد حسن", photoUrl: null }],
+  players: [{ id: "player-b-1", name: "Ø³Ø¹ÙŠØ¯ Ø­Ø³Ù†", photoUrl: null }],
 };
 const teams = [teamA, teamB];
 
 test("current roster identity resolves canonical player and team names", () => {
   const resolved = resolveStatsPlayer({ id: "goal-1", roster_player_id: "player-a-1", team_roster_id: "team-a", player: "old name", team: "old team" }, teams);
-  assert.equal(resolved.player, "محمد علي");
-  assert.equal(resolved.team, "الفريق أ");
+  assert.equal(resolved.player, "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ");
+  assert.equal(resolved.team, "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£");
   assert.equal(resolved.identityKey, "roster:player-a-1");
 });
 
 test("legacy snapshot resolves without a roster id", () => {
-  const resolved = resolveStatsPlayer({ id: "legacy-1", player: "لاعب تاريخي", team: "فريق تاريخي" }, teams);
-  assert.equal(resolved.player, "لاعب تاريخي");
-  assert.equal(resolved.team, "فريق تاريخي");
+  const resolved = resolveStatsPlayer({ id: "legacy-1", player: "Ù„Ø§Ø¹Ø¨ ØªØ§Ø±ÙŠØ®ÙŠ", team: "ÙØ±ÙŠÙ‚ ØªØ§Ø±ÙŠØ®ÙŠ" }, teams);
+  assert.equal(resolved.player, "Ù„Ø§Ø¹Ø¨ ØªØ§Ø±ÙŠØ®ÙŠ");
+  assert.equal(resolved.team, "ÙØ±ÙŠÙ‚ ØªØ§Ø±ÙŠØ®ÙŠ");
   assert.match(resolved.identityKey, /^legacy:/);
 });
 
@@ -75,9 +75,9 @@ test("historical null rows never render blank or UUIDs", () => {
 
 test("goal aggregation uses roster identity and keeps same-name players separate", () => {
   const rows = groupGoalsByPlayer([
-    { id: "g1", roster_player_id: "player-a-1", team_roster_id: "team-a", player: "محمد علي", team: "الفريق أ", goals: 2 },
-    { id: "g2", roster_player_id: "player-a-1", team_roster_id: "team-a", player: "محمد علي", team: "الفريق أ", goals: 3 },
-    { id: "g3", roster_player_id: "player-a-2", team_roster_id: "team-a", player: "محمد علي", team: "الفريق أ", goals: 4 },
+    { id: "g1", roster_player_id: "player-a-1", team_roster_id: "team-a", player: "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ", team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£", goals: 2 },
+    { id: "g2", roster_player_id: "player-a-1", team_roster_id: "team-a", player: "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ", team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£", goals: 3 },
+    { id: "g3", roster_player_id: "player-a-2", team_roster_id: "team-a", player: "Ù…Ø­Ù…Ø¯ Ø¹Ù„ÙŠ", team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£", goals: 4 },
   ], teams);
   assert.equal(rows.length, 2);
   assert.deepEqual(rows.map((row) => row.goals), [5, 4]);
@@ -86,28 +86,28 @@ test("goal aggregation uses roster identity and keeps same-name players separate
 
 test("card aggregation uses the same identity resolver", () => {
   const rows = groupCardsByPlayer([
-    { id: "c1", roster_player_id: "player-b-1", team_roster_id: "team-b", player: "سعيد حسن", team: "الفريق ب", yellow: 1, red: 0 },
-    { id: "c2", roster_player_id: "player-b-1", team_roster_id: "team-b", player: "سعيد حسن", team: "الفريق ب", yellow: 2, red: 1 },
+    { id: "c1", roster_player_id: "player-b-1", team_roster_id: "team-b", player: "Ø³Ø¹ÙŠØ¯ Ø­Ø³Ù†", team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¨", yellow: 1, red: 0 },
+    { id: "c2", roster_player_id: "player-b-1", team_roster_id: "team-b", player: "Ø³Ø¹ÙŠØ¯ Ø­Ø³Ù†", team: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¨", yellow: 2, red: 1 },
   ], teams);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].yellow, 3);
   assert.equal(rows[0].red, 1);
-  assert.equal(rows[0].player, "سعيد حسن");
+  assert.equal(rows[0].player, "Ø³Ø¹ÙŠØ¯ Ø­Ø³Ù†");
 });
 
 test("server validation rejects unknown players and cross-team players", () => {
-  const matches = [{ team_a: "الفريق أ", team_b: "الفريق ب" }];
-  const roster = { id: "team-a", bracket_id: "bracket-1", team_name: "الفريق أ" };
-  assert.equal(validateStatsPlayerSelection({ bracketId: "bracket-1", roster, player: { id: "player-b-1", roster_id: "team-b", name: "سعيد حسن" }, matches }).ok, false);
+  const matches = [{ team_a: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£", team_b: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¨" }];
+  const roster = { id: "team-a", bracket_id: "bracket-1", team_name: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£" };
+  assert.equal(validateStatsPlayerSelection({ bracketId: "bracket-1", roster, player: { id: "player-b-1", roster_id: "team-b", name: "Ø³Ø¹ÙŠØ¯ Ø­Ø³Ù†" }, matches }).ok, false);
   assert.equal(validateStatsPlayerSelection({ bracketId: "bracket-1", roster, player: null, matches }).ok, false);
 });
 
 test("server validation accepts an official bracket team before its first match", () => {
   const result = validateStatsPlayerSelection({
     bracketId: "bracket-1",
-    roster: { id: "team-c", bracket_id: "bracket-1", team_name: "الفريق ج" },
-    player: { id: "player-c-1", roster_id: "team-c", name: "لاعب ج" },
-    matches: [{ team_a: "الفريق أ", team_b: "الفريق ب" }],
+    roster: { id: "team-c", bracket_id: "bracket-1", team_name: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¬" },
+    player: { id: "player-c-1", roster_id: "team-c", name: "Ù„Ø§Ø¹Ø¨ Ø¬" },
+    matches: [{ team_a: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø£", team_b: "Ø§Ù„ÙØ±ÙŠÙ‚ Ø¨" }],
   });
   assert.equal(result.ok, true);
 });
@@ -144,8 +144,8 @@ test("public match cards render real logo URLs and keep the placeholder fallback
 
 test("suspension engine applies three-yellow cycle to next team match", () => {
   const matches = [
-    { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-01-01", match_time: "10:00", status: "انتهت" },
-    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "مجدولة" },
+    { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-01-01", match_time: "10:00", status: "Ø§Ù†ØªÙ‡Øª" },
+    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" },
   ];
   const cards = [1, 2, 3].map((n, i) => ({ id: `c${n}`, bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 1, red: 0 }));
   const state = getSuspensionState(cards, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
@@ -154,7 +154,7 @@ test("suspension engine applies three-yellow cycle to next team match", () => {
 });
 
 test("completed suspension match clears state and legacy cards need assignment", () => {
-  const matches = [{ id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "انتهت" }];
+  const matches = [{ id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "Ø§Ù†ØªÙ‡Øª" }];
   const cards = [{ id: "c", bracket_id: "b", match_id: null, roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 3, red: 0 }];
   const state = getSuspensionState(cards, matches);
   assert.equal(state.isSuspended, false);
@@ -170,8 +170,8 @@ test("eligibility is match-specific and does not globally block another match", 
 test("direct red remains active until the next team match is completed", () => {
   const base = [
     { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-02-01", match_time: "10:00", status: "انتهت" },
-    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "مجدولة" },
-    { id: "m3", bracket_id: "b", team_a: "A", team_b: "D", match_date: "2026-02-03", match_time: "10:00", status: "مجدولة" },
+    { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" },
+    { id: "m3", bracket_id: "b", team_a: "A", team_b: "D", match_date: "2026-02-03", match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" },
   ];
   const cards = [{ id: "red", bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 0, red: 1 }];
   const before = getSuspensionState(cards, base);
@@ -185,7 +185,7 @@ test("direct red remains active until the next team match is completed", () => {
 });
 
 test("public and admin consumers receive the same suspension state", () => {
-  const matches = [{ id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-02-01", match_time: "10:00", status: "انتهت" }, { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "مجدولة" }];
+  const matches = [{ id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-02-01", match_time: "10:00", status: "Ø§Ù†ØªÙ‡Øª" }, { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-02-02", match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" }];
   const cards = [{ id: "red", bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 0, red: 1 }];
   const publicState = getSuspensionState(cards, matches);
   const adminState = getSuspensionState(cards, matches);
@@ -194,10 +194,10 @@ test("public and admin consumers receive the same suspension state", () => {
 
 test("public suspension status rendering uses readable Arabic labels", () => {
   const source = fs.readFileSync("app/[tournament]/cards/page.tsx", "utf8");
-  assert.match(source, /الحالة/);
-  assert.match(source, /متاح/);
-  assert.match(source, /موقوف مباراة/);
-  assert.doesNotMatch(source, /[ÙØ]/);
+  assert.match(source, /\u0627\u0644\u062d\u0627\u0644\u0629/);
+  assert.match(source, /\u0645\u062a\u0627\u062d/);
+  assert.match(source, /\u0645\u0648\u0642\u0648\u0641 \u0645\u0628\u0627\u0631\u0627\u0629/);
+  assert.doesNotMatch(source, /[Ã™Ã˜]/);
 });
 
 test("card events migration is additive and event based", () => {
@@ -209,7 +209,7 @@ test("card events migration is additive and event based", () => {
 });
 
 test("card events count three yellows across three matches", () => {
-  const matches = [1, 2, 3, 4].map((id) => ({ id: `m${id}`, team_a: "A", team_b: "B", match_date: `2026-10-0${id}`, match_time: "10:00", status: "مجدولة" }));
+  const matches = [1, 2, 3, 4].map((id) => ({ id: `m${id}`, team_a: "A", team_b: "B", match_date: `2026-10-0${id}`, match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" }));
   const events = [1, 2, 3].map((n) => ({ id: `e${n}`, match_id: `m${n}`, roster_player_id: "p", team_roster_id: "t", card_type: "yellow" }));
   const state = getSuspensionStateFromEvents(events, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
   assert.equal(state.isSuspended, true);
@@ -273,6 +273,15 @@ test("admin stats GET contracts accept a bracket and return empty-safe rows", ()
   assert.match(eventsRoute, /export async function GET/);
   assert.match(eventsRoute, /searchParams\.get\("bracket_id"\)/);
   assert.match(eventsRoute, /rows: query\.data \|\| \[\]/);
+});
+
+test("first direct-red event renders a player row when legacy cards are empty", () => {
+  const teams = [{ id: "team-1", team: "Ø§Ù„Ù‚Ø¯Ø³", players: [{ id: "player-1", name: "Ø£Ø­Ù…Ø¯" }] }];
+  const rows = addEventOnlyCardRows([], [{ id: "event-1", roster_player_id: "player-1", team_roster_id: "team-1", card_type: "direct_red" }], teams);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].red, 1);
+  assert.equal(resolveStatsPlayer(rows[0], teams).player, "Ø£Ø­Ù…Ø¯");
+  assert.equal(resolveStatsPlayer(rows[0], teams).team, "Ø§Ù„Ù‚Ø¯Ø³");
 });
 
 test("new card events use payload-bound idempotency keys and protected RPC grants", () => {

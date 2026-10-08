@@ -72,6 +72,19 @@ export function groupCardsByPlayer(rows: CardStatsRow[], teams: RosterTeamLite[]
   return [...grouped.values()].sort((a, b) => (Number(b.red) || 0) - (Number(a.red) || 0) || (Number(b.yellow) || 0) - (Number(a.yellow) || 0));
 }
 
+export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red" }[], teams: RosterTeamLite[]) {
+  const known = new Set(rows.map((row) => resolveStatsPlayer(row, teams).rosterPlayerId).filter(Boolean));
+  const synthetic = new Map<string, CardStatsRow>();
+  for (const event of events) {
+    if (known.has(event.roster_player_id)) continue;
+    const current = synthetic.get(event.roster_player_id) || { id: `event:${event.roster_player_id}`, roster_player_id: event.roster_player_id, team_roster_id: event.team_roster_id, yellow: 0, red: 0 };
+    if (event.card_type === "yellow") current.yellow = (Number(current.yellow) || 0) + 1;
+    else current.red = (Number(current.red) || 0) + 1;
+    synthetic.set(event.roster_player_id, current);
+  }
+  return [...rows, ...synthetic.values()];
+}
+
 export function getCardTotalsWithEvents(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null; is_historical_distribution?: boolean }[]) {
   const newEvents = events.filter((event) => !(event.is_historical_distribution ?? Boolean(event.source_card_id)));
   return {

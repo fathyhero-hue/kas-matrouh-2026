@@ -1,4 +1,4 @@
-import { normalize, type RosterTeamLite } from "./roster-link";
+﻿import { normalize, type RosterTeamLite } from "./roster-link";
 
 export type SuspensionMatch = { id: string; bracket_id?: string; team_a: string | null; team_b: string | null; match_date?: string | null; match_time?: string | null; status?: string | null };
 export type SuspensionCard = { id: string; bracket_id?: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; player?: string | null; team?: string | null; yellow?: number | null; red?: number | null };
@@ -6,7 +6,7 @@ export type CardEvent = { id: string; bracket_id?: string | null; match_id: stri
 export type SuspensionReason = "yellow_accumulation" | "direct_red" | "combined";
 export type SuspensionState = { isSuspended: boolean; reason: SuspensionReason | null; yellowCountInCycle: number; triggerMatchId: string | null; suspensionMatchId: string | null; suspensionMatchIds?: string[]; served: boolean; needsMatchAssignment: boolean };
 
-const COMPLETED = new Set(["انتهت", "Ø§Ù†ØªÙ‡Øª", "finished", "completed"]);
+const COMPLETED = new Set(["انتهت", "finished", "completed"]);
 const matchSortKey = (match: SuspensionMatch) => `${match.match_date || "9999-99-99"}T${match.match_time || "99:99:99"}::${match.id}`;
 const isCompleted = (match: SuspensionMatch) => COMPLETED.has(String(match.status || "").trim().toLowerCase());
 const nextTeamMatch = (matches: SuspensionMatch[], team: string, from: SuspensionMatch) => matches.filter((match) => normalize(match.team_a || "") === normalize(team) || normalize(match.team_b || "") === normalize(team)).sort((a, b) => matchSortKey(a).localeCompare(matchSortKey(b))).find((match) => matchSortKey(match) > matchSortKey(from));
