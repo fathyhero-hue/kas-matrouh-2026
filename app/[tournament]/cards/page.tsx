@@ -3,7 +3,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/lib/sport/tournaments";
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
-import { getBracketRosterTeams } from "@/lib/sport/roster-link";
+import { getBracketCardRosterTeams } from "@/lib/sport/roster-link";
 import { addEventOnlyCardRows, getCardTotalsWithEvents, groupCardsByPlayer, hasUnassignedCards, resolveStatsPlayer } from "@/lib/sport/stats-player";
 import { getCardStatus, getSuspensionStateFromEvents } from "@/lib/sport/suspensions";
 import { getPublicCardEvents } from "@/lib/sport/public-card-events";
@@ -18,12 +18,13 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const [{ data: cards, error: cardsError }, { data: matches, error: matchesError }, publicEvents, rosterTeams] = await Promise.all([
+  const [{ data: cards, error: cardsError }, { data: matches, error: matchesError }, publicEvents, cardRoster] = await Promise.all([
     supabase.from("cards").select("*").eq("bracket_id", bracketId),
     supabase.from("matches").select("id, bracket_id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId),
     getPublicCardEvents(bracketId),
-    getBracketRosterTeams(supabase, bracketId),
+    getBracketCardRosterTeams(supabase, bracketId),
   ]);
+  const rosterTeams = cardRoster.teams;
   const cardEvents = publicEvents.data;
   const cardEventsError = publicEvents.error;
 
@@ -51,7 +52,7 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
             const identity = resolveStatsPlayer(card, rosterTeams);
             const playerEvents = cardEvents.filter((event) => event.roster_player_id === identity.rosterPlayerId);
             const totals = getCardTotalsWithEvents(card, playerEvents);
-            const status = getCardStatus(getSuspensionStateFromEvents(playerEvents, matches || [], rosterTeams), hasUnassignedCards(card, playerEvents), Boolean(cardsError || matchesError || cardEventsError));
+            const status = getCardStatus(getSuspensionStateFromEvents(playerEvents, matches || [], rosterTeams), hasUnassignedCards(card, playerEvents), Boolean(cardsError || matchesError || cardEventsError || cardRoster.error));
             return <tr key={identity.identityKey} className="border-b border-white/5 last:border-0">
               <td className="px-3 py-3 text-right font-black">{identity.player}</td>
               <td className="px-3 py-3 text-right text-muted-foreground">{identity.team}</td>

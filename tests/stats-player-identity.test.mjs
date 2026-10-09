@@ -31,6 +31,7 @@ const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/sus
 const { getSuspensionStateFromEvents, getCardStatus } = load("lib/sport/suspensions.ts");
 const { getCardTotalsWithEvents, hasUnassignedCards } = load("lib/sport/stats-player.ts");
 const { buildCardEventAssignments, countAssignedCardEvents } = load("lib/sport/card-event-distribution.ts");
+const { getBracketCardRosterTeams } = load("lib/sport/roster-link.ts");
 
 const teamA = {
   id: "team-a",
@@ -444,6 +445,49 @@ test("missing event or match evidence requires review", () => {
     { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-01", status: "scheduled" },
   ];
   assert.equal(getCardStatus(getSuspensionStateFromEvents([{ ...event, match_id: "m1" }], sameDay, [{ id: "t", team: "A", players: [] }]), false), "يحتاج مراجعة");
+});
+
+test("public card roster uses readable columns and resolves Jerusalem red card", async () => {
+  const query = {
+    from(table) {
+      assert.equal(table, "team_rosters");
+      return {
+        select(columns) {
+          assert.equal(columns, "id, team_name, roster_players(id, name)");
+          return {
+            async eq(column, bracketId) {
+              assert.equal(column, "bracket_id");
+              assert.equal(bracketId, "elite");
+              return { data: [
+                { id: "jerusalem", team_name: "القدس", roster_players: [{ id: "osama", name: "اسامه محمد عبدالمولي" }] },
+                { id: "wadi", team_name: "الوادي", roster_players: [] },
+              ], error: null };
+            },
+          };
+        },
+      };
+    },
+  };
+  const { teams, error } = await getBracketCardRosterTeams(query, "elite");
+  assert.equal(error, null);
+  assert.equal(resolveStatsPlayer({ roster_player_id: "osama", team_roster_id: "jerusalem" }, teams).player, "اسامه محمد عبدالمولي");
+  const matches = [{ id: "jerusalem-wadi", team_a: "القدس", team_b: "الوادي", match_date: "2026-10-22", match_time: "21:00:00", status: "انتهت" }];
+  const events = [{ id: "red", match_id: "jerusalem-wadi", roster_player_id: "osama", team_roster_id: "jerusalem", card_type: "direct_red" }];
+  const publicState = getSuspensionStateFromEvents(events, matches, teams);
+  const adminState = getSuspensionStateFromEvents(events, matches, teams.map((team) => ({ ...team, logoUrl: "logo" })));
+  assert.equal(getCardStatus(publicState, false, Boolean(error)), "موقوف مباراة");
+  assert.equal(getCardStatus(adminState, false), "موقوف مباراة");
+  matches.push({ id: "next-jerusalem", team_a: "القدس", team_b: "النسور", match_date: "2026-10-24", match_time: "21:00:00", status: "انتهت" });
+  assert.equal(getCardStatus(getSuspensionStateFromEvents(events, matches, teams), false), "متاح");
+});
+
+test("public card roster query errors remain explicit", async () => {
+  const failure = { code: "42501", message: "permission denied for table team_rosters" };
+  const db = { from: () => ({ select: () => ({ eq: async () => ({ data: null, error: failure }) }) }) };
+  const result = await getBracketCardRosterTeams(db, "elite");
+  assert.deepEqual(result.teams, []);
+  assert.equal(result.error, failure);
+  assert.equal(getCardStatus(getSuspensionStateFromEvents([], [], []), false, Boolean(result.error)), "يحتاج مراجعة");
 });
 
 test("three historical yellows require three explicit match assignments", () => {

@@ -12,6 +12,7 @@ export type RosterTeamLite = {
 
 type RosterQueryPlayer = { id: string; name: string | null; personal_image_url: string | null };
 type RosterQueryRow = { id: string; team_name: string | null; logo_url: string | null; coach_name: string | null; coach_photo_url: string | null; roster_players: RosterQueryPlayer[] | null };
+type CardRosterQueryRow = { id: string; team_name: string | null; roster_players: { id: string; name: string | null }[] | null };
 type OfficialTeamRow = { name: string | null; logo_url: string | null };
 
 // Same normalization strategy used elsewhere for team-name matching
@@ -51,6 +52,27 @@ export async function getBracketRosterTeams(supabase: SupabaseClient, bracketId:
         .filter((p) => p.name)
         .map((p) => ({ id: p.id as string, name: p.name as string, photoUrl: (p.personal_image_url as string) || null })),
     }));
+}
+
+export async function getBracketCardRosterTeams(supabase: SupabaseClient, bracketId: string) {
+  const { data, error } = await supabase
+    .from("team_rosters")
+    .select("id, team_name, roster_players(id, name)")
+    .eq("bracket_id", bracketId);
+
+  const teams: RosterTeamLite[] = ((data as CardRosterQueryRow[] | null) || [])
+    .filter((row) => row.team_name)
+    .map((row) => ({
+      id: row.id,
+      team: row.team_name as string,
+      logoUrl: null,
+      coachName: null,
+      coachPhotoUrl: null,
+      players: (row.roster_players || [])
+        .filter((player) => player.name)
+        .map((player) => ({ id: player.id, name: player.name as string, photoUrl: null })),
+    }));
+  return { teams, error };
 }
 
 export function buildTeamLogoMap(teams: RosterTeamLite[]): Map<string, string> {
