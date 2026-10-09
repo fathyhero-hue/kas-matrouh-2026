@@ -14,9 +14,41 @@ export async function GET(req: NextRequest) {
   const bracketId = text(req.nextUrl.searchParams.get("bracket_id"));
   if (!bracketId) return bad("bracket_id is required.");
   const db = createServiceRoleClient();
-  const query = await db.from("card_events").select("*").eq("bracket_id", bracketId).order("created_at");
-  if (query.error) return NextResponse.json({ error: "Unable to load card events." }, { status: 500 });
-  return NextResponse.json({ rows: query.data || [] });
+  const query = await db.from("card_events").select("id, bracket_id, match_id, roster_player_id, team_roster_id, card_type, source_card_id, source_card_ordinal, created_at").eq("bracket_id", bracketId).order("created_at");
+  if (query.error) {
+    console.error("Admin card events GET query error", { bracketId, code: query.error.code });
+    return NextResponse.json({ error: "Unable to load card events." }, { status: 500 });
+  }
+  const rows = query.data || [];
+  const playerIds = [...new Set(rows.map((row) => row.roster_player_id))];
+  const teamIds = [...new Set(rows.map((row) => row.team_roster_id))];
+  const matchIds = [...new Set(rows.map((row) => row.match_id))];
+  const [playersQuery, teamsQuery, matchesQuery] = await Promise.all([
+    playerIds.length ? db.from("roster_players").select("id, name, roster_id").in("id", playerIds) : Promise.resolve({ data: [], error: null }),
+    teamIds.length ? db.from("team_rosters").select("id, team_name").in("id", teamIds) : Promise.resolve({ data: [], error: null }),
+    matchIds.length ? db.from("matches").select("id, team_a, team_b, match_date, match_time").in("id", matchIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (playersQuery.error || teamsQuery.error || matchesQuery.error) {
+    console.error("Admin card event identity query error", {
+      bracketId,
+      playerCode: playersQuery.error?.code,
+      teamCode: teamsQuery.error?.code,
+      matchCode: matchesQuery.error?.code,
+    });
+    return NextResponse.json({ error: "Unable to resolve card event identity." }, { status: 500 });
+  }
+  const players = playersQuery.data;
+  const teams = teamsQuery.data;
+  const matches = matchesQuery.data;
+  const playerById = new Map((players || []).map((row) => [row.id, row]));
+  const teamById = new Map((teams || []).map((row) => [row.id, row]));
+  const matchById = new Map((matches || []).map((row) => [row.id, row]));
+  return NextResponse.json({ rows: rows.map((row) => ({
+    ...row,
+    player_name: playerById.get(row.roster_player_id)?.name || "لاعب غير معروف — يحتاج مراجعة",
+    team_name: teamById.get(row.team_roster_id)?.team_name || "فريق غير معروف — يحتاج مراجعة",
+    match: matchById.get(row.match_id) || null,
+  })) });
 }
 
 export async function POST(req: NextRequest) {

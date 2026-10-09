@@ -30,8 +30,16 @@ export async function GET(req: NextRequest) {
   if (!ALLOWED_TABLES.has(table)) return NextResponse.json({ error: "Unsupported stats table." }, { status: 400 });
   if (!bracketId) return NextResponse.json({ error: "bracket_id is required." }, { status: 400 });
   const db = createServiceRoleClient();
-  const query = await db.from(table).select("*").eq("bracket_id", bracketId);
-  if (query.error) return NextResponse.json({ error: "Unable to load stats entries." }, { status: 500 });
+  const columns = table === "cards"
+    ? "id, bracket_id, player, team, yellow, red, match_id, roster_player_id, team_roster_id"
+    : table === "goals"
+      ? "id, bracket_id, player, team, goals, image_url, roster_player_id, team_roster_id"
+      : "id, bracket_id, player, team, match_name, votes, image_url";
+  const query = await db.from(table).select(columns).eq("bracket_id", bracketId);
+  if (query.error) {
+    console.error("Admin stats entries GET query error", { table, bracketId, code: query.error.code });
+    return NextResponse.json({ error: "Unable to load stats entries." }, { status: 500 });
+  }
   return NextResponse.json({ rows: query.data || [] });
 }
 

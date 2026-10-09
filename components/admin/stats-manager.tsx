@@ -10,7 +10,7 @@ import { buildCardEventAssignments, countAssignedCardEvents } from "@/lib/sport/
 
 type Goal = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; goals: number; image_url: string | null };
 type Card = { id: string; bracket_id?: string | null; player: string | null; team: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
-type CardEvent = { id: string; bracket_id: string; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null };
+type CardEvent = { id: string; bracket_id: string; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null; player_name?: string | null; team_name?: string | null };
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
@@ -471,7 +471,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
           <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as "yellow" | "direct_red" })); }} className={`${inputCls} min-w-40`}><option value="yellow">إنذار</option><option value="direct_red">طرد مباشر</option></select>
           <button onClick={() => void addEvent()} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
         </div>
-        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => <div key={event.id} className="flex items-center justify-between"><span>{event.card_type === "yellow" ? "إنذار" : "طرد مباشر"} · {matches.find((match) => match.id === event.match_id)?.team_a} × {matches.find((match) => match.id === event.match_id)?.team_b}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>)}</div>
+        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => { const identity = resolveStatsPlayer({ id: event.id, roster_player_id: event.roster_player_id, team_roster_id: event.team_roster_id, player: event.player_name, team: event.team_name }, rosterTeams); const match = matches.find((item) => item.id === event.match_id); return <div key={event.id} className="flex items-center justify-between"><span>{identity.player} · {identity.team} · {event.card_type === "yellow" ? "إنذار" : "طرد مباشر"}{match ? ` · ${match.team_a} × ${match.team_b}` : ""}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>; })}</div>
       </div>
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
         <TeamPlayerPicker

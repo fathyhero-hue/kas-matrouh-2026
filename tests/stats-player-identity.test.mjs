@@ -207,6 +207,32 @@ test("Card Events UI files contain no common UTF-8 mojibake", () => {
   }
 });
 
+test("admin event GET enriches identity and uses explicit safe columns", () => {
+  const route = fs.readFileSync("app/api/admin/card-events/route.ts", "utf8");
+  assert.match(route, /roster_players/);
+  assert.match(route, /player_name/);
+  assert.match(route, /team_name/);
+  assert.match(route, /لاعب غير معروف/);
+  assert.doesNotMatch(route, /select\("\*"\)/);
+});
+
+test("four direct-red events preserve four player identities in admin rendering", () => {
+  const teams = [{ id: "jerusalem", team: "القدس", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [
+    { id: "p1", name: "وليد صالح حسين", photoUrl: null },
+    { id: "p2", name: "حمزه عبدالعاطي عوض", photoUrl: null },
+    { id: "p3", name: "مصطفي محمد محمود", photoUrl: null },
+    { id: "p4", name: "احمد رمضان اسماعيل", photoUrl: null },
+  ] }];
+  const events = ["p1", "p2", "p3", "p4"].map((roster_player_id, index) => ({
+    id: `red-${index + 1}`, roster_player_id, team_roster_id: "jerusalem", card_type: "direct_red",
+  }));
+  assert.deepEqual(events.map((event) => resolveStatsPlayer(event, teams).player), [
+    "وليد صالح حسين", "حمزه عبدالعاطي عوض", "مصطفي محمد محمود", "احمد رمضان اسماعيل",
+  ]);
+  const manager = fs.readFileSync("components/admin/stats-manager.tsx", "utf8");
+  assert.match(manager, /resolveStatsPlayer\(\{ id: event\.id/);
+});
+
 test("card events migration is additive and event based", () => {
   const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
   assert.match(migration, /create table if not exists public\.card_events/);
