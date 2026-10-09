@@ -88,7 +88,21 @@ export function lookupTeamLogo(logos: Map<string, string>, team?: string | null)
 
 // Convenience wrapper for pages that only need the team->logo map.
 export async function getBracketTeamLogos(supabase: SupabaseClient, bracketId: string): Promise<Map<string, string>> {
-  return buildTeamLogoMap(await getBracketRosterTeams(supabase, bracketId));
+  const [{ data: rosters, error: rosterError }, { data: officialTeams, error: officialError }] = await Promise.all([
+    supabase.from("team_rosters").select("team_name, logo_url").eq("bracket_id", bracketId),
+    supabase.from("elite_teams").select("name, logo_url"),
+  ]);
+  if (rosterError) throw rosterError;
+  if (officialError) throw officialError;
+
+  const logos = new Map<string, string>();
+  for (const team of (officialTeams as OfficialTeamRow[] | null) || []) {
+    if (team.name && team.logo_url) logos.set(normalize(team.name), team.logo_url);
+  }
+  for (const roster of (rosters as Pick<RosterQueryRow, "team_name" | "logo_url">[] | null) || []) {
+    if (roster.team_name && roster.logo_url) logos.set(normalize(roster.team_name), roster.logo_url);
+  }
+  return logos;
 }
 
 // Returns a (team, player) -> photoUrl lookup function, built once per page load.

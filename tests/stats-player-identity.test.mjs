@@ -31,7 +31,7 @@ const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/sus
 const { getSuspensionStateFromEvents, getCardStatus } = load("lib/sport/suspensions.ts");
 const { getCardTotalsWithEvents, hasUnassignedCards } = load("lib/sport/stats-player.ts");
 const { buildCardEventAssignments, countAssignedCardEvents } = load("lib/sport/card-event-distribution.ts");
-const { getBracketCardRosterTeams } = load("lib/sport/roster-link.ts");
+const { getBracketCardRosterTeams, getBracketTeamLogos, lookupTeamLogo } = load("lib/sport/roster-link.ts");
 
 const teamA = {
   id: "team-a",
@@ -140,6 +140,34 @@ test("public match cards render real logo URLs and keep the placeholder fallback
   assert.match(matchCardSource, /<img src=\{src\}/);
   assert.doesNotMatch(matchCardSource, /from ["']next\/image["']/);
   assert.match(matchCardSource, /<Shield/);
+});
+
+test("public match logos use only publicly readable roster columns", async () => {
+  const selects = [];
+  const supabase = {
+    from(table) {
+      return {
+        select(columns) {
+          selects.push([table, columns]);
+          if (table === "team_rosters") {
+            return {
+              eq(column, value) {
+                assert.equal(column, "bracket_id");
+                assert.equal(value, "elite-bracket");
+                assert.equal(columns, "team_name, logo_url");
+                return Promise.resolve({ data: [{ team_name: " Team A ", logo_url: "https://example.com/roster-a.png" }], error: null });
+              },
+            };
+          }
+          return Promise.resolve({ data: [{ name: "Team A", logo_url: "https://example.com/official-a.png" }, { name: "Team B", logo_url: "https://example.com/official-b.png" }], error: null });
+        },
+      };
+    },
+  };
+  const logos = await getBracketTeamLogos(supabase, "elite-bracket");
+  assert.deepEqual(selects, [["team_rosters", "team_name, logo_url"], ["elite_teams", "name, logo_url"]]);
+  assert.equal(lookupTeamLogo(logos, "team a"), "https://example.com/roster-a.png");
+  assert.equal(lookupTeamLogo(logos, "Team B"), "https://example.com/official-b.png");
 });
 
 
