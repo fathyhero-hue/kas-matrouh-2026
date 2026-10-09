@@ -28,8 +28,8 @@ const { UNKNOWN_PLAYER, UNKNOWN_TEAM, addEventOnlyCardRows, groupCardsByPlayer, 
 const rosterLinkSource = fs.readFileSync("lib/sport/roster-link.ts", "utf8");
 const matchCardSource = fs.readFileSync("components/sport/match-card.tsx", "utf8");
 const { getSuspensionState, getPlayerEligibilityForMatch } = load("lib/sport/suspensions.ts");
-const { getSuspensionStateFromEvents } = load("lib/sport/suspensions.ts");
-const { getCardTotalsWithEvents } = load("lib/sport/stats-player.ts");
+const { getSuspensionStateFromEvents, getCardStatus } = load("lib/sport/suspensions.ts");
+const { getCardTotalsWithEvents, hasUnassignedCards } = load("lib/sport/stats-player.ts");
 const { buildCardEventAssignments, countAssignedCardEvents } = load("lib/sport/card-event-distribution.ts");
 
 const teamA = {
@@ -375,7 +375,75 @@ test("legacy distribution does not double count totals while new events are adde
     { card_type: "direct_red", is_historical_distribution: true },
     { card_type: "direct_red", source_card_id: null },
   ]);
-  assert.deepEqual(totals, { yellow: 4, red: 2 });
+  assert.deepEqual(totals, { yellow: 3, red: 2 });
+});
+
+test("a direct red recorded in cards and card_events counts once and suspends", () => {
+  const matches = [
+    { id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" },
+    { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-02", status: "scheduled" },
+  ];
+  const teams = [{ id: "t", team: "A", players: [{ id: "p", name: "P" }] }];
+  const events = [{ id: "r1", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red", source_card_id: null }];
+  const totals = getCardTotalsWithEvents({ yellow: 0, red: 1 }, events);
+  const state = getSuspensionStateFromEvents(events, matches, teams);
+  assert.equal(totals.red, 1);
+  assert.equal(getCardStatus(state, hasUnassignedCards({ red: 1 }, events)), "موقوف مباراة");
+  assert.equal(state.suspensionMatchId, "m2");
+});
+
+test("third yellow suspends for the following team match, not the trigger", () => {
+  const matches = [1, 2, 3, 4].map((n) => ({ id: `m${n}`, team_a: "A", team_b: "B", match_date: `2026-10-0${n}`, status: n <= 3 ? "finished" : "scheduled" }));
+  const events = [1, 2, 3].map((n) => ({ id: `y${n}`, match_id: `m${n}`, roster_player_id: "p", team_roster_id: "t", card_type: "yellow" }));
+  const teams = [{ id: "t", team: "A", players: [{ id: "p", name: "P" }] }];
+  const state = getSuspensionStateFromEvents(events, matches, teams);
+  assert.equal(state.suspensionMatchId, "m4");
+  assert.equal(getPlayerEligibilityForMatch(state, "m3").eligible, true);
+  assert.equal(getPlayerEligibilityForMatch(state, "m4").eligible, false);
+  assert.equal(getCardStatus(state, false), "موقوف مباراة");
+  matches[3].status = "postponed";
+  const pending = getSuspensionStateFromEvents(events, matches, teams);
+  assert.equal(getCardStatus(pending, false), "موقوف مباراة");
+  assert.equal(pending.suspensionMatchId, null);
+  matches[3].status = "finished";
+  assert.equal(getCardStatus(getSuspensionStateFromEvents(events, matches, teams), false), "متاح");
+});
+
+test("a postponed match does not serve the ban, but the next completed team match does", () => {
+  const matches = [
+    { id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" },
+    { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-02", status: "postponed" },
+    { id: "m3", team_a: "A", team_b: "D", match_date: "2026-10-03", status: "scheduled" },
+  ];
+  const events = [{ id: "r1", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" }];
+  const teams = [{ id: "t", team: "A", players: [] }];
+  const pending = getSuspensionStateFromEvents(events, matches, teams);
+  assert.equal(getCardStatus(pending, false), "موقوف مباراة");
+  assert.equal(pending.suspensionMatchId, "m3");
+  assert.equal(getPlayerEligibilityForMatch(pending, "m3").eligible, false);
+  matches[2].status = "finished";
+  assert.equal(getCardStatus(getSuspensionStateFromEvents(events, matches, teams), false), "متاح");
+});
+
+test("a sanction remains active without a scheduled next match", () => {
+  const events = [{ id: "r1", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" }];
+  const matches = [{ id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" }];
+  const state = getSuspensionStateFromEvents(events, matches, [{ id: "t", team: "A", players: [] }]);
+  assert.equal(state.isSuspended, true);
+  assert.equal(state.suspensionMatchId, null);
+  assert.equal(getPlayerEligibilityForMatch(state, "future-match").eligible, false);
+});
+
+test("missing event or match evidence requires review", () => {
+  assert.equal(getCardStatus(getSuspensionStateFromEvents([], [], []), hasUnassignedCards({ red: 1 }, [])), "يحتاج مراجعة");
+  const event = { id: "r1", match_id: "missing", roster_player_id: "p", team_roster_id: "t", card_type: "direct_red" };
+  assert.equal(getCardStatus(getSuspensionStateFromEvents([event], [], []), false), "يحتاج مراجعة");
+  assert.equal(getCardStatus(getSuspensionStateFromEvents([], [], []), false, true), "يحتاج مراجعة");
+  const sameDay = [
+    { id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" },
+    { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-01", status: "scheduled" },
+  ];
+  assert.equal(getCardStatus(getSuspensionStateFromEvents([{ ...event, match_id: "m1" }], sameDay, [{ id: "t", team: "A", players: [] }]), false), "يحتاج مراجعة");
 });
 
 test("three historical yellows require three explicit match assignments", () => {

@@ -94,11 +94,19 @@ export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string;
 }
 
 export function getCardTotalsWithEvents(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null; is_historical_distribution?: boolean }[]) {
-  const newEvents = events.filter((event) => !(event.is_historical_distribution ?? Boolean(event.source_card_id)));
+  const eventYellow = events.filter((event) => event.card_type === "yellow").length;
+  const eventRed = events.filter((event) => event.card_type === "direct_red").length;
+  // A legacy counter may describe the same physical cards as independently entered events.
+  // Without a source link, count the larger known total rather than adding both.
   return {
-    yellow: (Number(legacy.yellow) || 0) + newEvents.filter((event) => event.card_type === "yellow").length,
-    red: (Number(legacy.red) || 0) + newEvents.filter((event) => event.card_type === "direct_red").length,
+    yellow: Math.max(Number(legacy.yellow) || 0, eventYellow),
+    red: Math.max(Number(legacy.red) || 0, eventRed),
   };
+}
+
+export function hasUnassignedCards(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null }[]) {
+  return (Number(legacy.yellow) || 0) > events.filter((event) => event.card_type === "yellow").length ||
+    (Number(legacy.red) || 0) > events.filter((event) => event.card_type === "direct_red").length;
 }
 
 export type ValidationRoster = { id: string; bracket_id: string; team_name: string | null };

@@ -65,6 +65,7 @@ export default async function AdminStatsPage({
           initialGoals={(goals.data || []) as never[]}
           initialCards={(cards.data || []) as never[]}
           initialCardEvents={(cardEvents.data || []) as never[]}
+          cardDataError={Boolean(cards.error || cardEvents.error || matches.error)}
           initialMotm={(motm.data || []) as never[]}
           initialFormations={(formations.data || []) as never[]}
           matches={(matches.data || []) as never[]}
