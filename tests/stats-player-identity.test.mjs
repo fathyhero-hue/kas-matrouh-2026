@@ -233,6 +233,33 @@ test("four direct-red events preserve four player identities in admin rendering"
   assert.match(manager, /resolveStatsPlayer\(\{ id: event\.id/);
 });
 
+test("public direct-red events resolve four distinct names without legacy card rows", () => {
+  const events = [
+    ["event-1", "p1", "وليد صالح حسين"],
+    ["event-2", "p2", "حمزه عبدالعاطي عوض"],
+    ["event-3", "p3", "مصطفي محمد محمود"],
+    ["event-4", "p4", "احمد رمضان اسماعيل"],
+  ].map(([id, roster_player_id, player_name]) => ({
+    id, roster_player_id, team_roster_id: "jerusalem", player_name, team_name: "القدس", card_type: "direct_red",
+  }));
+  const rows = addEventOnlyCardRows([], events, []);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows.map((row) => resolveStatsPlayer(row, []).player), events.map((event) => event.player_name));
+  assert.equal(rows.reduce((total, row) => total + (Number(row.red) || 0), 0), 4);
+  const publicEvents = fs.readFileSync("lib/sport/public-card-events.ts", "utf8");
+  assert.match(publicEvents, /from\("roster_players"\)\.select\("id, roster_id, name"\)/);
+  assert.match(publicEvents, /from\("team_rosters"\)\.select\("id, team_name"\)/);
+  assert.match(publicEvents, /player_name:/);
+});
+
+test("event-only admin rows cannot call legacy card mutation actions", () => {
+  const manager = fs.readFileSync("components/admin/stats-manager.tsx", "utf8");
+  assert.match(manager, /const isPersistedCard = rows\.some\(\(row\) => row\.id === c\.id\)/);
+  assert.match(manager, /\{isPersistedCard && <>[\s\S]*updateCard\(c as Card/);
+  assert.match(manager, /if \(!rows\.some\(\(current\) => current\.id === row\.id\)\) return;/);
+  assert.match(manager, /if \(!rows\.some\(\(row\) => row\.id === id\)\) return;/);
+});
+
 test("card events migration is additive and event based", () => {
   const migration = fs.readFileSync("supabase/migrations/20261008220000_card_events.sql", "utf8");
   assert.match(migration, /create table if not exists public\.card_events/);

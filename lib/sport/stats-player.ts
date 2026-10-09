@@ -72,12 +72,20 @@ export function groupCardsByPlayer(rows: CardStatsRow[], teams: RosterTeamLite[]
   return [...grouped.values()].sort((a, b) => (Number(b.red) || 0) - (Number(a.red) || 0) || (Number(b.yellow) || 0) - (Number(a.yellow) || 0));
 }
 
-export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red" }[], teams: RosterTeamLite[]) {
+export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; player_name?: string | null; team_name?: string | null }[], teams: RosterTeamLite[]) {
   const known = new Set(rows.map((row) => resolveStatsPlayer(row, teams).rosterPlayerId).filter(Boolean));
   const synthetic = new Map<string, CardStatsRow>();
   for (const event of events) {
     if (known.has(event.roster_player_id)) continue;
-    const current = synthetic.get(event.roster_player_id) || { id: `event:${event.roster_player_id}`, roster_player_id: event.roster_player_id, team_roster_id: event.team_roster_id, yellow: 0, red: 0 };
+    const current = synthetic.get(event.roster_player_id) || {
+      id: `event:${event.roster_player_id}`,
+      roster_player_id: event.roster_player_id,
+      team_roster_id: event.team_roster_id,
+      player: event.player_name || UNKNOWN_PLAYER,
+      team: event.team_name || UNKNOWN_TEAM,
+      yellow: 0,
+      red: 0,
+    };
     if (event.card_type === "yellow") current.yellow = (Number(current.yellow) || 0) + 1;
     else current.red = (Number(current.red) || 0) + 1;
     synthetic.set(event.roster_player_id, current);

@@ -425,6 +425,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   };
 
   const updateCard = async (row: Card, field: "yellow" | "red", delta: number) => {
+    if (!rows.some((current) => current.id === row.id)) return;
     const value = Math.max(0, (row[field] || 0) + delta);
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, [field]: value } : r)));
     try {
@@ -435,6 +436,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   };
 
   const remove = async (id: string) => {
+    if (!rows.some((row) => row.id === id)) return;
     try {
       await fetch(`/api/admin/stats-entries?table=cards&id=${id}`, { method: "DELETE" });
       setRows((prev) => prev.filter((r) => r.id !== id));
@@ -444,6 +446,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
   };
 
   const beginEdit = (row: Card) => {
+    if (!rows.some((current) => current.id === row.id)) return;
     const team = rosterTeams.find((item) => item.id === row.team_roster_id) || rosterTeams.find((item) => item.team === row.team);
     const player = team?.players.find((item) => item.id === row.roster_player_id) || team?.players.find((item) => item.name === row.player);
     setEditingId(row.id);
@@ -498,6 +501,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
             const display = resolveStatsPlayer(c, rosterTeams);
             const suspension = getSuspensionStateFromEvents(events.filter((event) => event.roster_player_id === c.roster_player_id), matches, rosterTeams);
             const totals = getCardTotalsWithEvents(c, events.filter((event) => event.roster_player_id === c.roster_player_id));
+            const isPersistedCard = rows.some((row) => row.id === c.id);
             return (
             <div key={c.id} className="relative flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
               <div className="min-w-0 flex-1">
@@ -507,6 +511,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
                 {suspension.needsMatchAssignment && <div className="text-[11px] font-bold text-accent-orange">يحتاج تحديد المباراة</div>}
                 {!suspension.needsMatchAssignment && (suspension.isSuspended ? <div className="text-[11px] font-bold text-destructive">موقوف مباراة · {suspension.reason === "combined" ? "تراكم 3 إنذارات وطرد مباشر" : suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}</div> : <div className="text-[11px] font-bold text-accent-green">متاح</div>)}
               </div>
+              {isPersistedCard && <>
               <div className="flex items-center gap-1">
                 <button onClick={() => updateCard(c as Card, "yellow", -1)} className="h-6 w-6 rounded bg-white/5 text-[11px] font-black">âˆ’</button>
                 <span className="w-8 text-center text-[11px] font-black">ðŸŸ¨{c.yellow || 0}</span>
@@ -528,6 +533,7 @@ function CardsTab({ bracketId, initial, initialEvents, rosterTeams, matches }: {
                   <button onClick={() => setEditingId(null)} aria-label="إلغاء تعديل اللاعب" className="rounded-lg bg-white/5 p-2 text-muted-foreground"><X className="h-4 w-4" /></button>
                 </div>
               )}
+              </>}
             </div>
             );
           })

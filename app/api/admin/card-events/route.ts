@@ -43,12 +43,15 @@ export async function GET(req: NextRequest) {
   const playerById = new Map((players || []).map((row) => [row.id, row]));
   const teamById = new Map((teams || []).map((row) => [row.id, row]));
   const matchById = new Map((matches || []).map((row) => [row.id, row]));
-  return NextResponse.json({ rows: rows.map((row) => ({
-    ...row,
-    player_name: playerById.get(row.roster_player_id)?.name || "لاعب غير معروف — يحتاج مراجعة",
-    team_name: teamById.get(row.team_roster_id)?.team_name || "فريق غير معروف — يحتاج مراجعة",
-    match: matchById.get(row.match_id) || null,
-  })) });
+  return NextResponse.json({ rows: rows.map((row) => {
+    const player = playerById.get(row.roster_player_id);
+    return {
+      ...row,
+      player_name: player && player.roster_id === row.team_roster_id ? player.name || "لاعب غير معروف — يحتاج مراجعة" : "لاعب غير معروف — يحتاج مراجعة",
+      team_name: teamById.get(row.team_roster_id)?.team_name || "فريق غير معروف — يحتاج مراجعة",
+      match: matchById.get(row.match_id) || null,
+    };
+  }) });
 }
 
 export async function POST(req: NextRequest) {
