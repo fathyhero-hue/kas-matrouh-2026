@@ -10,9 +10,9 @@ import { SponsorsMarquee } from "@/components/home/sponsors-marquee";
 export const revalidate = 15;
 
 const TOURNAMENT_CARDS = [
-  { href: "/matrouh-cup", title: "كأس مطروح", subtitle: "البطولة الرئيسية", icon: "🏆" },
-  { href: "/elite-cup", title: "كأس النخبة", subtitle: "بطولة النخبة", icon: "⭐" },
-  { href: "/ramadan-cup", title: "بطولة حزب الشعب الجمهوري", subtitle: "البطولة الرمضانية", icon: "🌙" },
+  { href: "/matrouh-cup", title: "كأس مطروح", subtitle: "البطولة الرئيسية", image: "/images/tournaments/matrouh-cup.png" },
+  { href: "/elite-cup", title: "كأس النخبة", subtitle: "بطولة النخبة", image: "/images/tournaments/elite-cup.png" },
+  { href: "/ramadan-cup", title: "بطولة حزب الشعب الجمهوري", subtitle: "البطولة الرمضانية", image: "/images/tournaments/republican-party.png" },
 ];
 
 async function getTicker() {
@@ -57,7 +57,9 @@ export default async function NewHomePage() {
               href={t.href}
               className="group rounded-2xl bg-card p-6 text-center ring-1 ring-white/10 transition-all hover:-translate-y-1 hover:ring-accent-blue/50"
             >
-              <div className="text-4xl">{t.icon}</div>
+              <div className="mx-auto flex h-24 w-24 items-center justify-center">
+                <Image src={t.image} alt={t.title} width={96} height={96} sizes="96px" className="h-full w-full object-contain" />
+              </div>
               <div className="mt-3 text-h3 font-black">{t.title}</div>
               <div className="mt-1 text-caption text-muted-foreground">{t.subtitle}</div>
             </Link>
