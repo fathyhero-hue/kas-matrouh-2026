@@ -19,6 +19,7 @@ export const ADMIN_PERMISSIONS = [
   "matches.delete",
   "matches.schedule.manage",
   "matches.live.manage",
+  "matches.live.correct_score",
   "matches.results.manage",
   "stats.view",
   "stats.goals.manage",

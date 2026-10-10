@@ -38,6 +38,8 @@ test("supervisor is operational but cannot administer the system", () => {
 
 test("specialized roles stay within their domains by default", () => {
   assert.equal(hasAdminPermission("match_manager", "matches.results.manage"), true);
+  assert.equal(hasAdminPermission("match_manager", "matches.live.manage"), true);
+  assert.equal(hasAdminPermission("viewer", "matches.live.manage"), false);
   assert.equal(hasAdminPermission("viewer", "matches.results.manage"), false);
   assert.equal(hasAdminPermission("match_manager", "rosters.edit"), false);
   assert.equal(hasAdminPermission("registration_manager", "rosters.players.manage"), true);
@@ -50,6 +52,13 @@ test("specialized roles stay within their domains by default", () => {
   assert.equal(hasAdminPermission("shop_manager", "shop.orders.financial.manage"), false);
   assert.equal(hasAdminPermission("viewer", "matches.view"), true);
   assert.equal(hasAdminPermission("viewer", "matches.edit"), false);
+});
+
+test("live score correction is granted to super admin only by default", () => {
+  assert.equal(hasAdminPermission("super_admin", "matches.live.correct_score"), true);
+  assert.equal(hasAdminPermission("supervisor", "matches.live.correct_score"), false);
+  assert.equal(hasAdminPermission("match_manager", "matches.live.correct_score"), false);
+  assert.equal(hasAdminPermission("viewer", "matches.live.correct_score"), false);
 });
 
 test("per-admin overrides support grants and deny wins", () => {

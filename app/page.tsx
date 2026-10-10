@@ -1,13 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Radio, ShoppingBag, IdCard, ArrowLeft } from "lucide-react";
+import { ShoppingBag, IdCard, ArrowLeft } from "lucide-react";
 import { createPublicClient } from "@/lib/supabase/public";
-import { MatchCard } from "@/components/sport/match-card";
+import { LiveMatchSections } from "@/components/home/live-match-sections";
 import { NewsTicker } from "@/components/home/news-ticker";
 import { NewsSection } from "@/components/home/news-section";
 import { SponsorsMarquee } from "@/components/home/sponsors-marquee";
-import { TOURNAMENTS, type TournamentSlug } from "@/lib/sport/tournaments";
-import { getBracketTeamLogos, lookupTeamLogo } from "@/lib/sport/roster-link";
 
 export const revalidate = 15;
 
@@ -17,22 +15,12 @@ const TOURNAMENT_CARDS = [
   { href: "/ramadan-cup", title: "بطولة حزب الشعب الجمهوري", subtitle: "البطولة الرمضانية", icon: "🌙" },
 ];
 
-function resolveTournamentLink(suffix: string): { href: string; label: string } | null {
-  for (const slug of Object.keys(TOURNAMENTS) as TournamentSlug[]) {
-    const config = TOURNAMENTS[slug];
-    const edition = config.editions.find((e) => e.suffix === suffix);
-    if (edition) {
-      const qs = edition.key !== config.defaultEdition ? `?edition=${edition.key}` : "";
-      return { href: `/${slug}${qs}`, label: config.editions.length > 1 ? `${config.label} — ${edition.label}` : config.label };
-    }
-  }
-  return null;
-}
-
 async function getTicker() {
   const supabase = createPublicClient();
   const { data } = await supabase.from("app_settings").select("value").eq("key", "ticker").maybeSingle();
-  return ((data?.value as any)?.text as string) || "";
+  const value = data?.value;
+  return value && typeof value === "object" && !Array.isArray(value) &&
+    "text" in value && typeof value.text === "string" ? value.text : "";
 }
 
 async function getNews() {
@@ -41,46 +29,8 @@ async function getNews() {
   return data || [];
 }
 
-async function getLiveMatches() {
-  const supabase = createPublicClient();
-  const { data } = await supabase
-    .from("matches")
-    .select("*, brackets(legacy_suffix)")
-    .eq("is_live", true)
-    .order("match_date", { ascending: true });
-  return data || [];
-}
-
-async function getUpcomingMatch() {
-  const supabase = createPublicClient();
-  const { data } = await supabase
-    .from("matches")
-    .select("*, brackets(legacy_suffix)")
-    .eq("is_live", false)
-    .neq("status", "انتهت")
-    .order("match_date", { ascending: true })
-    .order("match_time", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  return data || null;
-}
-
 export default async function NewHomePage() {
-  const [ticker, liveMatches, news] = await Promise.all([getTicker(), getLiveMatches(), getNews()]);
-  const upcomingMatch = liveMatches.length === 0 ? await getUpcomingMatch() : null;
-
-  // Live/upcoming matches can belong to different tournaments — resolve each
-  // one's real team logos from its own bracket's roster.
-  const supabase = createPublicClient();
-  const bracketIds = [...new Set([...liveMatches, ...(upcomingMatch ? [upcomingMatch] : [])].map((m: any) => m.bracket_id).filter(Boolean))];
-  const logosByBracket = new Map<string, Map<string, string>>();
-  await Promise.all(
-    bracketIds.map(async (id) => {
-      logosByBracket.set(id, await getBracketTeamLogos(supabase, id));
-    })
-  );
-  const teamLogo = (bracketId: string, team: string | null, fallback: string | null) =>
-    lookupTeamLogo(logosByBracket.get(bracketId) || new Map(), team) || fallback;
+  const [ticker, news] = await Promise.all([getTicker(), getNews()]);
 
   return (
     <main dir="rtl" className="min-h-screen">
@@ -96,64 +46,7 @@ export default async function NewHomePage() {
         </p>
       </section>
 
-      {liveMatches.length > 0 && (
-        <section className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="mb-3 flex items-center gap-1.5 text-caption font-bold text-destructive">
-            <Radio className="h-3.5 w-3.5 animate-pulse" />
-            <span>مباريات جارية الآن ({liveMatches.length})</span>
-          </div>
-          <div className={`grid gap-4 ${liveMatches.length > 1 ? "sm:grid-cols-2 lg:grid-cols-3" : "mx-auto max-w-md"}`}>
-            {liveMatches.map((match: any) => {
-              const link = resolveTournamentLink(match.brackets?.legacy_suffix ?? "");
-              const card = (
-                <MatchCard
-                  teamA={match.team_a}
-                  teamALogo={teamLogo(match.bracket_id, match.team_a, match.team_a_logo)}
-                  teamB={match.team_b}
-                  teamBLogo={teamLogo(match.bracket_id, match.team_b, match.team_b_logo)}
-                  homeGoals={match.home_goals}
-                  awayGoals={match.away_goals}
-                  status={match.status}
-                  matchDate={match.match_date}
-                  matchTime={match.match_time}
-                  round={link?.label || match.round}
-                  isLive={match.is_live}
-                  liveMinute={match.live_minute}
-                  className={link ? "transition-all hover:-translate-y-0.5 hover:ring-destructive/40" : undefined}
-                />
-              );
-              return link ? (
-                <Link key={match.id} href={link.href}>{card}</Link>
-              ) : (
-                <div key={match.id}>{card}</div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {!liveMatches.length && upcomingMatch && (
-        <section className="mx-auto max-w-md px-4 sm:px-6">
-          <div className="mb-2 flex items-center gap-1.5 text-caption font-bold text-accent-orange">
-            <Radio className="h-3.5 w-3.5" />
-            <span>المباراة القادمة</span>
-          </div>
-          <MatchCard
-            teamA={upcomingMatch.team_a}
-            teamALogo={teamLogo(upcomingMatch.bracket_id, upcomingMatch.team_a, upcomingMatch.team_a_logo)}
-            teamB={upcomingMatch.team_b}
-            teamBLogo={teamLogo(upcomingMatch.bracket_id, upcomingMatch.team_b, upcomingMatch.team_b_logo)}
-            homeGoals={upcomingMatch.home_goals}
-            awayGoals={upcomingMatch.away_goals}
-            status={upcomingMatch.status}
-            matchDate={upcomingMatch.match_date}
-            matchTime={upcomingMatch.match_time}
-            round={resolveTournamentLink(upcomingMatch.brackets?.legacy_suffix ?? "")?.label || upcomingMatch.round}
-            isLive={upcomingMatch.is_live}
-            liveMinute={upcomingMatch.live_minute}
-          />
-        </section>
-      )}
+      <LiveMatchSections />
 
       <section className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
         <h2 className="mb-5 text-h2 font-black">اختر البطولة</h2>

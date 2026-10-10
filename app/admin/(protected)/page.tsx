@@ -1,7 +1,7 @@
 import { requireAdminPagePermission } from "@/lib/admin/authorization";
 import type { AdminPermission } from "@/lib/admin/permissions";
 import Link from "next/link";
-import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper, IdCard, Target } from "lucide-react";
+import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper, IdCard, Target, Radio } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +69,13 @@ export default async function AdminDashboard() {
       icon: Target,
       title: "إدارة التوقعات",
       subtitle: "مراجعة توقعات المشاركين واحتساب النقاط",
+    },
+    {
+      href: "/admin/live",
+      permission: "matches.live.manage" as AdminPermission,
+      icon: Radio,
+      title: "البث المباشر",
+      subtitle: "بدء المباريات وإدارة فتراتها يدويًا",
     },
     {
       href: "/admin/media",

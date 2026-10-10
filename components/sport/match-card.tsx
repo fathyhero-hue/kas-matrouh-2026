@@ -11,6 +11,7 @@ export type MatchCardProps = {
   status?: string | null;
   matchDate?: string | null;
   matchTime?: string | null;
+  venue?: string | null;
   round?: string | null;
   isLive?: boolean;
   liveMinute?: number | null;
@@ -35,7 +36,7 @@ const notStarted = (status?: string | null) => !status || status === "لم تب�
 
 export function MatchCard({
   teamA, teamALogo, teamB, teamBLogo, homeGoals, awayGoals,
-  status, matchDate, matchTime, round, isLive, liveMinute, className,
+  status, matchDate, matchTime, venue, round, isLive, liveMinute, className,
 }: MatchCardProps) {
   const finished = isFinished(status);
   const upcoming = notStarted(status);
@@ -77,6 +78,7 @@ export function MatchCard({
           <TeamLogo src={teamBLogo} name={teamB} />
           <span className="text-caption font-black leading-tight">{teamB}</span>
         </div>
+        {venue?.trim() && <div className="mt-3 text-center text-xs font-bold text-muted-foreground">{venue}</div>}
       </div>
     </div>
   );

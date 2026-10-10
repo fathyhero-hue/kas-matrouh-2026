@@ -2,8 +2,8 @@
 
 export type SuspensionMatch = { id: string; bracket_id?: string; team_a: string | null; team_b: string | null; match_date?: string | null; match_time?: string | null; status?: string | null };
 export type SuspensionCard = { id: string; bracket_id?: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; player?: string | null; team?: string | null; yellow?: number | null; red?: number | null };
-export type CardEvent = { id: string; bracket_id?: string | null; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null };
-export type SuspensionReason = "yellow_accumulation" | "direct_red" | "combined";
+export type CardEvent = { id: string; bracket_id?: string | null; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red" | "second_yellow_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null };
+export type SuspensionReason = "yellow_accumulation" | "direct_red" | "second_yellow_red" | "combined";
 export type SuspensionState = { isSuspended: boolean; reason: SuspensionReason | null; yellowCountInCycle: number; triggerMatchId: string | null; suspensionMatchId: string | null; suspensionMatchIds?: string[]; served: boolean; needsMatchAssignment: boolean; needsReview?: boolean };
 
 const COMPLETED = new Set(["انتهت", "finished", "completed"]);
@@ -65,13 +65,15 @@ export function getSuspensionStateFromEvents(events: CardEvent[], matches: Suspe
     if (!team || ![group.match.team_a, group.match.team_b].map((name) => normalize(name || "")).includes(normalize(team))) { needsReview = true; continue; }
     const teamMatches = matches.filter((match) => [match.team_a, match.team_b].some((name) => normalize(name || "") === normalize(team)));
     if (teamMatches.some((match) => !match.match_date || (match.id !== group.match.id && match.match_date === group.match.match_date && (!match.match_time || !group.match.match_time)))) needsReview = true;
-    const yellow = group.events.filter((event) => event.card_type === "yellow").length;
+    const secondYellowRed = group.events.filter((event) => event.card_type === "second_yellow_red").length;
+    const yellow = group.events.filter((event) => event.card_type === "yellow").length + secondYellowRed * 2;
     const directRed = group.events.some((event) => event.card_type === "direct_red");
     const reachesThirdYellow = yellowCountInCycle + yellow >= 3;
     yellowCountInCycle = reachesThirdYellow ? 0 : yellowCountInCycle + yellow;
     const next = nextTeamMatch(matches, team, group.match);
     if (next && !next.match_date) needsReview = true;
     if (directRed && reachesThirdYellow) sanctions.push({ reason: "combined", triggerMatchId: group.match.id, suspensionMatchId: next?.id || null, team });
+    else if (secondYellowRed) sanctions.push({ reason: "second_yellow_red", triggerMatchId: group.match.id, suspensionMatchId: next?.id || null, team });
     else if (directRed) sanctions.push({ reason: "direct_red", triggerMatchId: group.match.id, suspensionMatchId: next?.id || null, team });
     else if (reachesThirdYellow) sanctions.push({ reason: "yellow_accumulation", triggerMatchId: group.match.id, suspensionMatchId: next?.id || null, team });
   }

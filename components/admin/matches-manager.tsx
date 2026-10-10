@@ -21,6 +21,7 @@ type Match = {
   stage: string;
   match_date: string;
   match_time: string;
+  venue?: string | null;
   status: string;
   day_name: string | null;
   is_live: boolean;
@@ -54,6 +55,7 @@ function emptyForm(bracketId: string) {
     status: "لم تبدأ",
     match_date: new Date().toISOString().slice(0, 10),
     match_time: "15:30",
+    venue: "",
   };
 }
 
@@ -180,6 +182,7 @@ export function MatchesManager({
       status: m.status || "لم تبدأ",
       match_date: m.match_date,
       match_time: m.match_time?.slice(0, 5) || "15:30",
+      venue: m.venue || "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -320,6 +323,7 @@ export function MatchesManager({
         <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <input type="date" value={form.match_date} onChange={(e) => setForm({ ...form, match_date: e.target.value })} className={inputCls} />
           <input type="time" value={form.match_time} onChange={(e) => setForm({ ...form, match_time: e.target.value })} className={`${inputCls} text-center`} />
+          <input type="text" maxLength={200} value={form.venue || ""} onChange={(e) => setForm({ ...form, venue: e.target.value })} className={inputCls} placeholder="الملعب (اختياري)" />
           <select value={form.round} onChange={(e) => setForm({ ...form, round: e.target.value })} className={inputCls}>
             {roundOptions.map((r) => (
               <option key={r} value={r}>{r}</option>
@@ -369,7 +373,7 @@ export function MatchesManager({
               {items.map((m) => (
                 <div key={m.id} className={`overflow-hidden rounded-2xl ring-1 ${m.is_live ? "bg-red-950/20 ring-red-500/50" : "bg-card ring-white/10"}`}>
                   <div className={`flex items-center justify-between px-4 py-2 text-[10px] font-bold ${m.is_live ? "bg-red-600 text-white" : "bg-secondary text-muted-foreground"}`}>
-                    <span>{m.day_name} • {m.match_date} • {m.match_time?.slice(0, 5)}</span>
+                    <span>{m.day_name} • {m.match_date} • {m.match_time?.slice(0, 5)}{m.venue ? ` • ${m.venue}` : ""}</span>
                     {m.is_live && <span className="animate-pulse font-black">🔴 مباشر</span>}
                   </div>
                   <div className="grid grid-cols-1 gap-3 p-4 xl:grid-cols-2">

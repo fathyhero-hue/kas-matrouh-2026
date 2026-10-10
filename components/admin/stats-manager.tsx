@@ -10,7 +10,7 @@ import { buildCardEventAssignments, countAssignedCardEvents } from "@/lib/sport/
 
 type Goal = { id: string; player: string | null; team: string | null; roster_player_id?: string | null; team_roster_id?: string | null; goals: number; image_url: string | null };
 type Card = { id: string; bracket_id?: string | null; player: string | null; team: string | null; match_id?: string | null; roster_player_id?: string | null; team_roster_id?: string | null; yellow: number; red: number };
-type CardEvent = { id: string; bracket_id: string; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null; player_name?: string | null; team_name?: string | null };
+type CardEvent = { id: string; bracket_id: string; match_id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red" | "second_yellow_red"; source_card_id?: string | null; source_card_ordinal?: number | null; created_at?: string | null; player_name?: string | null; team_name?: string | null };
 type Motm = { id: string; player: string; team: string; match_name: string | null; image_url: string | null; rating: number | null };
 type FormationPlayer = { id?: string; name: string; team: string; image_url: string; slot_index: number };
 type Formation = { id: string; round: string; coach_name: string | null; coach_team: string | null; coach_image_url: string | null; formation_players: FormationPlayer[] };
@@ -373,7 +373,7 @@ function HistoricalCardDistribution({ row, events, matches, onSaved }: { row: Ca
 function CardsTab({ bracketId, initial, initialEvents, cardDataError, rosterTeams, matches }: { bracketId: string; initial: Card[]; initialEvents: CardEvent[]; cardDataError: boolean; rosterTeams: RosterTeam[]; matches: { id: string; team_a: string; team_b: string; match_date: string | null; match_time: string | null; status: string | null }[] }) {
   const [rows, setRows] = useState(initial);
   const [events, setEvents] = useState(initialEvents);
-  const [eventForm, setEventForm] = useState({ team: "", player: "", roster_player_id: "", team_roster_id: "", match_id: "", card_type: "yellow" as "yellow" | "direct_red" });
+  const [eventForm, setEventForm] = useState({ team: "", player: "", roster_player_id: "", team_roster_id: "", match_id: "", card_type: "yellow" as CardEvent["card_type"] });
   const eventIdempotencyKey = useRef<string | null>(null);
   const [form, setForm] = useState({ player: "", team: "", roster_player_id: "", team_roster_id: "", match_id: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -474,10 +474,10 @@ function CardsTab({ bracketId, initial, initialEvents, cardDataError, rosterTeam
         <div className="flex flex-wrap items-start gap-2">
           <TeamPlayerPicker rosterTeams={rosterTeams} team={eventForm.team} player={eventForm.player} rosterPlayerId={eventForm.roster_player_id} teamRosterId={eventForm.team_roster_id} requireRoster trackPhoto={false} onChange={(patch) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, ...patch, match_id: "" })); }} />
           <select value={eventForm.match_id} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, match_id: e.target.value })); }} className={`${inputCls} min-w-56`}><option value="">اختر المباراة</option>{matches.filter((match) => eventForm.team && (match.team_a === eventForm.team || match.team_b === eventForm.team)).map((match) => <option key={match.id} value={match.id}>{match.team_a} × {match.team_b} — {match.match_date || ""}</option>)}</select>
-          <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as "yellow" | "direct_red" })); }} className={`${inputCls} min-w-40`}><option value="yellow">إنذار</option><option value="direct_red">طرد مباشر</option></select>
+          <select value={eventForm.card_type} onChange={(e) => { eventIdempotencyKey.current = null; setEventForm((current) => ({ ...current, card_type: e.target.value as CardEvent["card_type"] })); }} className={`${inputCls} min-w-40`}><option value="yellow">إنذار</option><option value="direct_red">طرد مباشر</option><option value="second_yellow_red">طرد بعد الإنذار الثاني</option></select>
           <button onClick={() => void addEvent()} className="shrink-0 rounded-lg bg-primary px-4 py-2.5 text-caption font-black text-primary-foreground"><Plus className="h-4 w-4" /></button>
         </div>
-        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => { const identity = resolveStatsPlayer({ id: event.id, roster_player_id: event.roster_player_id, team_roster_id: event.team_roster_id, player: event.player_name, team: event.team_name }, rosterTeams); const match = matches.find((item) => item.id === event.match_id); return <div key={event.id} className="flex items-center justify-between"><span>{identity.player} · {identity.team} · {event.card_type === "yellow" ? "إنذار" : "طرد مباشر"}{match ? ` · ${match.team_a} × ${match.team_b}` : ""}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>; })}</div>
+        <div className="space-y-1 text-[11px] text-muted-foreground">{events.map((event) => { const identity = resolveStatsPlayer({ id: event.id, roster_player_id: event.roster_player_id, team_roster_id: event.team_roster_id, player: event.player_name, team: event.team_name }, rosterTeams); const match = matches.find((item) => item.id === event.match_id); const label = event.card_type === "yellow" ? "إنذار" : event.card_type === "direct_red" ? "طرد مباشر" : "طرد بعد الإنذار الثاني"; return <div key={event.id} className="flex items-center justify-between"><span>{identity.player} · {identity.team} · {label}{match ? ` · ${match.team_a} × ${match.team_b}` : ""}</span><button onClick={() => void removeEvent(event.id)} aria-label="حذف الحدث"><Trash2 className="h-3.5 w-3.5 text-red-400" /></button></div>; })}</div>
       </div>
       <div className="flex flex-wrap items-start gap-2 rounded-2xl bg-card p-4 ring-1 ring-white/10">
         <TeamPlayerPicker
@@ -513,8 +513,8 @@ function CardsTab({ bracketId, initial, initialEvents, cardDataError, rosterTeam
               <div className="min-w-0 flex-1">
                 <div className="truncate text-caption font-black">{display.player}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{display.team}</div>
-                <div className="text-[10px] text-muted-foreground">الإجمالي: {totals.yellow} إنذار · {totals.red} طرد</div>
-                <div className={`text-[11px] font-bold ${status === "موقوف مباراة" ? "text-destructive" : status === "متاح" ? "text-accent-green" : "text-accent-orange"}`}>{status}{status === "موقوف مباراة" ? ` · ${suspension.reason === "combined" ? "تراكم 3 إنذارات وطرد مباشر" : suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : "تراكم 3 إنذارات"}` : ""}</div>
+                <div className="text-[10px] text-muted-foreground">الإجمالي: {totals.yellow} إنذار · {totals.red} طرد مباشر{totals.secondYellowRed ? ` · ${totals.secondYellowRed} طرد بعد الإنذار الثاني` : ""}</div>
+                <div className={`text-[11px] font-bold ${status === "موقوف مباراة" ? "text-destructive" : status === "متاح" ? "text-accent-green" : "text-accent-orange"}`}>{status}{status === "موقوف مباراة" ? ` · ${suspension.reason === "combined" ? "تراكم 3 إنذارات وطرد مباشر" : suspension.reason === "direct_red" ? "بطاقة حمراء مباشرة" : suspension.reason === "second_yellow_red" ? "طرد بعد الإنذار الثاني" : "تراكم 3 إنذارات"}` : ""}</div>
               </div>
               {isPersistedCard && <>
               <div className="flex items-center gap-1">

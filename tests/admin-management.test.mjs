@@ -12,7 +12,7 @@ for (const role of ['super_admin', 'supervisor']) test(`${role}: list and detail
   const list = await h.load(root).GET(h.request()); assert.equal(list.status, 200);
   const body = await list.json(); assert.equal(body.admins.length, 2); assert.equal(body.roles.find(r => r.key === 'supervisor').name, 'المشرف العام');
   const result = await h.load(detail).GET(h.request(), h.context()); assert.equal(result.status, 200);
-  const data = await result.json(); assert.equal(data.permissions.length, 56); assert.match(data.admin.email, /example.test/);
+  const data = await result.json(); assert.equal(data.permissions.length, 57); assert.match(data.admin.email, /example.test/);
   assert.doesNotMatch(JSON.stringify([body, data]), /app_metadata|never expose|token|password":/);
 });
 test('create writes profile and audit without password and returns 201', async () => {

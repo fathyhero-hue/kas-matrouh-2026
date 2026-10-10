@@ -176,7 +176,7 @@ test("suspension engine applies three-yellow cycle to next team match", () => {
     { id: "m1", bracket_id: "b", team_a: "A", team_b: "B", match_date: "2026-01-01", match_time: "10:00", status: "Ø§Ù†ØªÙ‡Øª" },
     { id: "m2", bracket_id: "b", team_a: "A", team_b: "C", match_date: "2026-01-02", match_time: "10:00", status: "Ù…Ø¬Ø¯ÙˆÙ„Ø©" },
   ];
-  const cards = [1, 2, 3].map((n, i) => ({ id: `c${n}`, bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 1, red: 0 }));
+  const cards = [1, 2, 3].map((n) => ({ id: `c${n}`, bracket_id: "b", match_id: "m1", roster_player_id: "p", team_roster_id: "t", team: "A", yellow: 1, red: 0 }));
   const state = getSuspensionState(cards, matches, [{ id: "t", team: "A", logoUrl: null, coachName: null, coachPhotoUrl: null, players: [{ id: "p", name: "P", photoUrl: null }] }]);
   assert.equal(state.isSuspended, true);
   assert.equal(state.suspensionMatchId, "m2");
@@ -404,7 +404,40 @@ test("legacy distribution does not double count totals while new events are adde
     { card_type: "direct_red", is_historical_distribution: true },
     { card_type: "direct_red", source_card_id: null },
   ]);
-  assert.deepEqual(totals, { yellow: 3, red: 2 });
+  assert.deepEqual(totals, { yellow: 3, red: 2, secondYellowRed: 0 });
+});
+
+test("second-yellow dismissal counts as exactly two yellows and one next-match suspension", () => {
+  const matches = [
+    { id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" },
+    { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-02", status: "scheduled" },
+  ];
+  const teams = [{ id: "t", team: "A", players: [{ id: "p", name: "P" }] }];
+  const events = [{ id: "dismissal", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "second_yellow_red" }];
+  const totals = getCardTotalsWithEvents({ yellow: 0, red: 0 }, events);
+  const state = getSuspensionStateFromEvents(events, matches, teams);
+  assert.equal(totals.yellow, 2);
+  assert.equal(totals.red, 0);
+  assert.equal(totals.secondYellowRed, 1);
+  assert.equal(state.yellowCountInCycle, 2);
+  assert.equal(state.reason, "second_yellow_red");
+  assert.equal(state.suspensionMatchId, "m2");
+  assert.equal(state.suspensionMatchIds.length, 1);
+});
+
+test("editing or revoking a second-yellow dismissal recalculates its single suspension", () => {
+  const matches = [
+    { id: "m1", team_a: "A", team_b: "B", match_date: "2026-10-01", status: "finished" },
+    { id: "m2", team_a: "A", team_b: "C", match_date: "2026-10-02", status: "scheduled" },
+  ];
+  const teams = [{ id: "t", team: "A", players: [] }];
+  const active = [{ id: "dismissal", match_id: "m1", roster_player_id: "p", team_roster_id: "t", card_type: "second_yellow_red" }];
+  assert.equal(getSuspensionStateFromEvents(active, matches, teams).isSuspended, true);
+  assert.equal(getSuspensionStateFromEvents([], matches, teams).isSuspended, false);
+  const correctedToDirectRed = [{ ...active[0], card_type: "direct_red" }];
+  const state = getSuspensionStateFromEvents(correctedToDirectRed, matches, teams);
+  assert.equal(state.reason, "direct_red");
+  assert.equal(state.suspensionMatchId, "m2");
 });
 
 test("a direct red recorded in cards and card_events counts once and suspends", () => {

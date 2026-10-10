@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const bracketId = text(req.nextUrl.searchParams.get("bracket_id"));
   if (!bracketId) return bad("bracket_id is required.");
   const db = createServiceRoleClient();
-  const query = await db.from("card_events").select("id, bracket_id, match_id, roster_player_id, team_roster_id, card_type, source_card_id, source_card_ordinal, created_at").eq("bracket_id", bracketId).order("created_at");
+  const query = await db.from("card_events").select("id, bracket_id, match_id, roster_player_id, team_roster_id, card_type, match_minute, source_card_id, source_card_ordinal, created_at").eq("bracket_id", bracketId).order("created_at");
   if (query.error) {
     console.error("Admin card events GET query error", { bracketId, code: query.error.code });
     return NextResponse.json({ error: "Unable to load card events." }, { status: 500 });
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const teamId = text(body.team_roster_id);
     const cardType = text(body.card_type);
     const idempotencyKey = text(body.idempotency_key);
-    if (!bracketId || !matchId || !playerId || !teamId || !idempotencyKey || !["yellow", "direct_red"].includes(cardType)) {
+    if (!bracketId || !matchId || !playerId || !teamId || !idempotencyKey || !["yellow", "direct_red", "second_yellow_red"].includes(cardType)) {
       return bad("Card event details and idempotency key are required.");
     }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idempotencyKey)) {

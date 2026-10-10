@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper, IdCard, Users, History, Target } from "lucide-react";
+import { LayoutDashboard, Trophy, ClipboardList, ShoppingBag, LogOut, Star, Newspaper, IdCard, Users, History, Target, Radio } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin/audit", permission: "audit.view", label: "سجل النشاط", icon: History },
   { href: "/admin", permission: "dashboard.view", label: "الرئيسية", icon: LayoutDashboard },
   { href: "/admin/matches", permission: "matches.view", label: "المباريات", icon: Trophy },
+  { href: "/admin/live", permission: "matches.live.manage", label: "البث المباشر", icon: Radio },
   { href: "/admin/stats", permission: "stats.view", label: "الإحصائيات", icon: Star },
   { href: "/admin/predictions", permission: "matches.results.manage", label: "إدارة التوقعات", icon: Target },
   { href: "/admin/rosters", permission: "rosters.view", label: "القوائم", icon: ClipboardList },

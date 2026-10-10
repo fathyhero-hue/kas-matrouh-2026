@@ -38,7 +38,7 @@ export function resolveStatsPlayer(row: StatsIdentityRow, teams: RosterTeamLite[
 }
 
 export type GoalStatsRow = StatsIdentityRow & { goals?: number | null; image_url?: string | null };
-export type CardStatsRow = StatsIdentityRow & { yellow?: number | null; red?: number | null };
+export type CardStatsRow = StatsIdentityRow & { yellow?: number | null; red?: number | null; second_yellow_red?: number | null };
 
 export function groupGoalsByPlayer(rows: GoalStatsRow[], teams: RosterTeamLite[]) {
   const grouped = new Map<string, GoalStatsRow & ResolvedStatsPlayer>();
@@ -65,6 +65,7 @@ export function groupCardsByPlayer(rows: CardStatsRow[], teams: RosterTeamLite[]
     if (current) {
       current.yellow = (Number(current.yellow) || 0) + (Number(row.yellow) || 0);
       current.red = (Number(current.red) || 0) + (Number(row.red) || 0);
+      current.second_yellow_red = (Number(current.second_yellow_red) || 0) + (Number(row.second_yellow_red) || 0);
     } else {
       grouped.set(resolved.identityKey, { ...row, ...resolved });
     }
@@ -72,7 +73,7 @@ export function groupCardsByPlayer(rows: CardStatsRow[], teams: RosterTeamLite[]
   return [...grouped.values()].sort((a, b) => (Number(b.red) || 0) - (Number(a.red) || 0) || (Number(b.yellow) || 0) - (Number(a.yellow) || 0));
 }
 
-export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red"; player_name?: string | null; team_name?: string | null }[], teams: RosterTeamLite[]) {
+export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string; roster_player_id: string; team_roster_id: string; card_type: "yellow" | "direct_red" | "second_yellow_red"; player_name?: string | null; team_name?: string | null }[], teams: RosterTeamLite[]) {
   const known = new Set(rows.map((row) => resolveStatsPlayer(row, teams).rosterPlayerId).filter(Boolean));
   const synthetic = new Map<string, CardStatsRow>();
   for (const event of events) {
@@ -85,28 +86,34 @@ export function addEventOnlyCardRows(rows: CardStatsRow[], events: { id: string;
       team: event.team_name || UNKNOWN_TEAM,
       yellow: 0,
       red: 0,
+      second_yellow_red: 0,
     };
     if (event.card_type === "yellow") current.yellow = (Number(current.yellow) || 0) + 1;
-    else current.red = (Number(current.red) || 0) + 1;
+    else if (event.card_type === "direct_red") current.red = (Number(current.red) || 0) + 1;
+    else current.second_yellow_red = (Number(current.second_yellow_red) || 0) + 1;
     synthetic.set(event.roster_player_id, current);
   }
   return [...rows, ...synthetic.values()];
 }
 
-export function getCardTotalsWithEvents(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null; is_historical_distribution?: boolean }[]) {
-  const eventYellow = events.filter((event) => event.card_type === "yellow").length;
+export function getCardTotalsWithEvents(legacy: { yellow?: number | null; red?: number | null; second_yellow_red?: number | null }, events: { card_type: "yellow" | "direct_red" | "second_yellow_red"; source_card_id?: string | null; is_historical_distribution?: boolean }[]) {
+  const eventYellow = events.filter((event) => event.card_type === "yellow").length +
+    events.filter((event) => event.card_type === "second_yellow_red").length * 2;
   const eventRed = events.filter((event) => event.card_type === "direct_red").length;
+  const eventSecondYellowRed = events.filter((event) => event.card_type === "second_yellow_red").length;
   // A legacy counter may describe the same physical cards as independently entered events.
   // Without a source link, count the larger known total rather than adding both.
   return {
     yellow: Math.max(Number(legacy.yellow) || 0, eventYellow),
     red: Math.max(Number(legacy.red) || 0, eventRed),
+    secondYellowRed: Math.max(Number(legacy.second_yellow_red) || 0, eventSecondYellowRed),
   };
 }
 
-export function hasUnassignedCards(legacy: { yellow?: number | null; red?: number | null }, events: { card_type: "yellow" | "direct_red"; source_card_id?: string | null }[]) {
+export function hasUnassignedCards(legacy: { yellow?: number | null; red?: number | null; second_yellow_red?: number | null }, events: { card_type: "yellow" | "direct_red" | "second_yellow_red"; source_card_id?: string | null }[]) {
   return (Number(legacy.yellow) || 0) > events.filter((event) => event.card_type === "yellow").length ||
-    (Number(legacy.red) || 0) > events.filter((event) => event.card_type === "direct_red").length;
+    (Number(legacy.red) || 0) > events.filter((event) => event.card_type === "direct_red").length ||
+    (Number(legacy.second_yellow_red) || 0) > events.filter((event) => event.card_type === "second_yellow_red").length;
 }
 
 export type ValidationRoster = { id: string; bracket_id: string; team_name: string | null };

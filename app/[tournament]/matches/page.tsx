@@ -51,6 +51,7 @@ export default async function MatchesPage({ params, searchParams }: TournamentPa
                   status={m.status}
                   matchDate={m.match_date}
                   matchTime={m.match_time}
+                  venue={m.venue}
                   round={m.round}
                   isLive={m.is_live}
                   liveMinute={m.live_minute}
