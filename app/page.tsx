@@ -57,7 +57,7 @@ export default async function NewHomePage() {
               href={t.href}
               className="group rounded-2xl bg-card p-6 text-center ring-1 ring-white/10 transition-all hover:-translate-y-1 hover:ring-accent-blue/50"
             >
-              <div className="mx-auto flex h-24 w-24 items-center justify-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full sm:h-24 sm:w-24">
                 <Image src={t.image} alt={t.title} width={96} height={96} sizes="96px" className="h-full w-full object-contain" />
               </div>
               <div className="mt-3 text-h3 font-black">{t.title}</div>
