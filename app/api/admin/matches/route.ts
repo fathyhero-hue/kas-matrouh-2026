@@ -12,12 +12,61 @@ function isMissingVenueColumn(error: { code?: string; message?: string }) {
 }
 
 export async function POST(req: NextRequest) {
-  let authorization = await authorizeAdminRequest(req, "matches.edit");
+  const fullAuthorization = await authorizeAdminRequest(req, "matches.admin.full_control");
+  const isFullControl = !(fullAuthorization instanceof NextResponse);
+  let authorization = isFullControl ? fullAuthorization : await authorizeAdminRequest(req, "matches.edit");
   if (authorization instanceof NextResponse) return authorization;
-  let auditPermission: "matches.edit" | "matches.live.manage" = "matches.edit";
+  let auditPermission: "matches.edit" | "matches.live.manage" | "matches.admin.full_control" = isFullControl
+    ? "matches.admin.full_control"
+    : "matches.edit";
   try {
     const body = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "بيانات المباراة غير صالحة." }, { status: 400 });
+    }
     const id = body.id;
+    if (["reset", "archive", "restore"].includes(body.action) && !isFullControl) {
+      return NextResponse.json({ error: "هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط." }, { status: 403 });
+    }
+    if (isFullControl && ["reset", "archive", "restore"].includes(body.action)) {
+      if (typeof id !== "string" || !id) {
+        return NextResponse.json({ error: "معرّف المباراة مفقود." }, { status: 400 });
+      }
+      const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+      if (!reason || reason.length > 1000) {
+        return NextResponse.json({ error: "اكتب سببًا واضحًا للعملية (حتى 1000 حرف)." }, { status: 400 });
+      }
+      const { data, error } = await createServiceRoleClient().rpc("admin_manage_match", {
+        p_action: body.action,
+        p_match_id: id,
+        p_actor: authorization.userId,
+        p_patch: {},
+        p_reason: reason,
+      });
+      if (error) {
+        if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) {
+          return NextResponse.json({ error: "هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط." }, { status: 403 });
+        }
+        if (error.message.includes("MATCH_NOT_FOUND")) {
+          return NextResponse.json({ error: "المباراة غير موجودة." }, { status: 404 });
+        }
+        if (error.message.includes("MATCH_ADMIN_REASON_REQUIRED")) {
+          return NextResponse.json({ error: "سبب العملية مطلوب." }, { status: 400 });
+        }
+        throw error;
+      }
+      const actionLabel = body.action === "reset" ? "match.reset" : body.action === "archive" ? "match.archive" : "match.restore";
+      await auditAdminMutation({
+        actorUserId: authorization.userId,
+        action: actionLabel,
+        permission: "matches.admin.full_control",
+        entityType: "matches",
+        entityId: id,
+        metadata: { reason },
+        request: req,
+      });
+      return NextResponse.json({ ok: true, match: data });
+    }
     const patch = pickAllowedFields(body, ["team_a", "team_a_logo", "team_b", "team_b_logo", "home_goals", "away_goals", "home_penalty_goals", "away_penalty_goals", "match_date", "match_time", "day_name", "venue", "status", "is_live", "live_minute", "live_minute_base", "timer_started_at", "timer_paused_total", "is_timer_running", "bracket_id", "round", "stage", "match_label", "qualified_team", "next_match_label", "next_match_slot"]);
     if (Object.prototype.hasOwnProperty.call(patch, "venue")) {
       if (typeof patch.venue === "string") {
@@ -39,14 +88,45 @@ export async function POST(req: NextRequest) {
       ].some((field) => Object.prototype.hasOwnProperty.call(patch, field))
     );
     if (requiresLivePermission) {
-      const liveAuthorization = await authorizeAdminRequest(req, "matches.live.manage");
-      if (liveAuthorization instanceof NextResponse) return liveAuthorization;
-      authorization = liveAuthorization;
-      auditPermission = "matches.live.manage";
+      if (!isFullControl) {
+        const liveAuthorization = await authorizeAdminRequest(req, "matches.live.manage");
+        if (liveAuthorization instanceof NextResponse) return liveAuthorization;
+        authorization = liveAuthorization;
+        auditPermission = "matches.live.manage";
+      }
     }
     const supabase = createServiceRoleClient();
 
     if (id) {
+      if (isFullControl) {
+        const reason = typeof body.reason === "string" && body.reason.trim()
+          ? body.reason.trim()
+          : "تعديل من لوحة إدارة المباريات";
+        const { data, error } = await supabase.rpc("admin_manage_match", {
+          p_action: "update",
+          p_match_id: id,
+          p_actor: authorization.userId,
+          p_patch: patch,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) {
+            return NextResponse.json({ error: "هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط." }, { status: 403 });
+          }
+          if (error.message.includes("MATCH_NOT_FOUND")) {
+            return NextResponse.json({ error: "المباراة غير موجودة." }, { status: 404 });
+          }
+          if (error.message.includes("SCORE_BELOW_ACTIVE_GOAL_EVENTS")) {
+            return NextResponse.json({ error: "النتيجة المطلوبة أقل من عدد الأهداف المسجلة؛ صحح أحداث الأهداف أولًا." }, { status: 409 });
+          }
+          if (error.message.includes("INVALID_MATCH_SCORE") || error.message.includes("INVALID_MATCH_TEAMS")) {
+            return NextResponse.json({ error: "بيانات المباراة أو النتيجة غير صالحة." }, { status: 400 });
+          }
+          throw error;
+        }
+        await auditAdminMutation({ actorUserId: authorization.userId, action: "matches.mutation", permission: auditPermission, entityType: "matches", entityId: id, request: req });
+        return NextResponse.json({ ok: true, match: data });
+      }
       if (
         Object.prototype.hasOwnProperty.call(patch, "home_goals") ||
         Object.prototype.hasOwnProperty.call(patch, "away_goals") ||
@@ -103,19 +183,40 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const authorization = await authorizeAdminRequest(req, 'matches.delete');
+  const authorization = await authorizeAdminRequest(req, "matches.admin.full_control");
   if (authorization instanceof NextResponse) return authorization;
   try {
-    const id = req.nextUrl.searchParams.get("id");
+    const body = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "بيانات الأرشفة غير صالحة." }, { status: 400 });
+    }
+    const id = typeof body.id === "string" ? body.id : req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "معرّف المباراة مفقود." }, { status: 400 });
-    const supabase = createServiceRoleClient();
-    const { error } = await supabase.from("matches").delete().eq("id", id);
-    if (error) throw error;
-    await auditAdminMutation({ actorUserId: authorization.userId, action: "matches.mutation", permission: "matches.edit", entityType: "matches", request: req });
-    return NextResponse.json({ ok: true });
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (!reason || reason.length > 1000) {
+      return NextResponse.json({ error: "اكتب سببًا واضحًا للأرشفة (حتى 1000 حرف)." }, { status: 400 });
+    }
+    const { data, error } = await createServiceRoleClient().rpc("admin_manage_match", {
+      p_action: "archive",
+      p_match_id: id,
+      p_actor: authorization.userId,
+      p_patch: {},
+      p_reason: reason,
+    });
+    if (error) {
+      if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) {
+        return NextResponse.json({ error: "أرشفة المباريات متاحة للمسؤول الرئيسي المخوّل فقط." }, { status: 403 });
+      }
+      if (error.message.includes("MATCH_NOT_FOUND")) {
+        return NextResponse.json({ error: "المباراة غير موجودة." }, { status: 404 });
+      }
+      throw error;
+    }
+    await auditAdminMutation({ actorUserId: authorization.userId, action: "match.archive", permission: "matches.admin.full_control", entityType: "matches", entityId: id, request: req });
+    return NextResponse.json({ ok: true, match: data });
   } catch (error: unknown) {
-    console.error("Admin match delete error:", error);
-    const message = error instanceof Error ? error.message : "فشل حذف المباراة.";
+    console.error("Admin match archive error:", error);
+    const message = error instanceof Error ? error.message : "فشلت أرشفة المباراة.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

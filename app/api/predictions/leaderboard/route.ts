@@ -14,6 +14,7 @@ async function readMatches(supabase: ReturnType<typeof createServiceRoleClient>,
       .from("matches")
       .select("id, legacy_id, bracket_id, status, is_live, home_goals, away_goals")
       .eq("bracket_id", bracketId)
+      .is("archived_at", null)
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;

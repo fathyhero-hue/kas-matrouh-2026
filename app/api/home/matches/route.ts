@@ -29,6 +29,7 @@ export async function GET() {
       const { data, error } = await supabase
         .from("matches")
         .select("id, bracket_id, team_a, team_a_logo, team_b, team_b_logo, match_date, match_time, status, is_live, home_goals, away_goals, round, live_minute, live_minute_base, timer_started_at, timer_paused_total, is_timer_running, brackets(legacy_suffix)")
+        .is("archived_at", null)
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true })
         .order("id", { ascending: true })
@@ -86,9 +87,18 @@ export async function GET() {
       ]);
       if (goalsQuery.error) throw goalsQuery.error;
       if (cardsQuery.error) throw cardsQuery.error;
+      let activeCards = cardsQuery.data || [];
+      if (activeCards.length) {
+        const excludedQuery = await supabase.from("match_card_event_exclusions")
+          .select("event_id")
+          .in("event_id", activeCards.map((event) => event.id));
+        if (excludedQuery.error) throw excludedQuery.error;
+        const excludedIds = new Set((excludedQuery.data || []).map((row) => row.event_id));
+        activeCards = activeCards.filter((event) => !excludedIds.has(event.id));
+      }
       const rows = [
         ...(goalsQuery.data || []).map((event) => ({ ...event, event_type: "goal" as const })),
-        ...(cardsQuery.data || []).map((event) => ({ ...event, event_type: event.card_type as "yellow" | "direct_red" | "second_yellow_red" })),
+        ...activeCards.map((event) => ({ ...event, event_type: event.card_type as "yellow" | "direct_red" | "second_yellow_red" })),
       ];
       const teamIds = [...new Set(rows.map((event) => event.team_roster_id))];
       const playerIds = [...new Set(rows.map((event) => event.roster_player_id))];

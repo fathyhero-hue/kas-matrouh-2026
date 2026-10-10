@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 async function getStats(permissions: ReadonlySet<AdminPermission>) {
   const supabase = createServiceRoleClient();
   const [{ count: liveCount }, { count: pendingRosters }, { count: pendingOrders }] = await Promise.all([
-    permissions.has("matches.view") ? supabase.from("matches").select("id", { count: "exact", head: true }).eq("is_live", true) : Promise.resolve({ count: 0 }),
+    permissions.has("matches.view") ? supabase.from("matches").select("id", { count: "exact", head: true }).eq("is_live", true).is("archived_at", null) : Promise.resolve({ count: 0 }),
     permissions.has("rosters.view") ? supabase.from("team_rosters").select("id", { count: "exact", head: true }).eq("is_submitted", false) : Promise.resolve({ count: 0 }),
     permissions.has("shop.orders.view") ? supabase.from("orders").select("id", { count: "exact", head: true }).eq("payment_status", "pending_payment") : Promise.resolve({ count: 0 }),
   ]);

@@ -20,7 +20,7 @@ export default async function CardsPage({ params, searchParams }: TournamentPage
   const supabase = createPublicClient();
   const [{ data: cards, error: cardsError }, { data: matches, error: matchesError }, publicEvents, cardRoster] = await Promise.all([
     supabase.from("cards").select("*").eq("bracket_id", bracketId),
-    supabase.from("matches").select("id, bracket_id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId),
+    supabase.from("matches").select("id, bracket_id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId).is("archived_at", null),
     getPublicCardEvents(bracketId),
     getBracketCardRosterTeams(supabase, bracketId),
   ]);

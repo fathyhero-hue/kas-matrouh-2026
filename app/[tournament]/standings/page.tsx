@@ -40,7 +40,7 @@ export default async function StandingsPage({ params, searchParams }: Tournament
 
   const supabase = createPublicClient();
   const [{ data: matches }, logos] = await Promise.all([
-    supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status, stage").eq("bracket_id", bracketId),
+    supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status, stage").eq("bracket_id", bracketId).is("archived_at", null),
     getBracketTeamLogos(supabase, bracketId),
   ]);
   const standings = buildStandings(matches || [], logos);

@@ -38,6 +38,7 @@ async function readMatches(supabase: ReturnType<typeof createServiceRoleClient>)
     const { data, error } = await supabase
       .from("matches")
       .select("id, legacy_id, bracket_id, team_a, team_b, match_date, match_time, status, is_live, home_goals, away_goals")
+      .is("archived_at", null)
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;

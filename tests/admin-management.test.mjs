@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { ADMIN_PERMISSIONS } from '../lib/admin/permissions.ts';
 import { harness, ACTOR, TARGET, CREATED } from './admin-test-harness.mjs';
 const root = 'app/api/admin/admins/route.ts';
 const detail = 'app/api/admin/admins/[userId]/route.ts';
@@ -12,7 +13,7 @@ for (const role of ['super_admin', 'supervisor']) test(`${role}: list and detail
   const list = await h.load(root).GET(h.request()); assert.equal(list.status, 200);
   const body = await list.json(); assert.equal(body.admins.length, 2); assert.equal(body.roles.find(r => r.key === 'supervisor').name, 'المشرف العام');
   const result = await h.load(detail).GET(h.request(), h.context()); assert.equal(result.status, 200);
-  const data = await result.json(); assert.equal(data.permissions.length, 57); assert.match(data.admin.email, /example.test/);
+  const data = await result.json(); assert.equal(data.permissions.length, ADMIN_PERMISSIONS.length); assert.match(data.admin.email, /example.test/);
   assert.doesNotMatch(JSON.stringify([body, data]), /app_metadata|never expose|token|password":/);
 });
 test('create writes profile and audit without password and returns 201', async () => {

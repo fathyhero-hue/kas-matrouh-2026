@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/server";
+import { filterExcludedMatchCardEvents } from "@/lib/sport/match-card-event-exclusions";
 
 export async function getPublicCardEvents(bracketId: string) {
   const db = createServiceRoleClient();
@@ -10,9 +11,17 @@ export async function getPublicCardEvents(bracketId: string) {
     .order("created_at");
 
   if (error || !data?.length) return { data: [], error };
+  const [{ data: archivedMatches, error: archivedError }, excludedData] = await Promise.all([
+    db.from("matches").select("id").eq("bracket_id", bracketId).not("archived_at", "is", null),
+    filterExcludedMatchCardEvents(data),
+  ]);
+  if (archivedError) return { data: [], error: archivedError };
+  const archivedMatchIds = new Set((archivedMatches || []).map((match) => match.id));
+  const activeData = excludedData.filter((event) => !event.match_id || !archivedMatchIds.has(event.match_id));
+  if (!activeData.length) return { data: [], error: null };
 
-  const playerIds = [...new Set(data.map((event) => event.roster_player_id))];
-  const teamIds = [...new Set(data.map((event) => event.team_roster_id))];
+  const playerIds = [...new Set(activeData.map((event) => event.roster_player_id))];
+  const teamIds = [...new Set(activeData.map((event) => event.team_roster_id))];
   const [{ data: players, error: playersError }, { data: teams, error: teamsError }] = await Promise.all([
     db.from("roster_players").select("id, roster_id, name").in("id", playerIds),
     db.from("team_rosters").select("id, team_name").eq("bracket_id", bracketId).in("id", teamIds),
@@ -23,7 +32,7 @@ export async function getPublicCardEvents(bracketId: string) {
   const playerById = new Map((players || []).map((player) => [player.id, player]));
   const teamById = new Map((teams || []).map((team) => [team.id, team]));
   return {
-    data: data.map(({ source_card_id, ...event }) => {
+    data: activeData.map(({ source_card_id, ...event }) => {
       const player = playerById.get(event.roster_player_id);
       const team = teamById.get(event.team_roster_id);
       const validPlayer = player?.roster_id === event.team_roster_id ? player : null;

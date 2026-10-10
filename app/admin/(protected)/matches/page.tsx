@@ -6,6 +6,7 @@ import { EliteBracketDiagram } from "@/components/sport/elite-bracket-diagram";
 import { StandingsTable, type StandingsRow } from "@/components/sport/standings-table";
 import { computeEliteBracket, getEliteQualificationZone, getEliteStandings, type BracketMatch, type EliteBracket } from "@/lib/sport/elite-bracket";
 import { getBracketRosterTeams } from "@/lib/sport/roster-link";
+import { requireAdminPagePermission } from "@/lib/admin/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function AdminMatchesPage({
   searchParams: Promise<{ tournament?: string; edition?: string }>;
 }) {
   const { tournament: rawSlug, edition: editionKey } = await searchParams;
+  const authorization = await requireAdminPagePermission("matches.view");
   const slug: TournamentSlug = isTournamentSlug(rawSlug || "") ? (rawSlug as TournamentSlug) : "matrouh-cup";
   const edition = resolveEdition(slug, editionKey);
 
@@ -89,6 +91,7 @@ export default async function AdminMatchesPage({
             rosterTeams={rosterTeams}
             teamOptions={slug === "elite-cup" ? eliteTeams : undefined}
             isElite={slug === "elite-cup"}
+            canFullyManage={authorization.permissions.has("matches.admin.full_control")}
           />
         </>
       )}

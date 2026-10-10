@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const supabase = createPublicClient();
     const { data: match, error: matchError } = await supabase.from("matches")
       .select("id, bracket_id, team_a, team_b, match_date, match_time, status, is_live")
-      .eq("id", matchId).eq("bracket_id", bracketId).maybeSingle();
+      .eq("id", matchId).eq("bracket_id", bracketId).is("archived_at", null).maybeSingle();
     if (matchError) {
       console.error("Prediction match lookup failed:", matchError);
       return NextResponse.json({ error: "تعذر التحقق من المباراة." }, { status: 500 });

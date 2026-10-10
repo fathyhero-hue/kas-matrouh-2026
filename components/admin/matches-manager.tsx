@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Edit, Trash2, Play, Pause, Search } from "lucide-react";
+import { Archive, Edit, Play, Pause, RotateCcw, Search } from "lucide-react";
 
 type Match = {
   id: string;
@@ -30,6 +30,8 @@ type Match = {
   timer_started_at: string | null;
   timer_paused_total: number;
   is_timer_running: boolean;
+  archived_at?: string | null;
+  archive_reason?: string | null;
 };
 
 const ROUNDS = ["دور المجموعات", "دور الأربعة", "نصف النهائي", "دور الـ 16", "دور الثمانية", "دور الـ 4", "النهائي"];
@@ -78,6 +80,7 @@ export function MatchesManager({
   rosterTeams = [],
   teamOptions: configuredTeamOptions = [],
   isElite = false,
+  canFullyManage = false,
 }: {
   bracketId: string;
   initialMatches: Match[];
@@ -86,6 +89,7 @@ export function MatchesManager({
   rosterTeams?: { team: string; logoUrl: string | null }[];
   teamOptions?: string[];
   isElite?: boolean;
+  canFullyManage?: boolean;
 }) {
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [form, setForm] = useState<any>(emptyForm(bracketId));
@@ -94,6 +98,7 @@ export function MatchesManager({
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [matchGroup, setMatchGroup] = useState<"A" | "B">("A");
+  const [showArchived, setShowArchived] = useState(false);
 
   const hasGroups = !isElite && (groupATeams.length > 0 || groupBTeams.length > 0);
   const isGroupStage = form.round === "دور المجموعات";
@@ -216,22 +221,53 @@ export function MatchesManager({
 
     patchLocal(m.id, nextUpdates);
     try {
-      await saveApi(m.id, nextUpdates);
+      const saved = await saveApi(m.id, nextUpdates);
+      patchLocal(m.id, saved);
     } catch (e: any) {
       toast.error(e?.message || "فشل تحديث المباراة");
     }
   };
 
   const deleteMatch = async (id: string) => {
-    if (!confirm("متأكد من حذف هذه المباراة نهائياً؟")) return;
+    const match = matches.find((item) => item.id === id);
+    if (!match || !confirm(`ستُؤرشف المباراة ${match.team_a} - ${match.team_b} دون حذف أهدافها أو بطاقاتها أو توقعاتها. متابعة؟`)) return;
+    const reason = window.prompt("اكتب سبب أرشفة المباراة:");
+    if (!reason?.trim()) return;
     try {
-      const res = await fetch(`/api/admin/matches?id=${id}`, { method: "DELETE" });
+      const res = await fetch("/api/admin/matches", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, reason: reason.trim() }),
+      });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "فشل الحذف");
-      setMatches((prev) => prev.filter((m) => m.id !== id));
-      toast.success("تم حذف المباراة");
-    } catch (e: any) {
-      toast.error(e?.message || "فشل حذف المباراة");
+      if (!res.ok) throw new Error(data?.error || "فشلت أرشفة المباراة");
+      patchLocal(id, data.match);
+      toast.success("تمت أرشفة المباراة ويمكن استعادتها");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "فشلت أرشفة المباراة");
+    }
+  };
+
+  const manageMatch = async (match: Match, action: "reset" | "restore") => {
+    const isReset = action === "reset";
+    const message = isReset
+      ? `سيتم تصفير النتيجة والحالة وإلغاء أحداث الأهداف النشطة واستبعاد البطاقات من الإحصاءات للمباراة ${match.team_a} - ${match.team_b}. ستبقى سجلاتها محفوظة وقابلة للتدقيق. متابعة؟`
+      : `استعادة المباراة ${match.team_a} - ${match.team_b} إلى القوائم العامة؟`;
+    if (!confirm(message)) return;
+    const reason = window.prompt(isReset ? "اكتب سبب إعادة تعيين المباراة:" : "اكتب سبب استعادة المباراة:");
+    if (!reason?.trim()) return;
+    try {
+      const response = await fetch("/api/admin/matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: match.id, action, reason: reason.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "فشلت العملية");
+      patchLocal(match.id, data.match);
+      toast.success(isReset ? "تمت إعادة تعيين المباراة" : "تمت استعادة المباراة");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "فشلت العملية");
     }
   };
 
@@ -240,7 +276,8 @@ export function MatchesManager({
 
   const grouped = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const filtered = term ? matches.filter((m) => m.team_a?.toLowerCase().includes(term) || m.team_b?.toLowerCase().includes(term)) : matches;
+    const archivedFiltered = matches.filter((m) => Boolean(m.archived_at) === showArchived);
+    const filtered = term ? archivedFiltered.filter((m) => m.team_a?.toLowerCase().includes(term) || m.team_b?.toLowerCase().includes(term)) : archivedFiltered;
     const byRound = new Map<string, Match[]>();
     filtered.forEach((m) => {
       const key = m.round || "دور المجموعات";
@@ -248,7 +285,7 @@ export function MatchesManager({
       byRound.get(key)!.push(m);
     });
     return Array.from(byRound.entries());
-  }, [matches, search]);
+  }, [matches, search, showArchived]);
 
   return (
     <div className="space-y-6">
@@ -359,6 +396,15 @@ export function MatchesManager({
         <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالفريق..." className={`${inputCls} pr-9`} />
       </div>
+      {canFullyManage && (
+        <button
+          type="button"
+          onClick={() => setShowArchived((current) => !current)}
+          className="rounded-lg bg-secondary px-3 py-2 text-caption font-bold"
+        >
+          {showArchived ? "عرض المباريات النشطة" : "عرض المباريات المؤرشفة"}
+        </button>
+      )}
 
       {grouped.length === 0 ? (
         <div className="rounded-2xl bg-card p-8 text-center text-caption text-muted-foreground ring-1 ring-white/10">لا توجد مباريات</div>
@@ -374,7 +420,7 @@ export function MatchesManager({
                 <div key={m.id} className={`overflow-hidden rounded-2xl ring-1 ${m.is_live ? "bg-red-950/20 ring-red-500/50" : "bg-card ring-white/10"}`}>
                   <div className={`flex items-center justify-between px-4 py-2 text-[10px] font-bold ${m.is_live ? "bg-red-600 text-white" : "bg-secondary text-muted-foreground"}`}>
                     <span>{m.day_name} • {m.match_date} • {m.match_time?.slice(0, 5)}{m.venue ? ` • ${m.venue}` : ""}</span>
-                    {m.is_live && <span className="animate-pulse font-black">🔴 مباشر</span>}
+                    {m.archived_at ? <span>مؤرشفة</span> : m.is_live && <span className="animate-pulse font-black">🔴 مباشر</span>}
                   </div>
                   <div className="grid grid-cols-1 gap-3 p-4 xl:grid-cols-2">
                     <div className="flex flex-col justify-between rounded-xl bg-secondary/60 p-3">
@@ -389,18 +435,35 @@ export function MatchesManager({
                         <div className="flex-1 text-center text-caption font-black">{m.team_b}</div>
                       </div>
                       <div className="flex flex-wrap justify-center gap-2">
-                        <button onClick={() => startEdit(m)} className="flex items-center gap-1 rounded-lg bg-accent-blue/15 px-3 py-1.5 text-[11px] font-black text-accent-blue">
-                          <Edit className="h-3 w-3" /> تعديل
-                        </button>
-                        <button onClick={() => quickUpdate(m, { is_live: !m.is_live })} className={`rounded-lg px-3 py-1.5 text-[11px] font-black ${m.is_live ? "bg-red-500/20 text-red-400" : "bg-white/5 text-muted-foreground"}`}>
-                          {m.is_live ? "إيقاف اللايف" : "تشغيل اللايف"}
-                        </button>
-                        <button onClick={() => quickUpdate(m, { status: "انتهت", is_live: false, is_timer_running: false })} className="rounded-lg bg-accent-green/15 px-3 py-1.5 text-[11px] font-black text-accent-green">
-                          إنهاء
-                        </button>
-                        <button onClick={() => deleteMatch(m.id)} className="flex items-center gap-1 rounded-lg bg-red-500/15 px-3 py-1.5 text-[11px] font-black text-red-400">
-                          <Trash2 className="h-3 w-3" /> حذف
-                        </button>
+                        {m.archived_at ? (
+                          canFullyManage && (
+                            <button onClick={() => manageMatch(m, "restore")} className="flex items-center gap-1 rounded-lg bg-accent-green/15 px-3 py-1.5 text-[11px] font-black text-accent-green">
+                              <RotateCcw className="h-3 w-3" /> استعادة
+                            </button>
+                          )
+                        ) : (
+                          <>
+                            <button onClick={() => startEdit(m)} className="flex items-center gap-1 rounded-lg bg-accent-blue/15 px-3 py-1.5 text-[11px] font-black text-accent-blue">
+                              <Edit className="h-3 w-3" /> تعديل
+                            </button>
+                            <button onClick={() => quickUpdate(m, { is_live: !m.is_live })} className={`rounded-lg px-3 py-1.5 text-[11px] font-black ${m.is_live ? "bg-red-500/20 text-red-400" : "bg-white/5 text-muted-foreground"}`}>
+                              {m.is_live ? "إيقاف اللايف" : "تشغيل اللايف"}
+                            </button>
+                            <button onClick={() => quickUpdate(m, { status: "انتهت", is_live: false, is_timer_running: false })} className="rounded-lg bg-accent-green/15 px-3 py-1.5 text-[11px] font-black text-accent-green">
+                              إنهاء
+                            </button>
+                            {canFullyManage && (
+                              <>
+                                <button onClick={() => manageMatch(m, "reset")} className="flex items-center gap-1 rounded-lg bg-accent-orange/15 px-3 py-1.5 text-[11px] font-black text-accent-orange">
+                                  <RotateCcw className="h-3 w-3" /> إعادة تعيين
+                                </button>
+                                <button onClick={() => deleteMatch(m.id)} className="flex items-center gap-1 rounded-lg bg-red-500/15 px-3 py-1.5 text-[11px] font-black text-red-400">
+                                  <Archive className="h-3 w-3" /> أرشفة
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
 

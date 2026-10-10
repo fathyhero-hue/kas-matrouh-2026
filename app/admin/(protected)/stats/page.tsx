@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { TOURNAMENTS, resolveEdition, isTournamentSlug, type TournamentSlug } from "@/lib/sport/tournaments";
 import { StatsManager } from "@/components/admin/stats-manager";
 import { getBracketRosterTeams } from "@/lib/sport/roster-link";
+import { filterExcludedMatchCardEvents } from "@/lib/sport/match-card-event-exclusions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,15 @@ export default async function AdminStatsPage({
         supabase.from("card_events").select("*").eq("bracket_id", bracketId).order("created_at"),
         supabase.from("motm").select("*").eq("bracket_id", bracketId),
         supabase.from("formations").select("*, formation_players(*)").eq("bracket_id", bracketId).order("updated_at", { ascending: false }),
-        supabase.from("matches").select("id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId).order("match_date").order("match_time"),
+        supabase.from("matches").select("id, team_a, team_b, match_date, match_time, status").eq("bracket_id", bracketId).is("archived_at", null).order("match_date").order("match_time"),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const rosterTeams = bracketId ? await getBracketRosterTeams(supabase, bracketId) : [];
+  const activeMatchIds = new Set((matches.data || []).map((match) => match.id));
+  const cardEventsData = await filterExcludedMatchCardEvents(
+    (cardEvents.data || []).filter((event) => !event.match_id || activeMatchIds.has(event.match_id)),
+  );
 
   return (
     <div className="space-y-5">
@@ -64,7 +69,7 @@ export default async function AdminStatsPage({
           bracketId={bracketId}
           initialGoals={(goals.data || []) as never[]}
           initialCards={(cards.data || []) as never[]}
-          initialCardEvents={(cardEvents.data || []) as never[]}
+          initialCardEvents={cardEventsData as never[]}
           cardDataError={Boolean(cards.error || cardEvents.error || matches.error)}
           initialMotm={(motm.data || []) as never[]}
           initialFormations={(formations.data || []) as never[]}

@@ -19,14 +19,22 @@ export async function GET(req: NextRequest) {
     console.error("Admin card events GET query error", { bracketId, code: query.error.code });
     return NextResponse.json({ error: "Unable to load card events." }, { status: 500 });
   }
-  const rows = query.data || [];
+  let rows = query.data || [];
+  if (rows.length) {
+    const exclusionQuery = await db.from("match_card_event_exclusions")
+      .select("event_id")
+      .in("event_id", rows.map((row) => row.id));
+    if (exclusionQuery.error) return NextResponse.json({ error: "Unable to load active card events." }, { status: 500 });
+    const excluded = new Set((exclusionQuery.data || []).map((row) => row.event_id));
+    rows = rows.filter((row) => !excluded.has(row.id));
+  }
   const playerIds = [...new Set(rows.map((row) => row.roster_player_id))];
   const teamIds = [...new Set(rows.map((row) => row.team_roster_id))];
   const matchIds = [...new Set(rows.map((row) => row.match_id))];
   const [playersQuery, teamsQuery, matchesQuery] = await Promise.all([
     playerIds.length ? db.from("roster_players").select("id, name, roster_id").in("id", playerIds) : Promise.resolve({ data: [], error: null }),
     teamIds.length ? db.from("team_rosters").select("id, team_name").in("id", teamIds) : Promise.resolve({ data: [], error: null }),
-    matchIds.length ? db.from("matches").select("id, team_a, team_b, match_date, match_time").in("id", matchIds) : Promise.resolve({ data: [], error: null }),
+    matchIds.length ? db.from("matches").select("id, team_a, team_b, match_date, match_time").in("id", matchIds).is("archived_at", null) : Promise.resolve({ data: [], error: null }),
   ]);
   if (playersQuery.error || teamsQuery.error || matchesQuery.error) {
     console.error("Admin card event identity query error", {

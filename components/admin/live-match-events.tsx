@@ -24,6 +24,7 @@ type LiveEvent = {
 
 type EventData = {
   match: { liveEventsEnabled: boolean };
+  canFullyManage?: boolean;
   teams: TeamOption[];
   events: LiveEvent[];
 };
@@ -137,6 +138,10 @@ export function LiveMatchEvents({ matchId, onMatchUpdated }: Props) {
       toast.error("أدخل دقيقة بين 1 و150.");
       return;
     }
+    const reason = editing && data?.canFullyManage
+      ? window.prompt("اكتب سبب تعديل الحدث:")
+      : "";
+    if (editing && data?.canFullyManage && !reason?.trim()) return;
     setSaving(true);
     try {
       const fingerprint = JSON.stringify([matchId, eventType, teamRosterId, playerId, parsedMinute]);
@@ -151,6 +156,7 @@ export function LiveMatchEvents({ matchId, onMatchUpdated }: Props) {
         teamRosterId,
         playerId,
         minute: parsedMinute,
+        ...(editing && data?.canFullyManage ? { reason: reason?.trim() } : {}),
       };
       const response = await fetch("/api/admin/live/events", {
         method: editing ? "PATCH" : "POST",
@@ -183,10 +189,16 @@ export function LiveMatchEvents({ matchId, onMatchUpdated }: Props) {
 
   const revokeEvent = async (event: LiveEvent) => {
     if (!window.confirm("هل تريد إلغاء هذا الحدث؟ سيُحفظ أثره في سجل التدقيق.")) return;
+    const reason = data?.canFullyManage ? window.prompt("اكتب سبب إلغاء الحدث:") : "";
+    if (data?.canFullyManage && !reason?.trim()) return;
     setSaving(true);
     try {
       const params = new URLSearchParams({ match_id: matchId, event_id: event.id, kind: event.kind });
-      const response = await fetch(`/api/admin/live/events?${params}`, { method: "DELETE" });
+      const response = await fetch(`/api/admin/live/events?${params}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        ...(data?.canFullyManage ? { body: JSON.stringify({ reason: reason?.trim() }) } : {}),
+      });
       const payload = await readResponse(response);
       if (!response.ok) throw new Error(responseError(payload, "تعذر إلغاء الحدث."));
       if (editing?.id === event.id) resetForm();

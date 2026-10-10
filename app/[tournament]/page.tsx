@@ -72,6 +72,7 @@ export default async function TournamentOverviewPage({ params, searchParams }: P
       .from("matches")
       .select("*")
       .eq("bracket_id", bracketId)
+      .is("archived_at", null)
       .order("match_date", { ascending: false })
       .order("match_time", { ascending: false }),
     getBracketTeamLogos(supabase, bracketId),

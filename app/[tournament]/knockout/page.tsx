@@ -26,6 +26,7 @@ export default async function KnockoutPage({ params, searchParams }: TournamentP
         .from("matches")
         .select("*")
         .eq("bracket_id", bracketId)
+        .is("archived_at", null)
         .eq("stage", "knockout")
         .order("match_date", { ascending: true }),
       getEliteStandings(createServiceRoleClient(), bracketId),
@@ -76,6 +77,7 @@ export default async function KnockoutPage({ params, searchParams }: TournamentP
       .from("matches")
       .select("*")
       .eq("bracket_id", bracketId)
+      .is("archived_at", null)
       .eq("stage", "knockout")
       .order("match_date", { ascending: true }),
     getBracketTeamLogos(supabase, bracketId),

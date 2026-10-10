@@ -21,6 +21,7 @@ export default async function MatchesPage({ params, searchParams }: TournamentPa
       .from("matches")
       .select("*")
       .eq("bracket_id", bracketId)
+      .is("archived_at", null)
       .order("match_date", { ascending: false })
       .order("match_time", { ascending: false }),
     getBracketTeamLogos(supabase, bracketId),

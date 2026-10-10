@@ -61,11 +61,12 @@ export async function GET(request: NextRequest) {
   try {
     const db = createServiceRoleClient();
     const { data: match, error: matchError } = await db.from("matches")
-      .select("id, bracket_id, team_a, team_b, status, is_live, live_events_enabled")
+      .select("id, bracket_id, team_a, team_b, status, is_live, live_events_enabled, archived_at")
       .eq("id", matchId)
       .maybeSingle();
     if (matchError) throw matchError;
     if (!match) return inputError("المباراة غير موجودة.", 404);
+    if (match.archived_at) return inputError("المباراة مؤرشفة؛ استعدها قبل إدارة أحداثها.", 409);
 
     const typedMatch = match as MatchRow;
     const [teamsQuery, goalsQuery, cardsQuery] = await Promise.all([
@@ -85,6 +86,11 @@ export async function GET(request: NextRequest) {
     if (goalsQuery.error) throw goalsQuery.error;
     if (cardsQuery.error) throw cardsQuery.error;
 
+    const exclusionQuery = await db.from("match_card_event_exclusions")
+      .select("event_id")
+      .eq("match_id", matchId);
+    if (exclusionQuery.error) throw exclusionQuery.error;
+    const excludedCardIds = new Set((exclusionQuery.data || []).map((row) => row.event_id));
     const allowedTeams = (teamsQuery.data || []).filter((team) =>
       team.team_name && [typedMatch.team_a, typedMatch.team_b].includes(team.team_name),
     );
@@ -105,7 +111,7 @@ export async function GET(request: NextRequest) {
         createdAt: event.created_at,
         editable: true,
       })),
-      ...(cardsQuery.data || []).map((event) => ({
+      ...(cardsQuery.data || []).filter((event) => !excludedCardIds.has(event.id)).map((event) => ({
         id: event.id,
         kind: "card" as const,
         eventType: event.card_type,
@@ -129,6 +135,7 @@ export async function GET(request: NextRequest) {
         isLive: typedMatch.is_live,
         liveEventsEnabled: typedMatch.live_events_enabled,
       },
+      canFullyManage: authorization.permissions.has("matches.admin.full_control"),
       teams: allowedTeams.map((team) => ({
         id: team.id,
         name: team.team_name,
@@ -159,11 +166,12 @@ export async function POST(request: NextRequest) {
 
     const db = createServiceRoleClient();
     const { data: match, error: matchError } = await db.from("matches")
-      .select("id, bracket_id, team_a, team_b, status, is_live, live_events_enabled")
+      .select("id, bracket_id, team_a, team_b, status, is_live, live_events_enabled, archived_at")
       .eq("id", matchId)
       .maybeSingle();
     if (matchError) throw matchError;
     if (!match) return inputError("المباراة غير موجودة.", 404);
+    if (match.archived_at) return inputError("المباراة مؤرشفة؛ استعدها قبل إدارة أحداثها.", 409);
 
     if (values.action === "enable") {
       const { data, error } = await db.rpc("enable_match_live_events", {
@@ -261,7 +269,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const authorization = await authorizeAdminRequest(request, "matches.live.manage");
+  const fullAuthorization = await authorizeAdminRequest(request, "matches.admin.full_control");
+  const isFullControl = !(fullAuthorization instanceof NextResponse);
+  const authorization = isFullControl ? fullAuthorization : await authorizeAdminRequest(request, "matches.live.manage");
   if (authorization instanceof NextResponse) return authorization;
 
   try {
@@ -275,6 +285,9 @@ export async function PATCH(request: NextRequest) {
     const teamRosterId = text(values.teamRosterId);
     const playerId = text(values.playerId);
     const minute = Number(values.minute);
+    const reason = typeof values.reason === "string" && values.reason.trim()
+      ? values.reason.trim()
+      : "تعديل حدث من لوحة إدارة المباراة";
     if (!UUID_PATTERN.test(matchId) || !UUID_PATTERN.test(eventId) ||
       !["goal", "card"].includes(kind) || !Number.isInteger(minute) || minute < 1 || minute > 150) {
       return inputError("بيانات الحدث أو الدقيقة غير صالحة.");
@@ -287,11 +300,12 @@ export async function PATCH(request: NextRequest) {
 
     const db = createServiceRoleClient();
     const { data: match, error: matchError } = await db.from("matches")
-      .select("id, bracket_id, team_a, team_b")
+      .select("id, bracket_id, team_a, team_b, archived_at")
       .eq("id", matchId)
       .maybeSingle();
     if (matchError) throw matchError;
     if (!match) return inputError("المباراة غير موجودة.", 404);
+    if (match.archived_at) return inputError("المباراة مؤرشفة؛ استعدها قبل إدارة أحداثها.", 409);
     const team = await resolveSelection(db, match, teamRosterId, playerId);
     let oldMinute: number | null = null;
     let oldTeamRosterId = "";
@@ -309,6 +323,26 @@ export async function PATCH(request: NextRequest) {
       oldMinute = current.match_minute;
       oldTeamRosterId = current.team_roster_id;
       oldPlayerId = current.roster_player_id;
+      if (isFullControl) {
+        const { error } = await db.rpc("admin_manage_match_event", {
+          p_action: "update",
+          p_kind: "goal",
+          p_event_id: eventId,
+          p_match_id: matchId,
+          p_actor: authorization.userId,
+          p_team_roster_id: team.id,
+          p_roster_player_id: playerId,
+          p_event_type: "goal",
+          p_match_minute: minute,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) return inputError("هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط.", 403);
+          if (error.message.includes("MATCH_ARCHIVED")) return inputError("المباراة مؤرشفة؛ استعدها قبل إدارة أحداثها.", 409);
+          if (error.message.includes("EVENT_ALREADY_REVOKED")) return inputError("سبق إلغاء الحدث.", 409);
+          throw error;
+        }
+      } else {
       const { data: updated, error } = await db.rpc("update_match_goal_event", {
         p_event_id: eventId,
         p_team_roster_id: team.id,
@@ -321,6 +355,7 @@ export async function PATCH(request: NextRequest) {
         throw error;
       }
       if (!updated) return inputError("تغير الحدث بالتزامن؛ حدّث القائمة.", 409);
+      }
     } else {
       const { data: current, error: currentError } = await db.from("card_events")
         .select("id, source_card_id, team_roster_id, roster_player_id, match_minute")
@@ -333,6 +368,26 @@ export async function PATCH(request: NextRequest) {
       oldMinute = current.match_minute;
       oldTeamRosterId = current.team_roster_id;
       oldPlayerId = current.roster_player_id;
+      if (isFullControl) {
+        const { error } = await db.rpc("admin_manage_match_event", {
+          p_action: "update",
+          p_kind: "card",
+          p_event_id: eventId,
+          p_match_id: matchId,
+          p_actor: authorization.userId,
+          p_team_roster_id: team.id,
+          p_roster_player_id: playerId,
+          p_event_type: eventType,
+          p_match_minute: minute,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) return inputError("هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط.", 403);
+          if (error.message.includes("MATCH_ARCHIVED")) return inputError("المباراة مؤرشفة؛ استعدها قبل إدارة أحداثها.", 409);
+          if (error.message.includes("HISTORICAL_CARD_EVENT_IMMUTABLE")) return inputError("لا يمكن تعديل حدث بطاقة تاريخي.", 409);
+          throw error;
+        }
+      } else {
       const { data, error } = await db.from("card_events").update({
         team_roster_id: team.id,
         roster_player_id: playerId,
@@ -341,12 +396,13 @@ export async function PATCH(request: NextRequest) {
       }).eq("id", eventId).eq("match_id", matchId).is("source_card_id", null).select("id").maybeSingle();
       if (error) throw error;
       if (!data) return inputError("تغير الحدث بالتزامن؛ حدّث القائمة.", 409);
+      }
     }
 
     await auditAdminMutation({
       actorUserId: authorization.userId,
       action: "matches.live.event.update",
-      permission: "matches.live.manage",
+      permission: isFullControl ? "matches.admin.full_control" : "matches.live.manage",
       entityType: kind === "goal" ? "match_goal_event" : "card_event",
       entityId: eventId,
       metadata: {
@@ -369,7 +425,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const authorization = await authorizeAdminRequest(request, "matches.live.manage");
+  const fullAuthorization = await authorizeAdminRequest(request, "matches.admin.full_control");
+  const isFullControl = !(fullAuthorization instanceof NextResponse);
+  const authorization = isFullControl ? fullAuthorization : await authorizeAdminRequest(request, "matches.live.manage");
   if (authorization instanceof NextResponse) return authorization;
   const matchId = text(request.nextUrl.searchParams.get("match_id"));
   const eventId = text(request.nextUrl.searchParams.get("event_id"));
@@ -380,6 +438,10 @@ export async function DELETE(request: NextRequest) {
   try {
     const db = createServiceRoleClient();
     let auditMetadata: Record<string, unknown> = { match_id: matchId, event_type: kind };
+    const body = isFullControl ? await request.clone().json().catch(() => ({})) : {};
+    const reason = typeof body.reason === "string" && body.reason.trim()
+      ? body.reason.trim()
+      : "إلغاء حدث من لوحة إدارة المباراة";
     if (kind === "goal") {
       const { data: existing, error: existingError } = await db.from("match_goal_events")
         .select("id, team_roster_id, roster_player_id, match_minute")
@@ -388,12 +450,27 @@ export async function DELETE(request: NextRequest) {
         .maybeSingle();
       if (existingError) throw existingError;
       if (!existing) return inputError("الحدث لا يتبع المباراة المحددة.", 404);
-      const { data, error } = await db.rpc("revoke_match_goal_event", {
-        p_event_id: eventId,
-        p_actor: authorization.userId,
-      });
-      if (error) throw error;
-      if (data.match_id !== matchId) throw new Error("Goal event match changed while being revoked.");
+      if (isFullControl) {
+        const { error } = await db.rpc("admin_manage_match_event", {
+          p_action: "revoke",
+          p_kind: "goal",
+          p_event_id: eventId,
+          p_match_id: matchId,
+          p_actor: authorization.userId,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) return inputError("هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط.", 403);
+          throw error;
+        }
+      } else {
+        const { data, error } = await db.rpc("revoke_match_goal_event", {
+          p_event_id: eventId,
+          p_actor: authorization.userId,
+        });
+        if (error) throw error;
+        if (data.match_id !== matchId) throw new Error("Goal event match changed while being revoked.");
+      }
       auditMetadata = {
         ...auditMetadata,
         team_roster_id: existing.team_roster_id,
@@ -408,12 +485,27 @@ export async function DELETE(request: NextRequest) {
         .maybeSingle();
       if (existingError) throw existingError;
       if (!existing) return inputError("الحدث غير موجود.", 404);
-      if (existing.source_card_id) return inputError("لا يمكن إلغاء حدث بطاقة تاريخي.", 409);
-      const { data, error } = await db.from("card_events").delete()
-        .eq("id", eventId).eq("match_id", matchId).is("source_card_id", null)
-        .select("id").maybeSingle();
-      if (error) throw error;
-      if (!data) return inputError("تغير الحدث بالتزامن؛ حدّث القائمة.", 409);
+      if (isFullControl) {
+        const { error } = await db.rpc("admin_manage_match_event", {
+          p_action: "revoke",
+          p_kind: "card",
+          p_event_id: eventId,
+          p_match_id: matchId,
+          p_actor: authorization.userId,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.message.includes("MATCH_ADMIN_FORBIDDEN")) return inputError("هذه العملية متاحة للمسؤول الرئيسي المخوّل فقط.", 403);
+          throw error;
+        }
+      } else {
+        if (existing.source_card_id) return inputError("لا يمكن إلغاء حدث بطاقة تاريخي.", 409);
+        const { data, error } = await db.from("card_events").delete()
+          .eq("id", eventId).eq("match_id", matchId).is("source_card_id", null)
+          .select("id").maybeSingle();
+        if (error) throw error;
+        if (!data) return inputError("تغير الحدث بالتزامن؛ حدّث القائمة.", 409);
+      }
       auditMetadata = {
         ...auditMetadata,
         event_type: existing.card_type,
@@ -426,7 +518,7 @@ export async function DELETE(request: NextRequest) {
     await auditAdminMutation({
       actorUserId: authorization.userId,
       action: "matches.live.event.revoke",
-      permission: "matches.live.manage",
+      permission: isFullControl ? "matches.admin.full_control" : "matches.live.manage",
       entityType: kind === "goal" ? "match_goal_event" : "card_event",
       entityId: eventId,
       metadata: auditMetadata,

@@ -61,6 +61,14 @@ test("live score correction is granted to super admin only by default", () => {
   assert.equal(hasAdminPermission("viewer", "matches.live.correct_score"), false);
 });
 
+test("full match control is granted to super admin only by default", () => {
+  assert.equal(hasAdminPermission("super_admin", "matches.admin.full_control"), true);
+  for (const role of ["supervisor", "match_manager", "viewer"]) {
+    assert.equal(hasAdminPermission(role, "matches.admin.full_control"), false);
+    assert.equal(hasAdminPermission(role, "matches.delete"), false);
+  }
+});
+
 test("per-admin overrides support grants and deny wins", () => {
   assert.equal(hasAdminPermission("viewer", "matches.edit"), false);
   assert.equal(hasAdminPermission("viewer", "matches.edit", [

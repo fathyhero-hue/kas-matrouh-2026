@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         for (let from = 0; ; from += PAGE_SIZE) {
           const { data, error } = await db.from("matches")
             .select("id, bracket_id, team_a, team_a_logo, team_b, team_b_logo, match_date, match_time, status, is_live, home_goals, away_goals, live_events_enabled, live_event_base_home_goals, live_event_base_away_goals, live_minute, live_minute_base, timer_started_at, timer_paused_total, is_timer_running, updated_at")
+            .is("archived_at", null)
             .order("match_date", { ascending: true })
             .order("match_time", { ascending: true })
             .order("id", { ascending: true })
@@ -158,11 +159,12 @@ export async function POST(request: NextRequest) {
 
     const db = createServiceRoleClient();
     const { data: match, error: matchError } = await db.from("matches")
-      .select("id, status, is_live, live_minute, live_minute_base, timer_started_at, timer_paused_total, is_timer_running, updated_at")
+      .select("id, status, is_live, live_minute, live_minute_base, timer_started_at, timer_paused_total, is_timer_running, updated_at, archived_at")
       .eq("id", matchId)
       .maybeSingle();
     if (matchError) throw matchError;
     if (!match) return NextResponse.json({ error: "المباراة غير موجودة." }, { status: 404 });
+    if (match.archived_at) return NextResponse.json({ error: "المباراة مؤرشفة؛ استعدها قبل إدارة البث." }, { status: 409 });
 
     const previous = match as LiveMatchSnapshot & { id: string; updated_at: string | null };
     const patch = createLiveMatchTransition(previous, action as LiveMatchAction, new Date());

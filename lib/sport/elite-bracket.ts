@@ -90,7 +90,7 @@ export function isEliteGroupStageComplete(matches: MatchRow[], teamNames: string
 
 export async function getEliteStandings(supabase: SupabaseClient, bracketId: string) {
   const [{ data: matches }, logos, teams] = await Promise.all([
-    supabase.from("matches").select("*").eq("bracket_id", bracketId),
+    supabase.from("matches").select("*").eq("bracket_id", bracketId).is("archived_at", null),
     getBracketTeamLogos(supabase, bracketId),
     getEliteCupTeams(supabase, bracketId),
   ]);

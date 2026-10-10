@@ -19,15 +19,21 @@ export default async function ScorersPage({ params, searchParams }: TournamentPa
 
   const bracketId = await getBracketIdBySuffix(edition.suffix);
   const supabase = createPublicClient();
-  const [{ data: goals }, rosterTeams] = await Promise.all([
+  const [{ data: goals }, rosterTeams, activeMatches] = await Promise.all([
     supabase.from("goals").select("*").eq("bracket_id", bracketId).order("goals", { ascending: false }),
     getBracketRosterTeams(supabase, bracketId),
+    supabase.from("matches").select("id").eq("bracket_id", bracketId).is("archived_at", null),
   ]);
-  const { data: matchGoalEvents, error: matchGoalEventsError } = await createServiceRoleClient()
-    .from("match_goal_events")
-    .select("roster_player_id, team_roster_id")
-    .eq("bracket_id", bracketId)
-    .is("revoked_at", null);
+  const activeMatchIds = (activeMatches.data || []).map((match) => match.id);
+  const { data: matchGoalEvents, error: matchGoalEventsError } = activeMatchIds.length
+    ? await createServiceRoleClient()
+        .from("match_goal_events")
+        .select("roster_player_id, team_roster_id")
+        .eq("bracket_id", bracketId)
+        .in("match_id", activeMatchIds)
+        .is("revoked_at", null)
+    : { data: [], error: null };
+  if (activeMatches.error) throw activeMatches.error;
   if (matchGoalEventsError) throw matchGoalEventsError;
 
   const rosterPlayerById = new Map(rosterTeams.flatMap((team) =>

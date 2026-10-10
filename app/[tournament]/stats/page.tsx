@@ -74,7 +74,7 @@ export default async function TournamentStatsPage({ params, searchParams }: Tour
   const supabase = createPublicClient();
 
   const [{ data: matches }, { data: goals }, { data: cards }, { data: motm }, logos, rosterTeams] = await Promise.all([
-    supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status").eq("bracket_id", bracketId),
+    supabase.from("matches").select("team_a, team_b, home_goals, away_goals, status").eq("bracket_id", bracketId).is("archived_at", null),
     supabase.from("goals").select("player, team, goals, image_url").eq("bracket_id", bracketId).order("goals", { ascending: false }),
     supabase.from("cards").select("yellow, red").eq("bracket_id", bracketId),
     supabase.from("motm").select("player, team, image_url").eq("bracket_id", bracketId),

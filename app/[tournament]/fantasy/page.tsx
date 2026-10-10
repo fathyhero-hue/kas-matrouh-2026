@@ -20,6 +20,7 @@ export default async function FantasyPage({ params, searchParams }: TournamentPa
     .from("matches")
     .select("id, team_a, team_b, match_date, match_time, status, is_live")
     .eq("bracket_id", bracketId)
+    .is("archived_at", null)
     .neq("status", "انتهت")
     .order("match_date", { ascending: true })
     .limit(10);
