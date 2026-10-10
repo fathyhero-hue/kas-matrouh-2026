@@ -4,6 +4,7 @@ import { isTournamentSlug, resolveEdition, type TournamentPageProps } from "@/li
 import { getBracketIdBySuffix } from "@/lib/sport/data";
 import { EmptyState } from "@/components/sport/empty-state";
 import { PredictionBoard } from "@/components/sport/prediction-form";
+import { PredictionLeaderboard } from "@/components/sport/prediction-leaderboard";
 
 export const revalidate = 30;
 
@@ -24,7 +25,12 @@ export default async function FantasyPage({ params, searchParams }: TournamentPa
     .limit(10);
 
   const rows = matches || [];
-  if (rows.length === 0) return <EmptyState message="لسه مفيش مباريات قادمة تقدر تتوقعها" />;
-
-  return <PredictionBoard matches={rows} bracketId={bracketId} />;
+  return (
+    <div className="space-y-8">
+      {rows.length > 0
+        ? <PredictionBoard matches={rows} bracketId={bracketId} />
+        : <EmptyState message="لسه مفيش مباريات قادمة تقدر تتوقعها" />}
+      <PredictionLeaderboard bracketId={bracketId} />
+    </div>
+  );
 }

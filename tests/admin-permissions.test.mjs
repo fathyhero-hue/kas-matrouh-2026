@@ -38,6 +38,7 @@ test("supervisor is operational but cannot administer the system", () => {
 
 test("specialized roles stay within their domains by default", () => {
   assert.equal(hasAdminPermission("match_manager", "matches.results.manage"), true);
+  assert.equal(hasAdminPermission("viewer", "matches.results.manage"), false);
   assert.equal(hasAdminPermission("match_manager", "rosters.edit"), false);
   assert.equal(hasAdminPermission("registration_manager", "rosters.players.manage"), true);
   assert.equal(hasAdminPermission("registration_manager", "matches.edit"), false);

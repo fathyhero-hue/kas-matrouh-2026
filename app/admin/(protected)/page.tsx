@@ -1,7 +1,7 @@
 import { requireAdminPagePermission } from "@/lib/admin/authorization";
 import type { AdminPermission } from "@/lib/admin/permissions";
 import Link from "next/link";
-import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper, IdCard } from "lucide-react";
+import { Trophy, ClipboardList, ArrowLeft, ShoppingBag, Star, Newspaper, IdCard, Target } from "lucide-react";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +62,13 @@ export default async function AdminDashboard() {
       icon: Star,
       title: "الهدافين والكروت ونجم المباراة",
       subtitle: "إحصائيات اللاعبين لكل بطولة",
+    },
+    {
+      href: "/admin/predictions",
+      permission: "matches.results.manage" as AdminPermission,
+      icon: Target,
+      title: "إدارة التوقعات",
+      subtitle: "مراجعة توقعات المشاركين واحتساب النقاط",
     },
     {
       href: "/admin/media",
